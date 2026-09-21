@@ -418,9 +418,7 @@ class _KasirScreenState extends ConsumerState<KasirScreen> {
                               const SizedBox(height: 2),
                               Text(
                                 'Stok: ${product.stock} pcs',
-                                style: const TextStyle(
-                                  fontSize: 11,
-                                  color: product.stock == 0
+                                style: TextStyle(fontSize: 11, color: product.stock == 0
                                       ? AppColors.dangerMid
                                       : AppColors.textTertiary,
                                 ),

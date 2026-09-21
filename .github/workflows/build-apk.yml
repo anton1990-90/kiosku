@@ -23,11 +23,15 @@ jobs:
         uses: subosito/flutter-action@v2
         with:
           channel: 'stable'
-          flutter-version: '3.24.5'
-          cache: true
+          # Menggunakan versi stabil terbaru yang spesifik
+          flutter-version: '3.27.0'
+          cache: false # Ubah jadi false
 
       - name: Generate folder android
         run: flutter create . --project-name tokoku --platforms android
+
+      - name: Beri izin eksekusi Gradle
+        run: chmod +x android/gradlew
 
       - name: Tambah izin Android
         run: |

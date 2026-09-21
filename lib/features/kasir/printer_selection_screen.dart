@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import '../../core/constants/app_colors.dart';
-import 'bluetooth_printer_service.dart';
+import '../../shared/services/bluetooth_printer_service.dart';
 
 /// Printer selection screen — scan and pick a Bluetooth thermal printer.
 /// Returns the selected [BluetoothDevice] via Navigator.pop.

@@ -1,0 +1,47 @@
+name: tokoku
+description: Aplikasi UMKM toko sembako & penjualan - offline-first dengan autentikasi email.
+version: 1.0.0+1
+publish_to: 'none'
+
+environment:
+  sdk: '>=3.19.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # State management
+  flutter_riverpod: ^2.5.0
+
+  # Navigation
+  go_router: ^14.0.0
+
+  # Local database (offline-first)
+  sqflite: ^2.3.0
+  path: ^1.9.0
+
+  # Local storage for session
+  shared_preferences: ^2.2.0
+
+  # Crypto for password hashing
+  crypto: ^3.0.3
+
+  # Thermal receipt printing (ESC/POS)
+  esc_pos_utils: ^1.1.0
+
+  # Bluetooth for thermal printer connection
+  flutter_blue_plus: ^1.32.0
+
+  # Barcode scanning (camera + ML Kit)
+  mobile_scanner: ^5.2.3
+
+  # Icons
+  cupertino_icons: ^1.0.6
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^4.0.0
+
+flutter:
+  uses-material-design: true

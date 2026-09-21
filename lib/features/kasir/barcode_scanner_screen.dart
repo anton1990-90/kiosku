@@ -87,7 +87,7 @@ class _BarcodeScannerScreenState extends State<BarcodeScannerScreen> {
           MobileScanner(
             controller: _controller,
             onDetect: _onDetect,
-            errorBuilder: (context, error) => _buildError(),
+            errorBuilder: (context, error, child) => _buildError(),
           ),
           // Scan frame overlay
           Container(

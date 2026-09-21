@@ -346,7 +346,7 @@ class _KasirScreenState extends ConsumerState<KasirScreen> {
           // Product grid
           Expanded(
             child: GridView.builder(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, cart.isEmpty ? 100 : 280),
+              padding: EdgeInsets.fromLTRB(16, 8, 16, cart.isEmpty ? 100 : 280),
               gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                 crossAxisCount: 2,
                 mainAxisSpacing: 12,

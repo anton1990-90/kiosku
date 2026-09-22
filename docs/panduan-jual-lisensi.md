@@ -15,6 +15,7 @@ dari Anda.
 | Bagian | Status |
 |---|---|
 | Kode lisensi + aktivasi + cek pembaruan | Selesai, sudah di-commit & build sukses |
+| Fitur hutang, catatan, laporan harian/mingguan/bulanan, scan barcode, profil toko | Selesai — versi **1.1.1** |
 | APK bisa diunduh | Selesai — [tautan rilis terbaru](https://github.com/anton1990-90/kiosku/releases/latest/download/app-release.apk) |
 | **Kunci tanda tangan (BAGIAN A)** | **Belum** — 4 GitHub Secrets masih kosong, jadi APK saat ini masih ditandatangani debug key |
 | **Server aktivasi (BAGIAN B)** | **Belum** — `supabaseUrl` dan `supabaseAnonKey` masih berisi `ISI_...` |
@@ -23,6 +24,22 @@ dari Anda.
 > tidak bisa di-update dan Android ID-nya akan berubah saat kuncinya diganti —
 > artinya lisensi pelanggan akan mati. Kerjakan BAGIAN A dulu, jalankan build
 > ulang, baru mulai jualan.
+
+### Selama BAGIAN B belum dikerjakan, aplikasi terbuka tanpa aktivasi
+
+Supaya Anda tetap bisa mencoba semua fitur sebelum server aktivasi siap,
+gerbang lisensi sengaja dimatikan selama `supabaseUrl` / `supabaseAnonKey`
+masih berisi `ISI_...`. Saat itu beranda menampilkan spanduk merah:
+
+> Mode uji: lisensi belum aktif karena server aktivasi belum diisi di
+> app_config.dart. Jangan jual APK ini.
+
+Begitu kedua kunci Supabase diisi dan build dijalankan ulang, gerbang lisensi
+**aktif kembali otomatis** dan setiap pelanggan wajib aktivasi. Jadi APK yang
+benar-benar dijual selalu terkunci — tidak perlu mengubah kode lagi.
+
+**Artinya:** selama spanduk merah itu masih muncul, APK tersebut adalah versi
+uji, bukan versi jual.
 
 ---
 

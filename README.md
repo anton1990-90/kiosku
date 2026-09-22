@@ -1,4 +1,4 @@
-# TokoKu — Aplikasi UMKM Toko Sembako & Penjualan (v1.0.1)
+# TokoKu — Aplikasi UMKM Toko Sembako & Penjualan (v1.1.1)
 
 Aplikasi mobile cross-platform (Android & iOS) untuk toko sembako UMKM. Dibuat dengan Flutter, bekerja **offline-first** dengan autentikasi email.
 
@@ -7,12 +7,15 @@ Aplikasi mobile cross-platform (Android & iOS) untuk toko sembako UMKM. Dibuat d
 - **Offline-first**: Semua data tersimpan di perangkat (SQLite). Tidak butuh internet untuk jualan.
 - **Autentikasi email**: Login dengan email & password. Akses penjualan dikendalikan sesuai email terdaftar.
 - **Kasir (POS)**: Transaksi cepat dengan keranjang otomatis, pilihan metode pembayaran (tunai, QRIS, e-wallet), dan kalkulasi kembalian.
-- **Scan barcode**: Scan barcode produk (EAN-13/UPC) langsung dari kamera untuk menambahkan barang ke keranjang.
+- **Scan barcode**: Scan barcode produk (EAN-13/UPC) langsung dari kamera — untuk menambah barang ke keranjang maupun mengisi barcode saat menambah produk baru.
 - **Cetak struk thermal**: Cetak struk ke printer thermal Bluetooth 58mm/80mm setelah transaksi.
-- **Manajemen produk**: Tambah, edit, hapus produk dengan kategori, harga modal & jual, barcode, dan stok.
+- **Manajemen produk**: Tambah, edit, hapus produk dengan kategori, harga modal & jual, barcode, dan stok. Supplier dipilih dari daftar yang bisa diedit.
 - **Manajemen stok**: Visual progress bar, peringatan stok menipis & habis, restok mudah.
-- **Laporan penjualan**: Grafik mingguan, ringkasan laba, total transaksi, transaksi terbaru.
-- **Profile**: Info toko, pengaturan notifikasi, logout.
+- **Laporan berkala**: Laporan **harian, mingguan, dan bulanan** dengan grafik, ringkasan laba, produk terlaris, dan **detail produk per item** lengkap dengan tanggal, waktu, harga, dan laba per transaksi.
+- **Hutang & piutang**: Catat piutang pelanggan dan hutang ke supplier, cicilan pembayaran, riwayat bayar, serta peringatan jatuh tempo.
+- **Catatan**: Catatan bebas berwarna untuk pemilik toko, bisa disematkan (pin).
+- **Profile**: Logo usaha bisa diganti dari galeri, info toko, metode pembayaran yang bisa diaktifkan/dinonaktifkan, dan daftar supplier yang bisa diedit.
+- **Lisensi & pembaruan**: Aktivasi satu perangkat, plus notifikasi otomatis saat ada versi baru.
 
 ## Prasyarat
 
@@ -117,12 +120,19 @@ lib/
 
 ## Skema Database (SQLite)
 
+Versi skema: **2**. Migrasi dari versi 1 berjalan otomatis dan tidak menghapus data yang sudah ada.
+
 | Table | Purpose |
 |-------|---------|
-| `users` | Akun dengan email, password hash, nama toko |
+| `users` | Akun dengan email, password hash, nama toko, telepon toko, path logo |
 | `products` | Produk dengan nama, kategori, harga modal/jual, stok |
 | `sales` | Transaksi dengan invoice number, total, laba, metode bayar |
 | `sale_items` | Line items per transaksi (product, qty, subtotal) |
+| `suppliers` | Data pemasok yang bisa diedit |
+| `payment_methods` | Metode pembayaran yang bisa diaktifkan/dinonaktifkan |
+| `debts` | Piutang pelanggan & hutang ke supplier |
+| `debt_payments` | Riwayat pembayaran cicilan hutang |
+| `notes` | Catatan bebas pemilik toko |
 
 ## Palet Warna
 

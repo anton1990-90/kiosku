@@ -272,5 +272,23 @@ tidak bisa lagi dipakai untuk aktivasi baru di HP lain.
 - [ ] Supabase sudah dibuat dan `schema.sql` sudah dijalankan (Bagian B)
 - [ ] `app_config.dart` sudah diisi URL + anon key
 - [ ] Sudah push, dan build GitHub Actions **hijau**
+
+**Dua pemeriksaan di bawah ini yang paling sering terlewat.** Kalau salah satu
+gagal, APK-nya tetap "hijau" di GitHub tapi tidak layak dijual:
+
+- [ ] **APK benar-benar bertanda tangan kunci rilis, bukan debug key.**
+  Cara paling cepat: buka halaman build di GitHub → kalau masih muncul peringatan
+  `KEYSTORE_BASE64 belum diisi`, berarti masih debug key. Setelah terpasang,
+  pastikan sidik jari sertifikatnya sama dengan yang tercatat di
+  `release-signing/PENTING-BACA-INI.md`:
+  ```bash
+  keytool -printcert -jarfile app-release.apk
+  ```
+- [ ] **Spanduk merah "Mode uji" sudah tidak muncul lagi di beranda.**
+  Spanduk itu hanya tampil selama `app_config.dart` masih berisi `ISI_...`.
+  Kalau masih muncul, gerbang lisensi belum aktif — artinya pembeli bisa memakai
+  aplikasi tanpa aktivasi. **Jangan dijual selama spanduk itu masih ada.**
+
 - [ ] Sudah tes sendiri: instal APK, aktivasi dengan 1 kode percobaan
 - [ ] Sudah tes: coba kode yang sama di HP kedua → harus **ditolak**
+- [ ] Kode percobaan sudah dinonaktifkan (`status = 'revoked'`) atau dihapus

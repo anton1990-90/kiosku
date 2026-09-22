@@ -159,6 +159,37 @@ Klik **Save**. Selesai — 10 detik.
 Jangan berurutan (`TK-0001`, `TK-0002`), supaya tidak bisa ditebak orang lain.
 Ganti juga `TK` dengan kode singkatan Anda sendiri kalau mau.
 
+#### Cara cepat: pakai alat pembuat kode
+
+Kalau tidak mau mengetik kode manual (rawan salah ketik dan rawan kembar),
+jalankan alat bantu di folder repo:
+
+```bash
+python tools/buat-kode-lisensi.py --nama "Bu Siti" --toko "Toko Siti Jaya"
+```
+
+Hasilnya: satu kode acak siap pakai, plus perintah SQL `insert` yang tinggal
+Anda tempel ke Supabase SQL Editor. Beberapa pembeli sekaligus:
+
+```bash
+python tools/buat-kode-lisensi.py --jumlah 5
+```
+
+Kalau hanya butuh kodenya saja untuk dikirim lewat WhatsApp:
+
+```bash
+python tools/buat-kode-lisensi.py --jumlah 3 --ringkas
+```
+
+Alat ini otomatis menghindari huruf `I`, `O` dan angka `0`, `1` supaya
+pelanggan tidak salah ketik. Setiap kode yang dibuat juga dicatat di
+`ledger-lisensi.csv` sebagai arsip siapa memakai kode apa.
+
+> **Jangan pernah meng-commit `ledger-lisensi.csv`.** Berkas itu berisi daftar
+> pembeli **dan kode aktivasi yang masih berlaku** — kalau bocor, orang lain
+> bisa memakainya untuk mengaktifkan aplikasi. Berkas ini sudah masuk
+> `.gitignore`, jadi jangan dihapus dari sana.
+
 ### 4. Kirim Kode Aktivasi ke pelanggan
 
 Pelanggan memasukkan kode itu di layar Aktivasi. Aplikasi akan menampilkan

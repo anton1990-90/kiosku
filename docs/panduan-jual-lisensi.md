@@ -6,6 +6,26 @@ setelah itu aplikasi jalan penuh secara offline.
 
 ---
 
+## Status saat ini (per 22 September 2026)
+
+Kode sudah selesai dan build sudah **hijau** di GitHub Actions. Yang masih
+kurang hanya dua hal di bawah ini — keduanya belum bisa dikerjakan tanpa data
+dari Anda.
+
+| Bagian | Status |
+|---|---|
+| Kode lisensi + aktivasi + cek pembaruan | Selesai, sudah di-commit & build sukses |
+| APK bisa diunduh | Selesai — [tautan rilis terbaru](https://github.com/anton1990-90/kiosku/releases/latest/download/app-release.apk) |
+| **Kunci tanda tangan (BAGIAN A)** | **Belum** — 4 GitHub Secrets masih kosong, jadi APK saat ini masih ditandatangani debug key |
+| **Server aktivasi (BAGIAN B)** | **Belum** — `supabaseUrl` dan `supabaseAnonKey` masih berisi `ISI_...` |
+
+> **Jangan jual APK yang sekarang.** APK itu ditandatangani debug key, sehingga
+> tidak bisa di-update dan Android ID-nya akan berubah saat kuncinya diganti —
+> artinya lisensi pelanggan akan mati. Kerjakan BAGIAN A dulu, jalankan build
+> ulang, baru mulai jualan.
+
+---
+
 ## Ringkasan alur
 
 ```
@@ -29,8 +49,11 @@ aplikasi pembeli tidak akan pernah bisa di-update, dan semua lisensi akan mati
 kalau kuncinya berubah nanti.
 
 1. Buka folder `C:\Users\Hariyanto\Documents\tokoku_app_source\release-signing\`
-2. Baca file `PENTING-BACA-INI.md` di situ — ada langkah lengkapnya
-3. Intinya: buka
+2. **Klik dua kali `SALIN-SECRET-GITHUB.bat`** — file itu menyalin keempat nilai
+   ke clipboard satu per satu, jadi Anda tinggal Ctrl+V di GitHub. Tidak perlu
+   menyalin 3.640 karakter base64 dengan tangan.
+3. Kalau ingin tahu detailnya, baca `PENTING-BACA-INI.md` di folder yang sama.
+4. Halaman GitHub-nya:
    `https://github.com/anton1990-90/kiosku/settings/secrets/actions`
    lalu tambahkan 4 secrets:
 
@@ -41,7 +64,10 @@ kalau kuncinya berubah nanti.
    | `KEY_ALIAS` | `tokoku` |
    | `KEY_PASSWORD` | seluruh isi file `storepass.txt` |
 
-4. **Cadangkan folder `release-signing`** ke Google Drive atau flashdisk.
+5. Jalankan build ulang: tab **Actions** → **Build APK** → **Run workflow**
+   (branch `main`). Setelah selesai, APK di halaman Release sudah
+   ditandatangani kunci rilis dan siap dijual.
+6. **Cadangkan folder `release-signing`** ke Google Drive atau flashdisk.
    Kalau folder ini hilang, Anda tidak akan pernah bisa merilis update lagi.
 
 ---

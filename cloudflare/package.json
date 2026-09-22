@@ -1,0 +1,17 @@
+{
+  "name": "tokoku-lisensi",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Server aktivasi lisensi TokoKu — Cloudflare Worker + D1",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "db:init": "wrangler d1 execute tokoku-lisensi --remote --file=schema.sql",
+    "db:init:local": "wrangler d1 execute tokoku-lisensi --local --file=schema.sql",
+    "tail": "wrangler tail"
+  },
+  "devDependencies": {
+    "wrangler": "^4.0.0"
+  }
+}

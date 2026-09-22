@@ -1,23 +1,34 @@
 /// Konfigurasi aplikasi TokoKu.
 ///
-/// File ini berisi alamat server aktivasi lisensi dan pengaturan pembaruan.
-/// Isi dua nilai Supabase di bawah sebelum aplikasi dijual.
+/// Isi [activationServerUrl] dengan alamat Cloudflare Worker Anda sebelum
+/// aplikasi dijual. Cara memasangnya ada di `cloudflare/README.md`.
+///
+/// Catatan penting: karena nilai di bawah memakai `static const`, mengisi
+/// alamat server saja sudah cukup untuk menyalakan gerbang lisensi — tidak
+/// perlu mengubah kode lain.
 class AppConfig {
   AppConfig._();
 
-  /// URL project Supabase Anda, contoh: https://abcdefghijkl.supabase.co
-  /// Ambil di Supabase > Project Settings > API > Project URL.
-  static const String supabaseUrl = 'ISI_URL_SUPABASE_ANDA';
+  /// Alamat server aktivasi (Cloudflare Worker).
+  ///
+  /// Contoh: https://tokoku-lisensi.nama-anda.workers.dev
+  /// Jangan diakhiri garis miring.
+  static const String activationServerUrl = 'ISI_URL_SERVER_AKTIVASI';
 
-  /// Anon public key Supabase.
-  /// Ambil di Supabase > Project Settings > API > Project API keys > anon public.
-  /// Kunci ini memang aman ditanam di aplikasi (bukan kunci rahasia).
-  static const String supabaseAnonKey = 'ISI_ANON_KEY_SUPABASE';
+  /// Halaman portal aktivasi untuk pelanggan.
+  ///
+  /// Worker yang sama juga menyajikan halaman portalnya, jadi alamatnya
+  /// biasanya sama dengan [activationServerUrl]. Isi [_portalUrlKhusus]
+  /// hanya kalau portalnya ditaruh di alamat lain.
+  static const String _portalUrlKhusus = '';
+
+  static String get portalUrl =>
+      _portalUrlKhusus.isEmpty ? activationServerUrl : _portalUrlKhusus;
 
   /// Repo publik GitHub untuk cek pembaruan aplikasi.
   static const String githubRepo = 'anton1990-90/kiosku';
 
-  /// Nomor WhatsApp penjual untuk kirim Kode Perangkat.
+  /// Nomor WhatsApp penjual untuk bantuan aktivasi.
   /// Format internasional tanpa tanda plus, contoh: 6281234567890.
   /// Kosongkan ('') kalau tidak ingin tombol WhatsApp muncul.
   static const String sellerWhatsApp = '';
@@ -29,7 +40,8 @@ class AppConfig {
 
   /// Apakah server aktivasi sudah diisi.
   static bool get isActivationConfigured =>
-      !supabaseUrl.startsWith('ISI_') && !supabaseAnonKey.startsWith('ISI_');
+      !activationServerUrl.startsWith('ISI_') &&
+      activationServerUrl.startsWith('http');
 
   /// Link unduhan APK terbaru (selalu menunjuk rilis terakhir).
   static String get latestApkUrl =>

@@ -1,4 +1,4 @@
-# TokoKu — Aplikasi UMKM Toko Sembako & Penjualan (v1.1.1)
+# TokoKu — Aplikasi UMKM Toko Sembako & Penjualan (v1.2.0)
 
 Aplikasi mobile cross-platform (Android & iOS) untuk toko sembako UMKM. Dibuat dengan Flutter, bekerja **offline-first** dengan autentikasi email.
 
@@ -107,8 +107,18 @@ lib/
     ├── kasir/                       # Kasir (POS) + scan barcode + pilih printer
     ├── produk/                      # Produk management + form
     ├── stok/                        # Stok (Inventory)
-    ├── laporan/                     # Laporan (Reports)
-    └── profile/                    # Profile & settings
+    ├── laporan/                     # Laporan harian/mingguan/bulanan
+    ├── hutang/                      # Piutang & hutang
+    ├── catatan/                     # Catatan bebas
+    ├── license/                     # Layar aktivasi lisensi
+    └── profile/                     # Profile & settings
+
+cloudflare/                          # Server aktivasi lisensi (Worker + D1)
+├── src/index.js                     # API aktivasi + perutean
+├── src/halaman-portal.js            # Portal aktivasi untuk pelanggan
+├── src/halaman-admin.js             # Halaman admin untuk penjual
+├── schema.sql                       # Tabel vouchers & licenses
+└── README.md                        # Panduan pemasangan
 ```
 
 ## Alur Autentikasi Offline
@@ -156,6 +166,41 @@ Versi skema: **2**. Migrasi dari versi 1 berjalan otomatis dan tidak menghapus d
 - **esc_pos_utils** — ESC/POS thermal receipt generation
 - **flutter_blue_plus** — Bluetooth connection to thermal printer
 - **mobile_scanner** — barcode scanning (camera + ML Kit)
+
+## Lisensi & Aktivasi
+
+Sistem jual lepas: **bayar sekali, 1 voucher = 1 HP**. Aktivasi butuh internet
+sekali saja; setelah itu aplikasi berjalan penuh secara offline.
+
+```
+Pelanggan instal APK
+  → aplikasi menampilkan Kode Perangkat (TK-XXXX-XXXX-XXXX)
+  → pelanggan membeli Kode Voucher (VC-XXXX-XXXX-XXXX) dari penjual
+  → pelanggan menukarnya di portal aktivasi (atau langsung di aplikasi)
+  → menerima Kode Aktivasi (AK-XXXX-XXXX-XXXX) → aplikasi aktif
+```
+
+Server aktivasi berjalan di **Cloudflare Workers + D1** — paket gratisnya
+100.000 permintaan/hari dan **tidak pernah dibekukan** karena lama tidak dipakai.
+
+| Alamat | Untuk |
+|---|---|
+| `<alamat-worker>/` | Portal aktivasi pelanggan |
+| `<alamat-worker>/admin` | Halaman admin penjual (butuh `ADMIN_KEY`) |
+
+Alat bantu penjual:
+
+```bash
+python tools/buat-voucher.py --jumlah 10 --kelompok "Grosir-2026-09"
+python tools/buat-voucher.py --ringkasan
+```
+
+Panduan lengkap: **[`cloudflare/README.md`](cloudflare/README.md)** (pemasangan)
+dan **[`docs/panduan-jual-lisensi.md`](docs/panduan-jual-lisensi.md)** (cara jualan).
+
+> Selama `activationServerUrl` di `lib/core/config/app_config.dart` masih berisi
+> `ISI_...`, gerbang lisensi sengaja dimatikan supaya aplikasi bisa dicoba dan
+> beranda menampilkan spanduk merah "Mode uji". **APK seperti itu belum layak dijual.**
 
 ## License
 

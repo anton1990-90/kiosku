@@ -22,10 +22,17 @@ key.properties
 keystore-base64.txt
 storepass.txt
 
-# Arsip kode lisensi hasil tools/buat-kode-lisensi.py.
-# Berisi daftar pembeli DAN kode aktivasi yang masih berlaku — kalau bocor,
+# Arsip voucher hasil tools/buat-voucher.py.
+# Berisi daftar pembeli DAN kode voucher yang masih berlaku — kalau bocor,
 # orang lain bisa memakainya untuk mengaktifkan aplikasi. Jangan di-commit.
+ledger-voucher.csv
 ledger-lisensi.csv
+
+# Server aktivasi Cloudflare
+cloudflare/node_modules/
+cloudflare/.wrangler/
+# Berisi ADMIN_KEY untuk pengujian lokal.
+cloudflare/.dev.vars
 
 # Alat bantu lokal (PyYAML untuk validasi workflow)
 .pylibs/

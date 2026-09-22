@@ -1,8 +1,11 @@
 # Panduan Jual Lepas TokoKu — 1 Lisensi = 1 HP
 
-Sistem: **bayar sekali, pakai selamanya.** Setiap pembelian mendapat satu Kode
-Aktivasi yang hanya bisa dipakai di **satu HP**. Aktivasi butuh internet sekali;
-setelah itu aplikasi jalan penuh secara offline.
+Sistem: **bayar sekali, pakai selamanya.** Setiap pembelian mendapat satu
+**Kode Voucher** yang hanya bisa dipakai di **satu HP**. Aktivasi butuh internet
+sekali; setelah itu aplikasi jalan penuh secara offline.
+
+**Pelanggan mengaktifkan sendiri.** Anda tidak perlu membuat atau mengirim kode
+aktivasi satu per satu — cukup jual kodenya, sisanya dikerjakan server.
 
 ---
 
@@ -15,10 +18,11 @@ dari Anda.
 | Bagian | Status |
 |---|---|
 | Kode lisensi + aktivasi + cek pembaruan | Selesai, sudah di-commit & build sukses |
-| Fitur hutang, catatan, laporan harian/mingguan/bulanan, scan barcode, profil toko | Selesai — versi **1.1.1** |
+| Fitur hutang, catatan, laporan harian/mingguan/bulanan, scan barcode, profil toko | Selesai — versi **1.2.0** |
+| Portal aktivasi pelanggan + halaman admin penjual | Selesai — ada di folder `cloudflare/` |
 | APK bisa diunduh | Selesai — [tautan rilis terbaru](https://github.com/anton1990-90/kiosku/releases/latest/download/app-release.apk) |
 | **Kunci tanda tangan (BAGIAN A)** | **Belum** — 4 GitHub Secrets masih kosong, jadi APK saat ini masih ditandatangani debug key |
-| **Server aktivasi (BAGIAN B)** | **Belum** — `supabaseUrl` dan `supabaseAnonKey` masih berisi `ISI_...` |
+| **Server aktivasi (BAGIAN B)** | **Belum** — `activationServerUrl` masih berisi `ISI_...`, dan servernya belum diterbitkan ke Cloudflare |
 
 > **Jangan jual APK yang sekarang.** APK itu ditandatangani debug key, sehingga
 > tidak bisa di-update dan Android ID-nya akan berubah saat kuncinya diganti —
@@ -28,13 +32,13 @@ dari Anda.
 ### Selama BAGIAN B belum dikerjakan, aplikasi terbuka tanpa aktivasi
 
 Supaya Anda tetap bisa mencoba semua fitur sebelum server aktivasi siap,
-gerbang lisensi sengaja dimatikan selama `supabaseUrl` / `supabaseAnonKey`
-masih berisi `ISI_...`. Saat itu beranda menampilkan spanduk merah:
+gerbang lisensi sengaja dimatikan selama `activationServerUrl` masih berisi
+`ISI_...`. Saat itu beranda menampilkan spanduk merah:
 
 > Mode uji: lisensi belum aktif karena server aktivasi belum diisi di
 > app_config.dart. Jangan jual APK ini.
 
-Begitu kedua kunci Supabase diisi dan build dijalankan ulang, gerbang lisensi
+Begitu alamat server diisi dan build dijalankan ulang, gerbang lisensi
 **aktif kembali otomatis** dan setiap pelanggan wajib aktivasi. Jadi APK yang
 benar-benar dijual selalu terkunci — tidak perlu mengubah kode lagi.
 
@@ -47,15 +51,31 @@ uji, bukan versi jual.
 
 ```
 Pelanggan instal APK
-   → aplikasi tampilkan Kode Perangkat (mis. TK-7F3A-91C2-B8D4)
-   → pelanggan kirim kode itu + bukti transfer ke WhatsApp Anda
-   → Anda buat lisensi di dashboard Supabase (10 detik)
-   → Anda kirim Kode Aktivasi (mis. TK-1234-5678-9012)
-   → pelanggan masukkan kode → aplikasi aktif selamanya, offline
+   → aplikasi menampilkan Kode Perangkat (mis. TK-7F3A-91C2-B8D4)
+   → pelanggan membeli Kode Voucher dari Anda (mis. VC-4M2P-8QRT-1WZX)
+   → pelanggan membuka portal aktivasi, memasukkan kedua kode itu
+   → portal menampilkan Kode Aktivasi (mis. AK-9K3D-6VBH-2NQE)
+   → pelanggan menempelkannya di aplikasi → aktif selamanya, offline
 ```
 
-Kode Aktivasi tidak bisa dipakai di HP lain, karena server mengikatnya ke Kode
-Perangkat yang pertama kali memakainya.
+Yang perlu Anda kerjakan hanya **menyerahkan Kode Voucher**. Tidak ada langkah
+manual lagi — pelanggan menyelesaikan sendiri dalam satu menit.
+
+Pelanggan yang tidak mau membuka portal juga bisa menempel langsung Kode Voucher
+ke kolom Kode Aktivasi di aplikasi. Hasilnya sama.
+
+---
+
+## Tiga jenis kode — jangan tertukar
+
+| Kode | Awalan | Siapa yang membuat | Gunanya |
+|---|---|---|---|
+| **Kode Perangkat** | `TK-` | Aplikasi, otomatis | Menandai HP pelanggan. Tetap sama selama tidak diinstal ulang |
+| **Kode Voucher** | `VC-` | Anda, lewat alat pembuat voucher | Yang Anda **jual**. Sekali pakai |
+| **Kode Aktivasi** | `AK-` | Server, otomatis saat penukaran | Yang diketik pelanggan untuk mengaktifkan aplikasi |
+
+Ketiganya memakai huruf `I`, `O` dan angka `0`, `1` yang dibuang, supaya
+pelanggan tidak salah ketik.
 
 ---
 
@@ -91,32 +111,55 @@ kalau kuncinya berubah nanti.
 
 ## BAGIAN B — Pasang server aktivasi (sekali saja)
 
-Kita pakai Supabase. Gratis, dan cukup untuk ratusan sampai ribuan lisensi.
+Server aktivasi sekarang berjalan di **Cloudflare Workers**. Gratis, dan yang
+paling penting: **tidak pernah dibekukan** walaupun berhari-hari tidak dipakai.
+(Dulu rencananya pakai Supabase, tapi proyek gratisnya dibekukan setelah ± 7
+hari nganggur — sangat merepotkan untuk penjualan yang tidak setiap hari.)
 
-1. Daftar di **https://supabase.com** (bisa pakai akun Google)
-2. Klik **New project**. Nama bebas, mis. `tokoku-lisensi`.
-   Simpan password database di tempat aman (tidak dipakai aplikasi).
-3. Tunggu ± 2 menit sampai project selesai dibuat
-4. Buka menu **SQL Editor** → **New query**
-5. Buka file `supabase/schema.sql` dari repo ini, **salin seluruh isinya**,
-   tempel di SQL Editor, lalu klik **Run**
-6. Buka **Project Settings** (ikon gerigi) → **API**
-7. Catat dua nilai ini:
-   - **Project URL** — bentuknya `https://xxxxxxxx.supabase.co`
-   - **anon public** (di bagian Project API keys) — kode panjang diawali `eyJ...`
+Panduan teknis lengkapnya ada di **[`cloudflare/README.md`](../cloudflare/README.md)**.
+Ringkasnya:
 
-8. Tempel dua nilai itu ke file `lib/core/config/app_config.dart`:
+1. Daftar akun Cloudflare gratis di https://dash.cloudflare.com/sign-up
+2. Pasang Node.js kalau belum ada
+3. Jalankan, dari dalam folder `cloudflare/`:
 
-   ```dart
-   static const String supabaseUrl = 'https://xxxxxxxx.supabase.co';
-   static const String supabaseAnonKey = 'eyJhbGciOi...';
+   ```bash
+   npm install
+   npx wrangler login
+   npx wrangler d1 create tokoku-lisensi
    ```
 
-   Kalau mau, kirimkan dua nilai itu ke saya — saya isikan sekalian.
+   Perintah terakhir mencetak `database_id`. Salin ke `cloudflare/wrangler.toml`.
 
-> **Catatan:** kunci `anon` memang dirancang untuk ditanam di aplikasi, jadi ini
-> aman. Yang **tidak boleh** dibagikan adalah `service_role key` — jangan pernah
-> taruh itu di aplikasi.
+4. Buat tabelnya:
+
+   ```bash
+   npx wrangler d1 execute tokoku-lisensi --remote --file=schema.sql
+   ```
+
+5. Buat kunci admin, lalu simpan di Cloudflare:
+
+   ```bash
+   python -c "import secrets; print(secrets.token_urlsafe(32))"
+   npx wrangler secret put ADMIN_KEY
+   ```
+
+6. Terbitkan, lalu catat alamat yang dicetak:
+
+   ```bash
+   npx wrangler deploy
+   ```
+
+7. Isi alamat itu ke `lib/core/config/app_config.dart`:
+
+   ```dart
+   static const String activationServerUrl = 'https://tokoku-lisensi.nama-anda.workers.dev';
+   ```
+
+   Kalau mau, kirimkan alamat itu ke saya — saya isikan sekalian.
+
+Setelah ini, `<alamat-worker>` adalah portal pelanggan, dan
+`<alamat-worker>/admin` adalah halaman admin Anda.
 
 ---
 
@@ -135,79 +178,67 @@ Minta pelanggan:
 - Aktifkan **"Instal dari sumber tidak dikenal"** kalau diminta
 - Buka file APK untuk memasang
 
-### 2. Pelanggan membuka aplikasi
+### 2. Siapkan stok voucher
 
-Aplikasi menampilkan **Kode Perangkat**, contoh `TK-7F3A-91C2-B8D4`.
-Minta pelanggan mengirim kode itu + bukti transfer.
-
-### 3. Anda membuat lisensi
-
-Buka Supabase → **Table Editor** → tabel `licenses` → **Insert row**:
-
-| Kolom | Isi |
-|---|---|
-| `code` | kode aktivasi, mis. `TK-1234-5678-9012` |
-| `customer_name` | nama pembeli, mis. `Bu Siti` |
-| `store_name` | nama toko, mis. `Toko Siti Jaya` |
-| `status` | `active` |
-| `device_id` | **kosongkan** — nanti diisi otomatis saat aktivasi |
-| `activated_at` | **kosongkan** |
-
-Klik **Save**. Selesai — 10 detik.
-
-**Tips membuat kode:** gunakan pola `TK-XXXX-XXXX-XXXX` dengan angka acak.
-Jangan berurutan (`TK-0001`, `TK-0002`), supaya tidak bisa ditebak orang lain.
-Ganti juga `TK` dengan kode singkatan Anda sendiri kalau mau.
-
-#### Cara cepat: pakai alat pembuat kode
-
-Kalau tidak mau mengetik kode manual (rawan salah ketik dan rawan kembar),
-jalankan alat bantu di folder repo:
+Buat sekaligus banyak, supaya tidak perlu repot setiap ada pembeli:
 
 ```bash
-python tools/buat-kode-lisensi.py --nama "Bu Siti" --toko "Toko Siti Jaya"
+export TOKOKU_URL="https://tokoku-lisensi.nama-anda.workers.dev"
+export TOKOKU_ADMIN_KEY="kunci-admin-Anda"
+
+python tools/buat-voucher.py --jumlah 10 --kelompok "Grosir-2026-09"
 ```
 
-Hasilnya: satu kode acak siap pakai, plus perintah SQL `insert` yang tinggal
-Anda tempel ke Supabase SQL Editor. Beberapa pembeli sekaligus:
+Hasilnya daftar kode siap jual, dan tercatat di `ledger-voucher.csv`.
+
+Kalau hanya butuh daftar kodenya (untuk disalin ke chat atau dicetak di kartu):
 
 ```bash
-python tools/buat-kode-lisensi.py --jumlah 5
+python tools/buat-voucher.py --jumlah 5 --ringkas
 ```
 
-Kalau hanya butuh kodenya saja untuk dikirim lewat WhatsApp:
+Bisa juga lewat browser: buka `<alamat-worker>/admin`, masukkan `ADMIN_KEY`,
+lalu isi kolom **Buat Voucher Baru**.
 
-```bash
-python tools/buat-kode-lisensi.py --jumlah 3 --ringkas
-```
+### 3. Serahkan SATU kode ke pelanggan
 
-Alat ini otomatis menghindari huruf `I`, `O` dan angka `0`, `1` supaya
-pelanggan tidak salah ketik. Setiap kode yang dibuat juga dicatat di
-`ledger-lisensi.csv` sebagai arsip siapa memakai kode apa.
+Satu pembelian = satu Kode Voucher. Kirim lewat WhatsApp, atau cetak di kartu.
+Sertakan juga alamat portal:
 
-> **Jangan pernah meng-commit `ledger-lisensi.csv`.** Berkas itu berisi daftar
-> pembeli **dan kode aktivasi yang masih berlaku** — kalau bocor, orang lain
-> bisa memakainya untuk mengaktifkan aplikasi. Berkas ini sudah masuk
-> `.gitignore`, jadi jangan dihapus dari sana.
+> Buka `https://tokoku-lisensi.nama-anda.workers.dev`, masukkan Kode Perangkat
+> dari aplikasi dan Kode Voucher di bawah ini.
 
-### 4. Kirim Kode Aktivasi ke pelanggan
+### 4. Pelanggan menyelesaikan sendiri
 
-Pelanggan memasukkan kode itu di layar Aktivasi. Aplikasi akan menampilkan
-pesan "aktif" dan langsung masuk ke halaman pendaftaran akun toko.
+Di portal, pelanggan memasukkan **Kode Perangkat** + **Kode Voucher**, lalu
+mendapat **Kode Aktivasi**. Kode itu diketik di aplikasi → selesai.
 
 **Setelah aktif, aplikasi tidak butuh internet lagi** untuk operasi harian.
+
+### 5. Melihat siapa yang sudah aktif
+
+```bash
+python tools/buat-voucher.py --ringkasan
+```
+
+Atau buka `<alamat-worker>/admin`.
+
+> **Jangan pernah meng-commit `ledger-voucher.csv`.** Berkas itu berisi daftar
+> pembeli **dan kode voucher yang masih berlaku** — kalau bocor, orang lain bisa
+> memakainya untuk mengaktifkan aplikasi. Berkas ini sudah masuk `.gitignore`,
+> jadi jangan dihapus dari sana.
 
 ---
 
 ## BAGIAN D — Merilis update aplikasi
 
-Setiap kali Anda (atau saya) mengubah kode:
+Setiap kali kode diubah:
 
-1. Naikkan versi di `pubspec.yaml`, contoh `version: 1.0.0+1` → `version: 1.0.1+2`
+1. Naikkan versi di `pubspec.yaml`, contoh `version: 1.2.0+4` → `version: 1.2.1+5`
 2. Push ke branch `main`
 3. GitHub Actions otomatis:
    - membangun APK dengan kunci rilis Anda
-   - menerbitkan Release dengan tag `v1.0.1`
+   - menerbitkan Release dengan tag `v1.2.1`
 4. Pelanggan yang membuka aplikasi akan melihat dialog **"Pembaruan tersedia"**
    → tekan **Unduh** → browser terbuka → pasang APK baru
 
@@ -224,16 +255,20 @@ Pelanggan juga bisa cek manual: **Profil → Cek pembaruan**.
 Karena lisensi terikat pada 1 HP, HP baru akan meminta aktivasi lagi.
 
 1. Pelanggan instal aplikasi di HP baru
-2. Pelanggan kirim **Kode Perangkat baru**
-3. Anda buka Supabase → **SQL Editor**, jalankan:
-
-   ```sql
-   select public.reset_license_device('TK-1234-5678-9012');
-   ```
-
-4. Pelanggan memasukkan Kode Aktivasi yang **sama** di HP baru → aktif
+2. Anda buka `<alamat-worker>/admin`
+3. Cari lisensi pelanggan itu di tabel **Daftar Lisensi**, tekan **Pindah HP**
+4. Pelanggan memasukkan **Kode Voucher yang sama** (atau Kode Aktivasi yang
+   dulu) di HP baru → aktif
 
 HP lama otomatis tidak berlaku lagi.
+
+Lewat terminal, caranya:
+
+```bash
+curl -X POST "$TOKOKU_URL/admin/reset" \
+  -H "x-admin-key: $TOKOKU_ADMIN_KEY" \
+  -d '{"code":"AK-9K3D-6VBH-2NQE"}'
+```
 
 **Saran kebijakan:** gratis 1× dalam 12 bulan, setelah itu Rp 25–50rb per
 pindah perangkat. Tulis di nota supaya tidak ribut.
@@ -242,14 +277,20 @@ pindah perangkat. Tulis di nota supaya tidak ribut.
 
 ## BAGIAN F — Kalau pembeli minta refund
 
-Buka Supabase → SQL Editor:
+Buka `<alamat-worker>/admin` → tabel **Daftar Lisensi** → tekan
+**Nonaktifkan**. Lewat terminal:
 
-```sql
-update public.licenses set status = 'revoked' where code = 'TK-1234-5678-9012';
+```bash
+curl -X POST "$TOKOKU_URL/admin/revoke" \
+  -H "x-admin-key: $TOKOKU_ADMIN_KEY" \
+  -d '{"code":"AK-9K3D-6VBH-2NQE","jenis":"lisensi"}'
 ```
 
 Aplikasi yang sudah aktif **tetap jalan** (karena sudah offline), tapi kode itu
 tidak bisa lagi dipakai untuk aktivasi baru di HP lain.
+
+Kalau pelanggan membatalkan pembelian **sebelum** menukar vouchernya, cukup
+nonaktifkan vouchernya (`"jenis":"voucher"`) — kodenya jadi tidak berguna.
 
 ---
 
@@ -261,7 +302,7 @@ tidak bisa lagi dipakai untuk aktivasi baru di HP lain.
 | Pindah perangkat | Gratis 1× / 12 bulan, lalu Rp 25–50rb |
 | Update versi | Gratis (bagus untuk reputasi) |
 | Batas support | 6 bulan konsultasi WhatsApp, tulis di nota |
-| Nota | Sertakan nama toko, email, kode lisensi, tanggal, ketentuan |
+| Nota | Sertakan nama toko, email, kode voucher, tanggal, ketentuan |
 
 ---
 
@@ -269,8 +310,9 @@ tidak bisa lagi dipakai untuk aktivasi baru di HP lain.
 
 - [ ] 4 GitHub Secrets sudah diisi (Bagian A)
 - [ ] Folder `release-signing` sudah dicadangkan ke 2 tempat
-- [ ] Supabase sudah dibuat dan `schema.sql` sudah dijalankan (Bagian B)
-- [ ] `app_config.dart` sudah diisi URL + anon key
+- [ ] Server Cloudflare sudah diterbitkan dan `schema.sql` sudah dijalankan (Bagian B)
+- [ ] `ADMIN_KEY` sudah disimpan di pengelola kata sandi
+- [ ] `app_config.dart` sudah diisi `activationServerUrl`
 - [ ] Sudah push, dan build GitHub Actions **hijau**
 
 **Dua pemeriksaan di bawah ini yang paling sering terlewat.** Kalau salah satu
@@ -289,6 +331,22 @@ gagal, APK-nya tetap "hijau" di GitHub tapi tidak layak dijual:
   Kalau masih muncul, gerbang lisensi belum aktif — artinya pembeli bisa memakai
   aplikasi tanpa aktivasi. **Jangan dijual selama spanduk itu masih ada.**
 
-- [ ] Sudah tes sendiri: instal APK, aktivasi dengan 1 kode percobaan
-- [ ] Sudah tes: coba kode yang sama di HP kedua → harus **ditolak**
-- [ ] Kode percobaan sudah dinonaktifkan (`status = 'revoked'`) atau dihapus
+- [ ] Sudah tes sendiri: instal APK, aktivasi dengan 1 voucher percobaan
+- [ ] Sudah tes: coba voucher yang sama di HP kedua → harus **ditolak**
+- [ ] Sudah tes: buka portal di HP kedua dengan voucher yang sama → harus muncul
+      pesan "sudah dipakai di HP lain"
+- [ ] Voucher percobaan sudah dinonaktifkan dari halaman admin
+
+---
+
+## Kalau nanti mau menambah fitur
+
+Beberapa hal yang mudah ditambahkan tanpa mengubah arsitektur:
+
+- **Kode voucher berisi harga.** Tambahkan kolom di tabel `vouchers`, lalu
+  tampilkan di portal supaya pelanggan tahu paket yang dibeli.
+- **Pembelian otomatis.** Kalau nanti jualan lewat marketplace atau toko online,
+  server marketplace bisa memanggil `POST /admin/vouchers` untuk membuat kode
+  otomatis saat ada yang membayar.
+- **Masa berlaku voucher.** Tambahkan kolom tanggal kedaluwarsa dan periksa di
+  `/api/aktivasi`.

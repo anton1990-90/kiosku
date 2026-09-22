@@ -6,11 +6,19 @@ import '../../core/config/app_config.dart';
 import '../../shared/services/device_service.dart';
 import '../models/license_model.dart';
 
-/// Menangani aktivasi lisensi (online) dan penyimpanan statusnya (offline).
+/// Menangani aktivasi lisensi (online sekali) dan penyimpanan statusnya.
 ///
-/// Alur: aplikasi mengirim Kode Perangkat + Kode Aktivasi ke server Supabase.
-/// Server hanya mengizinkan satu perangkat per kode. Setelah berhasil, status
-/// disimpan di HP sehingga aplikasi berjalan tanpa internet selamanya.
+/// Alur jual lepas yang dipakai:
+///   * Pelanggan membeli Kode Voucher (VC-XXXX-XXXX-XXXX) dari penjual.
+///   * Kode itu ditukar menjadi Kode Aktivasi yang terkunci ke satu HP.
+///     Penukarannya bisa lewat halaman portal (di browser) atau langsung
+///     dari layar aktivasi aplikasi ini — hasilnya sama.
+///   * Setelah berhasil, statusnya disimpan di HP dan aplikasi berjalan
+///     penuh tanpa internet selamanya.
+///
+/// Server yang dipakai adalah Cloudflare Worker (lihat folder `cloudflare/`).
+/// Worker tidak pernah dibekukan karena lama tidak dipakai, jadi lisensi
+/// pelanggan tetap bisa diaktifkan kapan saja.
 class LicenseRepository {
   static const _kCode = 'lic_code';
   static const _kDevice = 'lic_device';
@@ -26,7 +34,11 @@ class LicenseRepository {
         .toString();
   }
 
-  /// Aktifkan lisensi. Melempar [LicenseException] dengan pesan siap tampil.
+  /// Aktifkan lisensi memakai [code].
+  ///
+  /// [code] boleh berupa Kode Voucher (VC-...) yang baru dibeli, atau Kode
+  /// Aktivasi (AK-...) yang didapat dari portal. Melempar [LicenseException]
+  /// dengan pesan yang sudah siap ditampilkan ke pelanggan.
   Future<LicenseModel> activate({required String code}) async {
     final trimmed = code.trim().toUpperCase();
     if (trimmed.isEmpty) {
@@ -44,18 +56,14 @@ class LicenseRepository {
     try {
       response = await http
           .post(
-            Uri.parse('${AppConfig.supabaseUrl}/rest/v1/rpc/activate_license'),
-            headers: {
-              'apikey': AppConfig.supabaseAnonKey,
-              'Authorization': 'Bearer ${AppConfig.supabaseAnonKey}',
-              'Content-Type': 'application/json',
-            },
+            Uri.parse('${AppConfig.activationServerUrl}/api/aktivasi'),
+            headers: const {'Content-Type': 'application/json'},
             body: jsonEncode({
-              'p_code': trimmed,
-              'p_device_id': deviceId,
+              'code': trimmed,
+              'device_id': deviceId,
             }),
           )
-          .timeout(const Duration(seconds: 15));
+          .timeout(const Duration(seconds: 20));
     } catch (_) {
       throw const LicenseException(
         'Tidak dapat menghubungi server aktivasi. Periksa koneksi internet Anda '
@@ -63,43 +71,65 @@ class LicenseRepository {
       );
     }
 
-    if (response.statusCode != 200) {
+    final Map<String, dynamic> data;
+    try {
+      final dynamic decoded = jsonDecode(response.body);
+      if (decoded is! Map) {
+        throw const FormatException('bukan objek');
+      }
+      data = Map<String, dynamic>.from(decoded);
+    } catch (_) {
       throw LicenseException(
-        'Server aktivasi menolak permintaan (${response.statusCode}). '
+        'Jawaban server tidak dikenali (${response.statusCode}). '
         'Coba lagi beberapa saat lagi.',
       );
     }
-
-    final dynamic decoded = jsonDecode(response.body);
-    if (decoded is! Map) {
-      throw const LicenseException('Jawaban server tidak dikenali.');
-    }
-    final data = Map<String, dynamic>.from(decoded);
 
     if (data['ok'] != true) {
       throw LicenseException(_messageFor(data['reason']?.toString()));
     }
 
+    // Server mengembalikan Kode Aktivasi yang berlaku. Kalau pelanggan tadi
+    // menempel Kode Voucher, nilainya berbeda dari yang dia ketik — karena
+    // itu yang disimpan harus yang dari server, bukan yang diketik.
+    final activationCode =
+        (data['activation_code'] ?? trimmed).toString().toUpperCase();
+
     return LicenseModel(
-      code: trimmed,
+      code: activationCode,
       deviceId: deviceId,
       customerName: (data['customer_name'] ?? '').toString(),
       storeName: (data['store_name'] ?? '').toString(),
-      activatedAt: DateTime.now(),
+      // Server mengirim waktu dalam UTC; ubah ke waktu HP supaya tanggal
+      // yang tampil di pengaturan tidak membingungkan.
+      activatedAt:
+          DateTime.tryParse((data['activated_at'] ?? '').toString())
+                  ?.toLocal() ??
+              DateTime.now(),
     );
   }
 
   String _messageFor(String? reason) {
     switch (reason) {
       case 'not_found':
-        return 'Kode aktivasi tidak ditemukan. Periksa kembali penulisan kodenya.';
+        return 'Kode tidak ditemukan. Periksa kembali penulisannya, atau '
+            'hubungi penjual tempat Anda membeli.';
       case 'used_on_other_device':
-        return 'Kode ini sudah dipakai di HP lain. Hubungi penjual untuk '
-            'memindahkan lisensi ke HP ini.';
+        return 'Kode ini sudah dipakai di HP lain. Satu kode hanya berlaku '
+            'untuk satu HP. Hubungi penjual kalau Anda baru mengganti HP.';
       case 'revoked':
-        return 'Kode aktivasi ini sudah dinonaktifkan oleh penjual.';
+        return 'Kode ini sudah dinonaktifkan oleh penjual.';
+      case 'device_code_entered':
+        return 'Sepertinya Anda menempel Kode Perangkat, bukan Kode Voucher. '
+            'Isi kolom ini dengan kode berawalan VC- yang Anda beli.';
+      case 'busy':
+        return 'Sedang ada permintaan lain untuk kode ini. Tunggu sebentar '
+            'lalu coba lagi.';
       case 'invalid_code':
         return 'Kode aktivasi tidak boleh kosong.';
+      case 'bad_request':
+      case 'server_error':
+        return 'Server sedang bermasalah. Coba lagi beberapa saat lagi.';
       default:
         return 'Aktivasi gagal. Hubungi penjual aplikasi.';
     }

@@ -1,0 +1,30 @@
+# ============================================================================
+# TokoKu — konfigurasi Cloudflare Worker
+#
+# Ganti dua nilai bertanda GANTI_... di bawah, lalu jalankan:
+#   npx wrangler deploy
+#
+# Rincian langkah ada di cloudflare/README.md
+# ============================================================================
+
+name = "tokoku-lisensi"
+main = "src/index.js"
+compatibility_date = "2026-09-01"
+
+# Akun gratis Cloudflare sudah cukup:
+#   * 100.000 permintaan per hari
+#   * TIDAK ada pembekuan karena tidak dipakai (beda dengan Supabase)
+workers_dev = true
+
+[[d1_databases]]
+binding = "DB"
+database_name = "tokoku-lisensi"
+# GANTI_DENGAN_ID_DATABASE — dapat dari:
+#   npx wrangler d1 create tokoku-lisensi
+database_id = "GANTI_DENGAN_ID_DATABASE"
+
+[vars]
+# Nama aplikasi yang muncul di halaman portal.
+APP_NAME = "TokoKu"
+# Nomor WhatsApp dukungan (format 628..., boleh dikosongkan).
+SUPPORT_WHATSAPP = ""

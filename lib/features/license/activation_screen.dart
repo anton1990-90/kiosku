@@ -9,9 +9,10 @@ import '../../shared/services/device_service.dart';
 
 /// Layar aktivasi lisensi.
 ///
-/// Muncul sebelum login/register. Pengguna menyalin Kode Perangkat, mengirimnya
-/// ke penjual, lalu memasukkan Kode Aktivasi yang diterima. Setelah berhasil,
-/// aplikasi berjalan offline selamanya.
+/// Muncul sebelum login/register. Pelanggan membeli Kode Voucher, lalu
+/// menempelkannya di sini — atau membukanya lewat portal di browser dan
+/// menempelkan Kode Aktivasi yang diterima. Dua-duanya jalan tanpa perlu
+/// menghubungi penjual.
 class ActivationScreen extends ConsumerStatefulWidget {
   const ActivationScreen({super.key});
 
@@ -54,20 +55,34 @@ class _ActivationScreenState extends ConsumerState<ActivationScreen> {
     );
   }
 
+  Future<void> _bukaLink(String alamat) async {
+    final uri = Uri.tryParse(alamat);
+    if (uri == null) return;
+    try {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Tidak bisa membuka $alamat'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
+  }
+
+  Future<void> _bukaPortal() async {
+    if (!AppConfig.isActivationConfigured) return;
+    await _bukaLink(AppConfig.portalUrl);
+  }
+
   Future<void> _openWhatsApp() async {
     if (AppConfig.sellerWhatsApp.isEmpty) return;
     final text = Uri.encodeComponent(
       'Halo, saya mau aktivasi aplikasi TokoKu.\n'
       'Kode Perangkat saya: $_deviceId',
     );
-    try {
-      await launchUrl(
-        Uri.parse('https://wa.me/${AppConfig.sellerWhatsApp}?text=$text'),
-        mode: LaunchMode.externalApplication,
-      );
-    } catch (_) {
-      // Diabaikan — pengguna masih bisa menyalin kode secara manual.
-    }
+    await _bukaLink('https://wa.me/${AppConfig.sellerWhatsApp}?text=$text');
   }
 
   Future<void> _activate() async {
@@ -128,39 +143,28 @@ class _ActivationScreenState extends ConsumerState<ActivationScreen> {
               ),
               const SizedBox(height: 8),
               const Text(
-                'Aplikasi ini berlisensi satu perangkat. Kirim Kode Perangkat di '
-                'bawah ke penjual, lalu masukkan Kode Aktivasi yang Anda terima.',
+                'Aplikasi ini berlisensi satu perangkat. Masukkan Kode Voucher '
+                'yang Anda beli di kolom bawah, lalu tekan Aktivasi.',
                 style: TextStyle(
                   fontSize: 14,
                   color: AppColors.textSecondary,
                   height: 1.6,
                 ),
               ),
-              const SizedBox(height: 28),
+              const SizedBox(height: 20),
               if (!AppConfig.isActivationConfigured) ...[
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: AppColors.dangerLight,
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: const Text(
-                    'Server aktivasi belum diisi di lib/core/config/app_config.dart. '
-                    'Aktivasi tidak akan bisa diproses.',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: AppColors.dangerMid,
-                      height: 1.5,
-                    ),
-                  ),
+                _kotakGalat(
+                  'Server aktivasi belum diisi di lib/core/config/app_config.dart. '
+                  'Aktivasi tidak akan bisa diproses.',
                 ),
                 const SizedBox(height: 16),
               ],
+              _langkahCara(),
+              const SizedBox(height: 20),
               _deviceCodeCard(),
               const SizedBox(height: 24),
               const Text(
-                'Kode Aktivasi',
+                'Kode Voucher / Kode Aktivasi',
                 style: TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.w600,
@@ -176,7 +180,7 @@ class _ActivationScreenState extends ConsumerState<ActivationScreen> {
                   if (!_busy) _activate();
                 },
                 decoration: InputDecoration(
-                  hintText: 'TK-XXXX-XXXX-XXXX',
+                  hintText: 'VC-XXXX-XXXX-XXXX',
                   filled: true,
                   fillColor: AppColors.bgCard,
                   prefixIcon: const Icon(Icons.key_outlined,
@@ -186,34 +190,14 @@ class _ActivationScreenState extends ConsumerState<ActivationScreen> {
                   ),
                 ),
               ),
+              const SizedBox(height: 6),
+              const Text(
+                'Awalan VC- untuk kode yang Anda beli, AK- untuk kode dari portal.',
+                style: TextStyle(fontSize: 11, color: AppColors.textTertiary),
+              ),
               if (_error != null) ...[
                 const SizedBox(height: 12),
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: AppColors.dangerLight,
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Icon(Icons.error_outline,
-                          color: AppColors.dangerMid, size: 18),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Text(
-                          _error!,
-                          style: const TextStyle(
-                            fontSize: 12,
-                            color: AppColors.dangerMid,
-                            height: 1.5,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
+                _kotakGalat(_error!),
               ],
               const SizedBox(height: 20),
               SizedBox(
@@ -232,14 +216,25 @@ class _ActivationScreenState extends ConsumerState<ActivationScreen> {
                       : const Text('Aktivasi'),
                 ),
               ),
-              if (AppConfig.sellerWhatsApp.isNotEmpty) ...[
+              if (AppConfig.isActivationConfigured) ...[
                 const SizedBox(height: 12),
                 SizedBox(
                   width: double.infinity,
                   child: OutlinedButton.icon(
+                    onPressed: _busy ? null : _bukaPortal,
+                    icon: const Icon(Icons.open_in_new, size: 18),
+                    label: const Text('Buka Portal Aktivasi'),
+                  ),
+                ),
+              ],
+              if (AppConfig.sellerWhatsApp.isNotEmpty) ...[
+                const SizedBox(height: 12),
+                SizedBox(
+                  width: double.infinity,
+                  child: TextButton.icon(
                     onPressed: _busy ? null : _openWhatsApp,
                     icon: const Icon(Icons.chat_outlined, size: 18),
-                    label: const Text('Kirim Kode Perangkat ke Penjual'),
+                    label: const Text('Butuh bantuan? Chat penjual'),
                   ),
                 ),
               ],
@@ -247,6 +242,68 @@ class _ActivationScreenState extends ConsumerState<ActivationScreen> {
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _kotakGalat(String isi) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppColors.dangerLight,
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Icon(Icons.error_outline,
+              color: AppColors.dangerMid, size: 18),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              isi,
+              style: const TextStyle(
+                fontSize: 12,
+                color: AppColors.dangerMid,
+                height: 1.5,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _langkahCara() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.bgCard,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: const [
+          Text(
+            'Cara aktivasi',
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+              color: AppColors.textMain,
+            ),
+          ),
+          SizedBox(height: 10),
+          _Langkah(1, 'Salin Kode Perangkat di kotak hijau bawah.'),
+          _Langkah(2, 'Masukkan Kode Voucher dari penjual, lalu tekan Aktivasi.'),
+          _Langkah(
+            3,
+            'Belum punya Kode Voucher? Tekan Buka Portal Aktivasi untuk '
+            'membeli dan menukarnya sendiri.',
+          ),
+        ],
       ),
     );
   }
@@ -295,8 +352,57 @@ class _ActivationScreenState extends ConsumerState<ActivationScreen> {
           ),
           const SizedBox(height: 4),
           const Text(
-            'Kode ini tetap sama selama aplikasi tidak diinstal ulang.',
+            'Kode ini tetap sama selama aplikasi tidak diinstal ulang. '
+            'Dibutuhkan kalau Anda mengaktifkan lewat portal.',
             style: TextStyle(fontSize: 11, color: AppColors.primary),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Satu baris langkah bernomor di kotak "Cara aktivasi".
+class _Langkah extends StatelessWidget {
+  final int nomor;
+  final String teks;
+
+  const _Langkah(this.nomor, this.teks);
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 20,
+            height: 20,
+            alignment: Alignment.center,
+            decoration: const BoxDecoration(
+              color: AppColors.primaryLight,
+              shape: BoxShape.circle,
+            ),
+            child: Text(
+              '$nomor',
+              style: const TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w800,
+                color: AppColors.primaryDark,
+              ),
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              teks,
+              style: const TextStyle(
+                fontSize: 12.5,
+                color: AppColors.textSecondary,
+                height: 1.45,
+              ),
+            ),
           ),
         ],
       ),

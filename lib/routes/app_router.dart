@@ -45,8 +45,8 @@ final routerProvider = Provider<GoRouter>((ref) {
       final isActivationRoute = location.startsWith('/auth/activation');
 
       // Gerbang lisensi hanya aktif kalau server aktivasi sudah diisi.
-      // Selama supabaseUrl/supabaseAnonKey masih 'ISI_...' aplikasi boleh
-      // dipakai tanpa aktivasi supaya fitur bisa diuji. Begitu kuncinya diisi,
+      // Selama activationServerUrl masih 'ISI_...' aplikasi boleh dipakai
+      // tanpa aktivasi supaya fitur bisa diuji. Begitu alamatnya diisi,
       // gerbang ini otomatis aktif kembali — jadi build yang dijual tetap
       // wajib aktivasi.
       final licenseGateActive = AppConfig.isActivationConfigured;

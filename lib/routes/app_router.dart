@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../providers/auth_provider.dart';
 import '../providers/license_provider.dart';
+import '../core/config/app_config.dart';
 import '../core/constants/app_colors.dart';
 import '../data/models/debt_model.dart';
 import '../data/models/note_model.dart';
@@ -43,8 +44,15 @@ final routerProvider = Provider<GoRouter>((ref) {
 
       final isActivationRoute = location.startsWith('/auth/activation');
 
+      // Gerbang lisensi hanya aktif kalau server aktivasi sudah diisi.
+      // Selama supabaseUrl/supabaseAnonKey masih 'ISI_...' aplikasi boleh
+      // dipakai tanpa aktivasi supaya fitur bisa diuji. Begitu kuncinya diisi,
+      // gerbang ini otomatis aktif kembali — jadi build yang dijual tetap
+      // wajib aktivasi.
+      final licenseGateActive = AppConfig.isActivationConfigured;
+
       // Belum berlisensi → wajib aktivasi lebih dulu.
-      if (!licenseState.isLicensed) {
+      if (licenseGateActive && !licenseState.isLicensed) {
         return isActivationRoute ? null : '/auth/activation';
       }
 

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../core/config/app_config.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/utils/formatters.dart';
 import '../../providers/auth_provider.dart';
@@ -118,6 +119,39 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                 ),
               ),
             ),
+            // Peringatan: build ini belum dikunci lisensi karena server
+            // aktivasi belum diisi. Sengaja ditampilkan mencolok supaya APK
+            // semacam ini tidak ikut terjual.
+            if (!AppConfig.isActivationConfigured)
+              SliverToBoxAdapter(
+                child: Container(
+                  margin: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: AppColors.dangerLight,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Icon(Icons.warning_amber_rounded,
+                          size: 18, color: AppColors.dangerMid),
+                      SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Mode uji: lisensi belum aktif karena server aktivasi '
+                          'belum diisi di app_config.dart. Jangan jual APK ini.',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: AppColors.dangerMid,
+                            height: 1.4,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
             // Revenue hero card
             SliverToBoxAdapter(
               child: Container(

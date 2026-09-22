@@ -1,11 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/utils/formatters.dart';
 import '../../providers/auth_provider.dart';
+import '../../providers/license_provider.dart';
 import '../../providers/product_provider.dart';
 import '../../providers/sale_provider.dart';
+import '../../shared/services/update_service.dart';
+import '../../shared/widgets/update_dialog.dart';
 
 /// Profile screen — store info, settings, and logout.
 class ProfileScreen extends ConsumerStatefulWidget {
@@ -19,6 +23,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   bool _stockNotif = true;
   bool _dailyReport = true;
   bool _debtReminder = false;
+  String _appVersion = '...';
+  bool _checkingUpdate = false;
 
   @override
   void initState() {
@@ -26,6 +32,103 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ref.read(productProvider.notifier).loadProducts();
     });
+    _loadVersion();
+  }
+
+  Future<void> _loadVersion() async {
+    try {
+      final info = await PackageInfo.fromPlatform();
+      if (mounted) setState(() => _appVersion = info.version);
+    } catch (_) {
+      if (mounted) setState(() => _appVersion = '-');
+    }
+  }
+
+  /// Cek pembaruan manual dari layar Profil.
+  Future<void> _checkUpdate() async {
+    setState(() => _checkingUpdate = true);
+    final info = await UpdateService.instance.checkForUpdate();
+    if (!mounted) return;
+    setState(() => _checkingUpdate = false);
+
+    if (info == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Aplikasi sudah versi terbaru, atau tidak ada koneksi.'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+    await showUpdateDialog(context, info);
+  }
+
+  void _showLicenseDialog() {
+    final license = ref.read(licenseProvider).license;
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Info Lisensi'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _licenseRow('Kode lisensi', license?.code ?? '-'),
+            _licenseRow('Pemilik', license?.customerName.isNotEmpty == true
+                ? license!.customerName
+                : '-'),
+            _licenseRow('Kode perangkat', license?.deviceId ?? '-'),
+            _licenseRow(
+              'Tanggal aktivasi',
+              license != null ? Formatters.date(license.activatedAt) : '-',
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'Lisensi ini berlaku untuk 1 HP. Kalau Anda ganti HP, hubungi '
+              'penjual untuk memindahkan lisensi.',
+              style: TextStyle(
+                fontSize: 12,
+                color: AppColors.textSecondary,
+                height: 1.5,
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Tutup'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _licenseRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: const TextStyle(
+              fontSize: 11,
+              color: AppColors.textTertiary,
+            ),
+          ),
+          Text(
+            value,
+            style: const TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: AppColors.textMain,
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _logout() async {
@@ -58,6 +161,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     final authState = ref.watch(authProvider);
     final productState = ref.watch(productProvider);
     final salesAsync = ref.watch(saleProvider);
+    final licenseState = ref.watch(licenseProvider);
     final user = authState.user;
 
     final totalTransactions =
@@ -255,6 +359,30 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                     ],
                   ),
                   const SizedBox(height: 20),
+                  const _MenuGroupTitle('Lisensi & aplikasi'),
+                  _MenuCard(
+                    children: [
+                      _MenuItem(
+                        icon: Icons.verified_user_outlined,
+                        color: AppColors.primary,
+                        title: 'Lisensi aktif',
+                        subtitle: licenseState.license?.code ?? 'Belum aktif',
+                        trailing: Icons.chevron_right,
+                        onTap: _showLicenseDialog,
+                      ),
+                      _MenuItem(
+                        icon: Icons.system_update_alt,
+                        color: AppColors.infoMid,
+                        title: 'Cek pembaruan',
+                        subtitle: _checkingUpdate
+                            ? 'Memeriksa...'
+                            : 'Versi $_appVersion terpasang',
+                        trailing: Icons.chevron_right,
+                        onTap: _checkingUpdate ? null : _checkUpdate,
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 20),
                   const _MenuGroupTitle('Bantuan'),
                   _MenuCard(
                     children: [
@@ -270,7 +398,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                         icon: Icons.info_outline,
                         color: Colors.grey,
                         title: 'Tentang aplikasi',
-                        subtitle: 'Versi 1.0.0',
+                        subtitle: 'Versi $_appVersion',
                         trailing: Icons.chevron_right,
                         onTap: () {},
                       ),

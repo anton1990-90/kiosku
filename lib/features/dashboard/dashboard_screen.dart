@@ -6,7 +6,9 @@ import '../../core/utils/formatters.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/dashboard_provider.dart';
 import '../../providers/product_provider.dart';
+import '../../shared/services/update_service.dart';
 import '../../shared/widgets/shared_widgets.dart';
+import '../../shared/widgets/update_dialog.dart';
 
 /// Dashboard (Beranda) — overview of today's sales, quick actions, alerts.
 class DashboardScreen extends ConsumerStatefulWidget {
@@ -17,14 +19,29 @@ class DashboardScreen extends ConsumerStatefulWidget {
 }
 
 class _DashboardScreenState extends ConsumerState<DashboardScreen> {
+  /// Supaya dialog pembaruan hanya muncul sekali per sesi aplikasi.
+  static bool _updateChecked = false;
+
   @override
   void initState() {
     super.initState();
     // Load stats after first frame
-    WidgetsBinding.instance.addPostFrameCallback((_) {
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
       ref.read(dashboardProvider.notifier).loadStats();
       ref.read(productProvider.notifier).loadProducts();
+      await _checkForUpdate();
     });
+  }
+
+  /// Periksa pembaruan aplikasi lewat GitHub Releases. Gagal dengan tenang
+  /// kalau tidak ada internet.
+  Future<void> _checkForUpdate() async {
+    if (_updateChecked) return;
+    _updateChecked = true;
+
+    final info = await UpdateService.instance.checkForUpdate();
+    if (!mounted || info == null) return;
+    await showUpdateDialog(context, info);
   }
 
   Future<void> _refresh() async {

@@ -14,3 +14,14 @@ build/
 .symlinks/
 .flutter/
 pubspec.lock
+
+# Kunci tanda tangan aplikasi — JANGAN PERNAH di-commit (repo ini publik!)
+*.jks
+*.keystore
+key.properties
+keystore-base64.txt
+storepass.txt
+
+# Alat bantu lokal (PyYAML untuk validasi workflow)
+.pylibs/
+__pycache__/

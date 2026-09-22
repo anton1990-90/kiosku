@@ -35,6 +35,16 @@ dependencies:
   # Barcode scanning (camera + ML Kit)
   mobile_scanner: ^5.2.3
 
+  # Networking — aktivasi lisensi & cek pembaruan
+  http: ^1.2.0
+
+  # Kode Perangkat (ID perangkat) & versi aplikasi
+  device_info_plus: ^10.1.0
+  package_info_plus: ^8.0.0
+
+  # Membuka link unduhan APK di browser
+  url_launcher: ^6.3.0
+
   # Icons
   cupertino_icons: ^1.0.6
 

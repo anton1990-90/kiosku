@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../providers/auth_provider.dart';
+import '../providers/license_provider.dart';
 import '../core/constants/app_colors.dart';
 import '../features/auth/login_screen.dart';
 import '../features/auth/register_screen.dart';
+import '../features/license/activation_screen.dart';
 import '../features/dashboard/dashboard_screen.dart';
 import '../features/kasir/kasir_screen.dart';
 import '../features/produk/produk_screen.dart';
@@ -17,28 +19,42 @@ import '../shared/widgets/bottom_nav_shell.dart';
 /// Redirects unauthenticated users to login.
 final routerProvider = Provider<GoRouter>((ref) {
   final authState = ref.watch(authProvider);
+  final licenseState = ref.watch(licenseProvider);
 
   return GoRouter(
     initialLocation: '/',
     debugLogDiagnostics: false,
     redirect: (context, state) {
-      // While checking auth state, stay on the splash screen.
-      if (authState.isLoading) {
-        return state.matchedLocation == '/'
-            ? null
-            : '/';
+      final location = state.matchedLocation;
+
+      // Sambil memuat status auth & lisensi, tetap di splash.
+      if (authState.isLoading || licenseState.isLoading) {
+        return location == '/' ? null : '/';
+      }
+
+      final isActivationRoute = location.startsWith('/auth/activation');
+
+      // Belum berlisensi → wajib aktivasi lebih dulu.
+      if (!licenseState.isLicensed) {
+        return isActivationRoute ? null : '/auth/activation';
+      }
+
+      // Sudah berlisensi tapi masih di layar aktivasi → lanjut ke alur akun.
+      if (isActivationRoute) {
+        if (authState.isAuthenticated) return '/dashboard';
+        return authState.isFirstRun ? '/auth/register' : '/auth/login';
       }
 
       final isLoggedIn = authState.isAuthenticated;
-      final isAuthRoute = state.matchedLocation.startsWith('/auth');
+      final isAuthRoute = location.startsWith('/auth');
 
-      // Not logged in → redirect to register (first run) or login.
+      // Belum login → ke register (pertama kali) atau login.
       if (!isLoggedIn && !isAuthRoute) {
         return authState.isFirstRun ? '/auth/register' : '/auth/login';
       }
 
-      // Logged in but on auth screen or splash → go to dashboard.
-      if (isLoggedIn && (isAuthRoute || state.matchedLocation == '/')) {
+      // Sudah login tapi di layar auth/splash → ke dashboard.
+      if (isLoggedIn && (isAuthRoute || location == '/')) {
         return '/dashboard';
       }
 
@@ -52,6 +68,11 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const _SplashScreen(),
       ),
       // Auth routes (no bottom nav)
+      GoRoute(
+        path: '/auth/activation',
+        name: 'activation',
+        builder: (context, state) => const ActivationScreen(),
+      ),
       GoRoute(
         path: '/auth/login',
         name: 'login',

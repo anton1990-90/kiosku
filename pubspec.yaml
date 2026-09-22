@@ -1,6 +1,6 @@
 name: tokoku
 description: Aplikasi UMKM toko sembako & penjualan - offline-first dengan autentikasi email.
-version: 1.0.0+1
+version: 1.1.0+2
 publish_to: 'none'
 
 environment:
@@ -44,6 +44,10 @@ dependencies:
 
   # Membuka link unduhan APK di browser
   url_launcher: ^6.3.0
+
+  # Ganti logo usaha dari galeri + simpan ke penyimpanan aplikasi
+  image_picker: ^1.1.2
+  path_provider: ^2.1.4
 
   # Icons
   cupertino_icons: ^1.0.6

@@ -9,8 +9,19 @@ class Formatters {
     'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des',
   ];
 
+  /// Indonesian month names (full).
+  static const _monthsFull = [
+    'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
+    'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember',
+  ];
+
   /// Indonesian day names (short, Mon-first).
   static const _days = ['Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab', 'Min'];
+
+  /// Indonesian day names (full, Mon-first).
+  static const _daysFull = [
+    'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Minggu',
+  ];
 
   /// Format integer to Rupiah string: 65000 -> "Rp 65.000"
   static String rupiah(int amount) {
@@ -49,9 +60,25 @@ class Formatters {
     return '${dt.day} ${_months[dt.month - 1]} ${dt.year}';
   }
 
+  /// Format date with full month: "21 September 2026"
+  static String dateFull(DateTime dt) {
+    return '${dt.day} ${_monthsFull[dt.month - 1]} ${dt.year}';
+  }
+
+  /// Format date with day name: "Senin, 21 Sep 2026"
+  static String dateWithDay(DateTime dt) {
+    return '${dayNameFull(dt)}, ${date(dt)}';
+  }
+
   /// Format date with time: "21 Sep 2026, 14:30"
   static String dateTime(DateTime dt) {
     return '${date(dt)}, ${time(dt)}';
+  }
+
+  /// Format date and time with seconds: "21 Sep 2026, 14:30:07"
+  static String dateTimeSeconds(DateTime dt) {
+    final s = dt.second.toString().padLeft(2, '0');
+    return '${dateTime(dt)}:$s';
   }
 
   /// Format time only: "14:30"
@@ -65,5 +92,29 @@ class Formatters {
   static String dayName(DateTime dt) {
     // DateTime.weekday: Mon=1 .. Sun=7
     return _days[dt.weekday - 1];
+  }
+
+  /// Format full day name: "Senin", "Selasa", etc.
+  static String dayNameFull(DateTime dt) {
+    return _daysFull[dt.weekday - 1];
+  }
+
+  /// Nama bulan penuh dari nomor bulan (1..12).
+  static String monthNameFull(int month) {
+    if (month < 1 || month > 12) return '-';
+    return _monthsFull[month - 1];
+  }
+
+  /// Rentang tanggal ringkas: "21 - 27 Sep 2026", atau
+  /// "28 Sep - 4 Okt 2026" kalau melewati batas bulan.
+  static String dateRange(DateTime from, DateTime to) {
+    if (from.year == to.year && from.month == to.month) {
+      return '${from.day} - ${to.day} ${_months[from.month - 1]} ${from.year}';
+    }
+    if (from.year == to.year) {
+      return '${from.day} ${_months[from.month - 1]} - '
+          '${to.day} ${_months[to.month - 1]} ${from.year}';
+    }
+    return '${date(from)} - ${date(to)}';
   }
 }

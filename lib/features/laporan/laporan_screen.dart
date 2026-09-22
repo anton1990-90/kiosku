@@ -2,10 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/utils/formatters.dart';
-import '../../data/models/sale_model.dart';
-import '../../providers/sale_provider.dart';
+import '../../core/utils/report_period.dart';
+import '../../data/models/report_models.dart';
+import '../../providers/report_provider.dart';
 
-/// Laporan screen — sales reports, weekly chart, top products.
+/// Laporan penjualan — harian, mingguan, dan bulanan.
+///
+/// Laporan harian menampilkan rincian tiap produk yang terjual lengkap dengan
+/// tanggal, jam, jumlah, harga satuan, dan subtotal.
 class LaporanScreen extends ConsumerStatefulWidget {
   const LaporanScreen({super.key});
 
@@ -14,219 +18,172 @@ class LaporanScreen extends ConsumerStatefulWidget {
 }
 
 class _LaporanScreenState extends ConsumerState<LaporanScreen> {
-  String _period = 'Mingguan';
-  List<({String day, int total})> _weeklyData = [];
-  ({int totalSales, int totalProfit, int transactions})? _summary;
-
-  @override
-  void initState() {
-    super.initState();
-    _loadData();
-  }
-
-  Future<void> _loadData() async {
-    final saleNotifier = ref.read(saleProvider.notifier);
-    final weekly = await saleNotifier.getWeeklySales();
-    final summary = await saleNotifier.getWeeklySummary();
-    if (mounted) {
-      setState(() {
-        _weeklyData = weekly;
-        _summary = summary;
-      });
+  Future<void> _pickDate(ReportPeriod period) async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: period.anchor,
+      firstDate: DateTime(2020),
+      lastDate: DateTime.now(),
+      helpText: 'Pilih tanggal laporan',
+      cancelText: 'Batal',
+      confirmText: 'Pilih',
+    );
+    if (picked != null) {
+      await ref.read(reportProvider.notifier).jumpTo(picked);
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final salesAsync = ref.watch(saleProvider);
+    final state = ref.watch(reportProvider);
+    final period = state.period;
 
     return Scaffold(
       backgroundColor: AppColors.bgPage,
       appBar: AppBar(
-        title: const Text(
-          'Laporan',
-          style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800),
+        title: const Text('Laporan'),
+        actions: [
+          if (!period.isCurrent)
+            TextButton(
+              onPressed: () => ref.read(reportProvider.notifier).goToday(),
+              child: const Text('Hari ini'),
+            ),
+        ],
+      ),
+      body: RefreshIndicator(
+        color: AppColors.primary,
+        onRefresh: () => ref.read(reportProvider.notifier).loadReport(),
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
+          children: [
+            _periodTabs(period),
+            const SizedBox(height: 14),
+            _dateNavigator(period, state.canGoNext),
+            const SizedBox(height: 18),
+            _summaryGrid(state.summary),
+            const SizedBox(height: 16),
+            if (period.type == ReportPeriodType.harian)
+              _hourlyChart(state.items)
+            else
+              _dailyChart(state.dailyTotals, period),
+            const SizedBox(height: 16),
+            _topProducts(state.topProducts),
+            const SizedBox(height: 16),
+            _itemDetailSection(state.items, period),
+          ],
         ),
       ),
-      body: CustomScrollView(
-        slivers: [
-          // Period tabs
-          SliverToBoxAdapter(
-            child: Container(
-              margin: const EdgeInsets.fromLTRB(20, 0, 20, 16),
-              padding: const EdgeInsets.all(3),
-              decoration: BoxDecoration(
-                color: AppColors.bgSoft,
-                borderRadius: BorderRadius.circular(24),
+    );
+  }
+
+  // ------------------------------------------------------------------ tabs
+
+  Widget _periodTabs(ReportPeriod period) {
+    const tabs = [
+      (ReportPeriodType.harian, 'Harian'),
+      (ReportPeriodType.mingguan, 'Mingguan'),
+      (ReportPeriodType.bulanan, 'Bulanan'),
+    ];
+
+    return Container(
+      padding: const EdgeInsets.all(3),
+      decoration: BoxDecoration(
+        color: AppColors.bgSoft,
+        borderRadius: BorderRadius.circular(24),
+      ),
+      child: Row(
+        children: tabs.map((t) {
+          final isActive = period.type == t.$1;
+          return Expanded(
+            child: GestureDetector(
+              onTap: () =>
+                  ref.read(reportProvider.notifier).setType(t.$1),
+              child: Container(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                decoration: BoxDecoration(
+                  color: isActive ? AppColors.bgCard : null,
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Text(
+                  t.$2,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: isActive ? AppColors.primary : AppColors.textSecondary,
+                  ),
+                ),
               ),
-              child: Row(
-                children: ['Harian', 'Mingguan', 'Bulanan'].map((p) {
-                  final isActive = _period == p;
-                  return Expanded(
-                    child: GestureDetector(
-                      onTap: () => setState(() => _period = p),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(vertical: 8),
-                        decoration: BoxDecoration(
-                          color: isActive ? AppColors.bgCard : null,
-                          borderRadius: BorderRadius.circular(20),
-                          boxShadow: isActive
-                              ? [
-                                  BoxShadow(
-                                    color: Colors.black.withOpacity(0.04),
-                                    blurRadius: 4,
-                                    offset: const Offset(0, 1),
-                                  ),
-                                ]
-                              : null,
-                        ),
-                        child: Text(
-                          p,
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600,
-                            color: isActive
-                                ? AppColors.primary
-                                : AppColors.textSecondary,
-                          ),
-                        ),
+            ),
+          );
+        }).toList(),
+      ),
+    );
+  }
+
+  Widget _dateNavigator(ReportPeriod period, bool canGoNext) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+      decoration: BoxDecoration(
+        color: AppColors.bgCard,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.border, width: 0.5),
+      ),
+      child: Row(
+        children: [
+          IconButton(
+            tooltip: 'Periode sebelumnya',
+            onPressed: () => ref.read(reportProvider.notifier).goPrevious(),
+            icon: const Icon(Icons.chevron_left, color: AppColors.textSecondary),
+          ),
+          Expanded(
+            child: InkWell(
+              onTap: () => _pickDate(period),
+              borderRadius: BorderRadius.circular(8),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                child: Column(
+                  children: [
+                    Text(
+                      period.label,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.textMain,
                       ),
                     ),
-                  );
-                }).toList(),
-              ),
-            ),
-          ),
-          // Summary cards
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: GridView.count(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                crossAxisCount: 2,
-                mainAxisSpacing: 12,
-                crossAxisSpacing: 12,
-                childAspectRatio: 1.5,
-                children: [
-                  _SummaryCard(
-                    label: 'Total penjualan',
-                    value: _summary != null
-                        ? Formatters.rupiahCompact(_summary!.totalSales)
-                        : '...',
-                    color: AppColors.primary,
-                    trend: '+18%',
-                    isUp: true,
-                  ),
-                  _SummaryCard(
-                    label: 'Total laba',
-                    value: _summary != null
-                        ? Formatters.rupiahCompact(_summary!.totalProfit)
-                        : '...',
-                    color: AppColors.successMid,
-                    trend: '+12%',
-                    isUp: true,
-                  ),
-                  _SummaryCard(
-                    label: 'Transaksi',
-                    value: _summary != null ? '${_summary!.transactions}' : '...',
-                    color: AppColors.infoMid,
-                    trend: '+8%',
-                    isUp: true,
-                  ),
-                  _SummaryCard(
-                    label: 'Rata-rata/Transaksi',
-                    value: _summary != null && _summary!.transactions > 0
-                        ? Formatters.rupiahCompact(
-                            (_summary!.totalSales / _summary!.transactions).round())
-                        : '...',
-                    color: AppColors.accentMid,
-                    trend: '+3%',
-                    isUp: true,
-                  ),
-                ],
-              ),
-            ),
-          ),
-          // Chart
-          SliverToBoxAdapter(
-            child: Container(
-              margin: const EdgeInsets.fromLTRB(16, 16, 16, 16),
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: AppColors.bgCard,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: AppColors.border, width: 0.5),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'Penjualan mingguan',
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.textMain,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  SizedBox(
-                    height: 140,
-                    child: _weeklyData.isEmpty
-                        ? const Center(
-                            child: Text('Memuat data...',
-                                style: TextStyle(color: AppColors.textTertiary)))
-                        : Row(
-                            crossAxisAlignment: CrossAxisAlignment.end,
-                            mainAxisAlignment: MainAxisAlignment.spaceAround,
-                            children: _buildChartBars(),
+                    const SizedBox(height: 2),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(Icons.calendar_today,
+                            size: 11, color: AppColors.textTertiary),
+                        const SizedBox(width: 4),
+                        Text(
+                          period.isCurrent
+                              ? 'Periode berjalan'
+                              : 'Ketuk untuk pilih tanggal',
+                          style: const TextStyle(
+                            fontSize: 11,
+                            color: AppColors.textTertiary,
                           ),
-                  ),
-                ],
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
-          // Recent transactions
-          SliverToBoxAdapter(
-            child: Container(
-              margin: const EdgeInsets.fromLTRB(16, 0, 16, 100),
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: AppColors.bgCard,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: AppColors.border, width: 0.5),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'Transaksi terbaru',
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.textMain,
-                    ),
-                  ),
-                  const SizedBox(height: 14),
-                  salesAsync.when(
-                    data: (sales) => sales.isEmpty
-                        ? const Text('Belum ada transaksi',
-                            style: TextStyle(color: AppColors.textTertiary))
-                        : Column(
-                            children: sales.take(8).map((s) => _saleRow(s)).toList(),
-                          ),
-                    loading: () => const Center(
-                      child: SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      ),
-                    ),
-                    error: (_, __) => const Text('Gagal memuat data'),
-                  ),
-                ],
-              ),
+          IconButton(
+            tooltip: 'Periode berikutnya',
+            onPressed: canGoNext
+                ? () => ref.read(reportProvider.notifier).goNext()
+                : null,
+            icon: Icon(
+              Icons.chevron_right,
+              color: canGoNext ? AppColors.textSecondary : AppColors.border,
             ),
           ),
         ],
@@ -234,101 +191,575 @@ class _LaporanScreenState extends ConsumerState<LaporanScreen> {
     );
   }
 
-  List<Widget> _buildChartBars() {
-    final maxTotal = _weeklyData.fold<int>(
-        0, (max, d) => d.total > max ? d.total : max);
-    if (maxTotal == 0) return [];
+  // --------------------------------------------------------------- ringkasan
 
-    return _weeklyData.map((d) {
-      final heightPercent = d.total / maxTotal;
-      final isHighlight = heightPercent >= 0.95;
-      return Expanded(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.end,
-          children: [
-            Container(
-              width: 24,
-              height: (100 * heightPercent).clamp(4.0, 100.0).toDouble(),
-              decoration: BoxDecoration(
-                color: isHighlight
-                    ? AppColors.primary
-                    : AppColors.primaryLight,
-                borderRadius: const BorderRadius.vertical(
-                  top: Radius.circular(6),
+  Widget _summaryGrid(ReportSummary summary) {
+    final cards = [
+      (
+        'Total penjualan',
+        Formatters.rupiahCompact(summary.totalSales),
+        Icons.payments_outlined,
+        AppColors.primary,
+        AppColors.primaryLight,
+      ),
+      (
+        'Laba kotor',
+        Formatters.rupiahCompact(summary.totalProfit),
+        Icons.trending_up,
+        AppColors.successMid,
+        AppColors.successLight,
+      ),
+      (
+        'Transaksi',
+        '${summary.transactions}',
+        Icons.receipt_long_outlined,
+        AppColors.infoMid,
+        AppColors.infoLight,
+      ),
+      (
+        'Produk terjual',
+        '${summary.itemsSold}',
+        Icons.inventory_2_outlined,
+        AppColors.accentMid,
+        AppColors.accentLight,
+      ),
+    ];
+
+    return GridView.count(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      crossAxisCount: 2,
+      mainAxisSpacing: 12,
+      crossAxisSpacing: 12,
+      childAspectRatio: 1.7,
+      children: cards
+          .map((c) => _MetricCard(
+                label: c.$1,
+                value: c.$2,
+                icon: c.$3,
+                color: c.$4,
+                bgColor: c.$5,
+              ))
+          .toList(),
+    );
+  }
+
+  // ----------------------------------------------------------------- grafik
+
+  /// Grafik per hari — dipakai untuk periode mingguan dan bulanan.
+  Widget _dailyChart(
+    List<({DateTime date, int total})> data,
+    ReportPeriod period,
+  ) {
+    final maxTotal =
+        data.fold<int>(0, (max, d) => d.total > max ? d.total : max);
+
+    return _ChartCard(
+      title: 'Penjualan per hari',
+      subtitle: maxTotal == 0
+          ? 'Belum ada penjualan pada periode ini'
+          : 'Tertinggi ${Formatters.rupiahCompact(maxTotal)}',
+      child: maxTotal == 0
+          ? const SizedBox(
+              height: 60,
+              child: Center(
+                child: Text(
+                  'Tidak ada data',
+                  style: TextStyle(color: AppColors.textTertiary, fontSize: 13),
                 ),
-                border: Border(
-                  top: BorderSide(
-                    color: AppColors.primary,
-                    width: 3,
+              ),
+            )
+          : SizedBox(
+              height: 140,
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: data.map((d) {
+                  final ratio = d.total / maxTotal;
+                  return Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 2),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          Text(
+                            d.total == 0
+                                ? ''
+                                : Formatters.rupiahCompact(d.total)
+                                    .replaceAll('Rp ', ''),
+                            style: const TextStyle(
+                              fontSize: 9,
+                              color: AppColors.textTertiary,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Container(
+                            height: (110 * ratio).clamp(4.0, 110.0).toDouble(),
+                            decoration: BoxDecoration(
+                              color: ratio >= 0.95
+                                  ? AppColors.primary
+                                  : AppColors.primaryLight,
+                              borderRadius: const BorderRadius.vertical(
+                                top: Radius.circular(4),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            '${d.date.day}',
+                            style: const TextStyle(
+                              fontSize: 10,
+                              color: AppColors.textSecondary,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                }).toList(),
+              ),
+            ),
+    );
+  }
+
+  /// Grafik per jam — dipakai untuk laporan harian, dihitung dari detail item.
+  Widget _hourlyChart(List<ReportItemDetail> items) {
+    final totals = List<int>.filled(24, 0);
+    for (final item in items) {
+      totals[item.soldAt.hour] += item.subtotal;
+    }
+
+    // Hanya tampilkan jam yang masuk akal untuk toko (06:00 - 22:00).
+    const startHour = 6;
+    const endHour = 22;
+    final visible = <({int hour, int total})>[
+      for (var h = startHour; h <= endHour; h++) (hour: h, total: totals[h]),
+    ];
+    final maxTotal =
+        visible.fold<int>(0, (max, d) => d.total > max ? d.total : max);
+
+    return _ChartCard(
+      title: 'Penjualan per jam',
+      subtitle: maxTotal == 0
+          ? 'Belum ada penjualan hari ini'
+          : 'Tertinggi ${Formatters.rupiahCompact(maxTotal)}',
+      child: maxTotal == 0
+          ? const SizedBox(
+              height: 60,
+              child: Center(
+                child: Text(
+                  'Tidak ada data',
+                  style: TextStyle(color: AppColors.textTertiary, fontSize: 13),
+                ),
+              ),
+            )
+          : SizedBox(
+              height: 130,
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: visible.map((d) {
+                  final ratio = d.total / maxTotal;
+                  return Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 1),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          Container(
+                            height: (100 * ratio).clamp(3.0, 100.0).toDouble(),
+                            decoration: BoxDecoration(
+                              color: ratio >= 0.95
+                                  ? AppColors.primary
+                                  : AppColors.primaryLight,
+                              borderRadius: const BorderRadius.vertical(
+                                top: Radius.circular(3),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          // Hanya label jam genap supaya tidak berdesakan.
+                          Text(
+                            d.hour.isEven ? '${d.hour}' : '',
+                            style: const TextStyle(
+                              fontSize: 9,
+                              color: AppColors.textSecondary,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                }).toList(),
+              ),
+            ),
+    );
+  }
+
+  // -------------------------------------------------------- produk terlaris
+
+  Widget _topProducts(List<TopProduct> products) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.bgCard,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.border, width: 0.5),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Produk terlaris',
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w700,
+              color: AppColors.textMain,
+            ),
+          ),
+          const SizedBox(height: 12),
+          if (products.isEmpty)
+            const Text(
+              'Belum ada produk terjual pada periode ini.',
+              style: TextStyle(fontSize: 13, color: AppColors.textTertiary),
+            )
+          else
+            ...products.asMap().entries.map((entry) {
+              final i = entry.key;
+              final p = entry.value;
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 24,
+                      height: 24,
+                      decoration: BoxDecoration(
+                        color: i == 0
+                            ? AppColors.accentLight
+                            : AppColors.bgSoft,
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Center(
+                        child: Text(
+                          '${i + 1}',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                            color: i == 0
+                                ? AppColors.accentMid
+                                : AppColors.textSecondary,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        p.productName,
+                        style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.textMain,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Text(
+                          '${p.quantity} terjual',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.textMain,
+                          ),
+                        ),
+                        Text(
+                          Formatters.rupiah(p.revenue),
+                          style: const TextStyle(
+                            fontSize: 11,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              );
+            }),
+        ],
+      ),
+    );
+  }
+
+  // ------------------------------------------------------- rincian per item
+
+  /// Rincian tiap produk yang terjual, dikelompokkan per tanggal.
+  /// Setiap baris memuat jam transaksi, jumlah, harga satuan, dan subtotal.
+  Widget _itemDetailSection(
+    List<ReportItemDetail> items,
+    ReportPeriod period,
+  ) {
+    // Kelompokkan per hari, urut dari yang terbaru.
+    final grouped = <String, List<ReportItemDetail>>{};
+    for (final item in items) {
+      final key = '${item.soldAt.year}-${item.soldAt.month}-'
+          '${item.soldAt.day}';
+      grouped.putIfAbsent(key, () => []).add(item);
+    }
+    final keys = grouped.keys.toList()..sort((a, b) => b.compareTo(a));
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.bgCard,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.border, width: 0.5),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Expanded(
+                child: Text(
+                  'Rincian produk terjual',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.textMain,
                   ),
                 ),
               ),
+              if (items.isNotEmpty)
+                Text(
+                  '${items.length} baris',
+                  style: const TextStyle(
+                    fontSize: 11,
+                    color: AppColors.textTertiary,
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Text(
+            period.type == ReportPeriodType.harian
+                ? 'Setiap produk yang terjual beserta jam dan harganya.'
+                : 'Dikelompokkan per tanggal transaksi.',
+            style: const TextStyle(
+              fontSize: 11,
+              color: AppColors.textTertiary,
+              height: 1.4,
             ),
-            const SizedBox(height: 6),
-            Text(
-              d.day,
-              style: TextStyle(
-                fontSize: 10,
-                color: isHighlight
-                    ? AppColors.primary
-                    : AppColors.textTertiary,
-                fontWeight: isHighlight ? FontWeight.w700 : FontWeight.w500,
+          ),
+          const SizedBox(height: 14),
+          if (items.isEmpty)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 12),
+              child: Text(
+                'Belum ada produk terjual pada periode ini.',
+                style: TextStyle(fontSize: 13, color: AppColors.textTertiary),
               ),
-            ),
-          ],
-        ),
-      );
-    }).toList();
+            )
+          else
+            ...keys.map((key) {
+              final dayItems = grouped[key]!;
+              final dayTotal =
+                  dayItems.fold<int>(0, (sum, i) => sum + i.subtotal);
+              final day = dayItems.first.soldAt;
+
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Judul hari
+                  Container(
+                    margin: const EdgeInsets.only(bottom: 8, top: 4),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 10, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: AppColors.bgSoft,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            Formatters.dateWithDay(day),
+                            style: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.textMain,
+                            ),
+                          ),
+                        ),
+                        Text(
+                          Formatters.rupiah(dayTotal),
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.primary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  ...dayItems.map(_itemRow),
+                  const SizedBox(height: 10),
+                ],
+              );
+            }),
+        ],
+      ),
+    );
   }
 
-  Widget _saleRow(SaleModel sale) {
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 10),
-      decoration: const BoxDecoration(
-        border: Border(
-          bottom: BorderSide(color: AppColors.border, width: 0.5),
-        ),
-      ),
+  Widget _itemRow(ReportItemDetail item) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Jam transaksi
           Container(
-            width: 36,
-            height: 36,
+            width: 46,
+            padding: const EdgeInsets.symmetric(vertical: 3),
             decoration: BoxDecoration(
               color: AppColors.primaryLight,
-              borderRadius: BorderRadius.circular(8),
+              borderRadius: BorderRadius.circular(6),
             ),
-            child: const Icon(Icons.receipt, size: 18, color: AppColors.primary),
+            child: Text(
+              Formatters.time(item.soldAt),
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+                color: AppColors.primaryDark,
+              ),
+            ),
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: 10),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  sale.invoiceNumber,
+                  item.productName,
                   style: const TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w600,
                     color: AppColors.textMain,
                   ),
                 ),
+                const SizedBox(height: 2),
                 Text(
-                  '${sale.totalItems} item · ${sale.paymentMethod.toUpperCase()}',
+                  '${item.quantity} x ${Formatters.rupiah(item.sellPrice)}'
+                  ' · ${Formatters.time(item.soldAt)}'
+                  '${item.customerName != null && item.customerName!.isNotEmpty ? ' · ${item.customerName}' : ''}',
                   style: const TextStyle(
                     fontSize: 11,
                     color: AppColors.textSecondary,
                   ),
                 ),
+                Text(
+                  item.invoiceNumber,
+                  style: const TextStyle(
+                    fontSize: 10,
+                    color: AppColors.textTertiary,
+                  ),
+                ),
               ],
             ),
           ),
+          const SizedBox(width: 8),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Text(
+                Formatters.rupiah(item.subtotal),
+                style: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.textMain,
+                ),
+              ),
+              Text(
+                'laba ${Formatters.rupiahCompact(item.profit)}',
+                style: const TextStyle(
+                  fontSize: 10,
+                  color: AppColors.successMid,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ------------------------------------------------------------- sub-widgets
+
+class _MetricCard extends StatelessWidget {
+  final String label;
+  final String value;
+  final IconData icon;
+  final Color color;
+  final Color bgColor;
+
+  const _MetricCard({
+    required this.label,
+    required this.value,
+    required this.icon,
+    required this.color,
+    required this.bgColor,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppColors.bgCard,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.border, width: 0.5),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 28,
+                height: 28,
+                decoration: BoxDecoration(
+                  color: bgColor,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(icon, size: 15, color: color),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  label,
+                  style: const TextStyle(
+                    fontSize: 11,
+                    color: AppColors.textSecondary,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
           Text(
-            Formatters.rupiah(sale.totalAmount),
-            style: const TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w700,
-              color: AppColors.primary,
+            value,
+            style: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.w800,
+              color: color,
+              letterSpacing: -0.5,
             ),
           ),
         ],
@@ -337,19 +768,15 @@ class _LaporanScreenState extends ConsumerState<LaporanScreen> {
   }
 }
 
-class _SummaryCard extends StatelessWidget {
-  final String label;
-  final String value;
-  final Color color;
-  final String trend;
-  final bool isUp;
+class _ChartCard extends StatelessWidget {
+  final String title;
+  final String subtitle;
+  final Widget child;
 
-  const _SummaryCard({
-    required this.label,
-    required this.value,
-    required this.color,
-    required this.trend,
-    required this.isUp,
+  const _ChartCard({
+    required this.title,
+    required this.subtitle,
+    required this.child,
   });
 
   @override
@@ -363,33 +790,25 @@ class _SummaryCard extends StatelessWidget {
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Text(
-            label,
+            title,
             style: const TextStyle(
-              fontSize: 12,
-              color: AppColors.textSecondary,
+              fontSize: 14,
+              fontWeight: FontWeight.w700,
+              color: AppColors.textMain,
             ),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 2),
           Text(
-            value,
-            style: TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.w800,
-              color: color,
-              letterSpacing: -0.5,
-            ),
-          ),
-          Text(
-            '$trend dari minggu lalu',
-            style: TextStyle(
+            subtitle,
+            style: const TextStyle(
               fontSize: 11,
-              fontWeight: FontWeight.w600,
-              color: isUp ? AppColors.successMid : AppColors.dangerMid,
+              color: AppColors.textTertiary,
             ),
           ),
+          const SizedBox(height: 16),
+          child,
         ],
       ),
     );

@@ -97,6 +97,57 @@ class AuthRepository {
     return UserModel.fromMap(results.first);
   }
 
+  /// Simpan perubahan info toko (nama, alamat, telepon, logo).
+  /// Mengembalikan user yang sudah diperbarui.
+  Future<UserModel> updateStore({
+    required int userId,
+    required String storeName,
+    String? storeAddress,
+    String? storePhone,
+    String? logoPath,
+  }) async {
+    final db = await _db.database;
+
+    final current = await getCurrentUser();
+    final merged = UserModel(
+      id: userId,
+      email: current?.email ?? '',
+      passwordHash: current?.passwordHash ?? '',
+      storeName: storeName,
+      storeAddress: (storeAddress ?? '').trim().isEmpty
+          ? null
+          : storeAddress!.trim(),
+      storePhone: (storePhone ?? '').trim().isEmpty ? null : storePhone!.trim(),
+      logoPath: logoPath,
+      createdAt: current?.createdAt ?? DateTime.now(),
+    );
+
+    await db.update(
+      'users',
+      {
+        'store_name': merged.storeName,
+        'store_address': merged.storeAddress,
+        'store_phone': merged.storePhone,
+        'logo_path': merged.logoPath,
+      },
+      where: 'id = ?',
+      whereArgs: [userId],
+    );
+
+    return merged;
+  }
+
+  /// Simpan hanya path logo (dipakai setelah memilih gambar dari galeri).
+  Future<void> updateLogoPath(int userId, String? logoPath) async {
+    final db = await _db.database;
+    await db.update(
+      'users',
+      {'logo_path': logoPath},
+      where: 'id = ?',
+      whereArgs: [userId],
+    );
+  }
+
   /// Logout — clears the session.
   Future<void> logout() async {
     final prefs = await SharedPreferences.getInstance();

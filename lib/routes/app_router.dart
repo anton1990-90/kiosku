@@ -4,12 +4,21 @@ import 'package:go_router/go_router.dart';
 import '../providers/auth_provider.dart';
 import '../providers/license_provider.dart';
 import '../core/constants/app_colors.dart';
+import '../data/models/debt_model.dart';
+import '../data/models/note_model.dart';
 import '../features/auth/login_screen.dart';
 import '../features/auth/register_screen.dart';
+import '../features/catatan/catatan_form_screen.dart';
+import '../features/catatan/catatan_screen.dart';
+import '../features/hutang/hutang_form_screen.dart';
+import '../features/hutang/hutang_screen.dart';
 import '../features/license/activation_screen.dart';
 import '../features/dashboard/dashboard_screen.dart';
 import '../features/kasir/kasir_screen.dart';
 import '../features/produk/produk_screen.dart';
+import '../features/profile/payment_methods_screen.dart';
+import '../features/profile/store_info_screen.dart';
+import '../features/profile/supplier_screen.dart';
 import '../features/stok/stok_screen.dart';
 import '../features/laporan/laporan_screen.dart';
 import '../features/profile/profile_screen.dart';
@@ -82,6 +91,54 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/auth/register',
         name: 'register',
         builder: (context, state) => const RegisterScreen(),
+      ),
+      // Halaman detail (tanpa bottom nav) — dibuka dengan tombol kembali.
+      GoRoute(
+        path: '/hutang',
+        name: 'hutang',
+        builder: (context, state) => const HutangScreen(),
+      ),
+      GoRoute(
+        path: '/hutang/tambah',
+        name: 'hutangTambah',
+        builder: (context, state) => const HutangFormScreen(),
+      ),
+      GoRoute(
+        path: '/hutang/edit',
+        name: 'hutangEdit',
+        builder: (context, state) =>
+            HutangFormScreen(debt: state.extra as DebtModel?),
+      ),
+      GoRoute(
+        path: '/catatan',
+        name: 'catatan',
+        builder: (context, state) => const CatatanScreen(),
+      ),
+      GoRoute(
+        path: '/catatan/tambah',
+        name: 'catatanTambah',
+        builder: (context, state) => const CatatanFormScreen(),
+      ),
+      GoRoute(
+        path: '/catatan/edit',
+        name: 'catatanEdit',
+        builder: (context, state) =>
+            CatatanFormScreen(note: state.extra as NoteModel?),
+      ),
+      GoRoute(
+        path: '/profile/toko',
+        name: 'storeInfo',
+        builder: (context, state) => const StoreInfoScreen(),
+      ),
+      GoRoute(
+        path: '/profile/pembayaran',
+        name: 'paymentMethods',
+        builder: (context, state) => const PaymentMethodsScreen(),
+      ),
+      GoRoute(
+        path: '/profile/supplier',
+        name: 'supplier',
+        builder: (context, state) => const SupplierScreen(),
       ),
       // Main app routes (with bottom nav shell)
       ShellRoute(

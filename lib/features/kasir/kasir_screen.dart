@@ -8,6 +8,7 @@ import '../../data/models/sale_model.dart';
 import '../../data/models/user_model.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/cart_provider.dart';
+import '../../providers/payment_method_provider.dart';
 import '../../providers/product_provider.dart';
 import '../../providers/sale_provider.dart';
 import '../../shared/services/bluetooth_printer_service.dart';
@@ -130,6 +131,7 @@ class _KasirScreenState extends ConsumerState<KasirScreen> {
         items: items,
         storeName: user.storeName,
         storeAddress: user.storeAddress,
+        storePhone: user.storePhone,
       );
       await BluetoothPrinterService.instance.printBytes(device, bytes);
       await BluetoothPrinterService.instance.disconnect(device);
@@ -614,16 +616,17 @@ class _KasirScreenState extends ConsumerState<KasirScreen> {
 }
 
 /// Payment dialog — choose payment method and enter paid amount.
-class _PaymentDialog extends StatefulWidget {
+/// Pilihan metode diambil dari pengaturan "Metode pembayaran" di Profil.
+class _PaymentDialog extends ConsumerStatefulWidget {
   final int totalAmount;
 
   const _PaymentDialog({required this.totalAmount});
 
   @override
-  State<_PaymentDialog> createState() => _PaymentDialogState();
+  ConsumerState<_PaymentDialog> createState() => _PaymentDialogState();
 }
 
-class _PaymentDialogState extends State<_PaymentDialog> {
+class _PaymentDialogState extends ConsumerState<_PaymentDialog> {
   String _method = 'tunai';
   final _paidController = TextEditingController();
 
@@ -631,6 +634,15 @@ class _PaymentDialogState extends State<_PaymentDialog> {
   void initState() {
     super.initState();
     _paidController.text = widget.totalAmount.toString();
+    // Muat metode terbaru, lalu pilih yang pertama sebagai default.
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      await ref.read(paymentMethodProvider.notifier).loadMethods();
+      if (!mounted) return;
+      final active = ref.read(paymentMethodProvider).active;
+      if (active.isNotEmpty) {
+        setState(() => _method = active.first.code);
+      }
+    });
   }
 
   @override
@@ -663,15 +675,24 @@ class _PaymentDialogState extends State<_PaymentDialog> {
           const Text('Metode pembayaran',
               style: TextStyle(fontSize: 13, color: AppColors.textSecondary)),
           const SizedBox(height: 8),
-          Row(
-            children: [
-              _methodChip('tunai', 'Tunai'),
-              const SizedBox(width: 8),
-              _methodChip('qris', 'QRIS'),
-              const SizedBox(width: 8),
-              _methodChip('ewallet', 'E-Wallet'),
-            ],
-          ),
+          Builder(builder: (context) {
+            final methods = ref.watch(paymentMethodProvider).active;
+            // Kalau pengguna belum mengatur metode apa pun, sediakan Tunai
+            // supaya transaksi tetap bisa diselesaikan.
+            final List<({String code, String name})> choices = methods.isEmpty
+                ? <({String code, String name})>[
+                    (code: 'tunai', name: 'Tunai'),
+                  ]
+                : methods.map((m) => (code: m.code, name: m.name)).toList();
+
+            return Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: choices
+                  .map((c) => _methodChip(c.code, c.name))
+                  .toList(),
+            );
+          }),
           const SizedBox(height: 16),
           TextField(
             controller: _paidController,

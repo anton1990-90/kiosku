@@ -67,25 +67,20 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
             SliverToBoxAdapter(
               child: Container(
                 color: AppColors.bgCard,
-                padding: const EdgeInsets.only(
-                    top: 8, left: 20, right: 20, bottom: 16),
+                padding: EdgeInsets.only(
+                  top: topSafePadding(context, extra: 12),
+                  left: 20,
+                  right: 20,
+                  bottom: 16,
+                ),
                 child: Column(
                   children: [
                     Row(
                       children: [
-                        CircleAvatar(
+                        StoreAvatar(
+                          logoPath: user?.logoPath,
+                          initials: user?.initials ?? 'TS',
                           radius: 22,
-                          backgroundColor: AppColors.primary,
-                          child: Text(
-                            (user?.storeName.isNotEmpty == true)
-                                ? user!.storeName.substring(0, 2).toUpperCase()
-                                : 'TS',
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.w700,
-                              fontSize: 16,
-                            ),
-                          ),
                         ),
                         const SizedBox(width: 12),
                         Expanded(
@@ -220,14 +215,14 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                       iconColor: AppColors.infoMid,
                       iconBgColor: AppColors.infoLight,
                       label: 'Hutang',
-                      onTap: () {},
+                      onTap: () => context.push('/hutang'),
                     ),
                     QuickAction(
-                      icon: Icons.note_add_outlined,
+                      icon: Icons.note_alt_outlined,
                       iconColor: AppColors.dangerMid,
                       iconBgColor: AppColors.dangerLight,
                       label: 'Catatan',
-                      onTap: () {},
+                      onTap: () => context.push('/catatan'),
                     ),
                   ],
                 ),

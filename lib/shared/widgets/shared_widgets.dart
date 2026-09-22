@@ -1,6 +1,77 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/utils/formatters.dart';
+
+/// Jarak aman dari tepi atas layar, termasuk tinggi status bar HP.
+///
+/// Dipakai oleh layar yang memakai header sendiri (bukan `AppBar`). Tanpa ini
+/// header akan tertutup jam/baterai/notch HP. Header tetap boleh mewarnai
+/// area di belakang status bar — yang digeser hanya isinya.
+double topSafePadding(BuildContext context, {double extra = 0}) {
+  return MediaQuery.of(context).padding.top + extra;
+}
+
+/// Avatar toko: menampilkan logo usaha kalau sudah dipasang, kalau belum
+/// memakai inisial nama toko. Dipakai di header beranda dan profil.
+class StoreAvatar extends StatelessWidget {
+  final String? logoPath;
+  final String initials;
+  final double radius;
+  final Color backgroundColor;
+  final Color foregroundColor;
+  final Color? borderColor;
+
+  const StoreAvatar({
+    super.key,
+    required this.logoPath,
+    required this.initials,
+    this.radius = 22,
+    this.backgroundColor = AppColors.primary,
+    this.foregroundColor = Colors.white,
+    this.borderColor,
+  });
+
+  bool get _hasLogo => logoPath != null && logoPath!.isNotEmpty;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: radius * 2,
+      height: radius * 2,
+      decoration: BoxDecoration(
+        color: _hasLogo ? Colors.white : backgroundColor,
+        shape: BoxShape.circle,
+        border: borderColor == null
+            ? null
+            : Border.all(color: borderColor!, width: 3),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: _hasLogo
+          // File gambar lokal bisa hilang (aplikasi dibersihkan). Kalau gagal
+          // dibaca, tampilkan inisial supaya header tidak kosong.
+          ? Image.file(
+              File(logoPath!),
+              fit: BoxFit.cover,
+              errorBuilder: (_, __, ___) => _initials(),
+            )
+          : _initials(),
+    );
+  }
+
+  Widget _initials() {
+    return Center(
+      child: Text(
+        initials,
+        style: TextStyle(
+          color: foregroundColor,
+          fontWeight: FontWeight.w700,
+          fontSize: radius * 0.7,
+        ),
+      ),
+    );
+  }
+}
 
 /// Stat card for dashboard — shows a metric with icon and trend.
 class StatCard extends StatelessWidget {

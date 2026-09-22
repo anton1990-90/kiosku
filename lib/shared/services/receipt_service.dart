@@ -15,6 +15,7 @@ class ReceiptService {
     required List<SaleItemModel> items,
     required String storeName,
     String? storeAddress,
+    String? storePhone,
     int paperWidth = 58,
   }) async {
     final profile = await CapabilityProfile.load();
@@ -35,6 +36,12 @@ class ReceiptService {
     if (storeAddress != null && storeAddress.isNotEmpty) {
       bytes += generator.text(
         storeAddress,
+        styles: const PosStyles(align: PosAlign.center),
+      );
+    }
+    if (storePhone != null && storePhone.isNotEmpty) {
+      bytes += generator.text(
+        'Telp: $storePhone',
         styles: const PosStyles(align: PosAlign.center),
       );
     }
@@ -140,6 +147,7 @@ class ReceiptService {
     required List<SaleItemModel> items,
     required String storeName,
     String? storeAddress,
+    String? storePhone,
   }) {
     final buffer = StringBuffer();
     final line = '--------------------------------\n';
@@ -147,6 +155,9 @@ class ReceiptService {
     buffer.writeln(storeName);
     if (storeAddress != null && storeAddress.isNotEmpty) {
       buffer.writeln(storeAddress);
+    }
+    if (storePhone != null && storePhone.isNotEmpty) {
+      buffer.writeln('Telp: $storePhone');
     }
     buffer.write(line);
     buffer.writeln('STRUK PENJUALAN');

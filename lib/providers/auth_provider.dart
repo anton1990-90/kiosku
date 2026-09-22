@@ -98,6 +98,44 @@ class AuthNotifier extends StateNotifier<AuthState> {
     state = const AuthState(isLoading: false);
   }
 
+  /// Simpan perubahan info toko dari layar "Info toko".
+  /// Mengembalikan true kalau berhasil.
+  Future<bool> updateStore({
+    required String storeName,
+    String? storeAddress,
+    String? storePhone,
+    String? logoPath,
+  }) async {
+    final userId = state.user?.id;
+    if (userId == null) return false;
+
+    try {
+      final updated = await _repo.updateStore(
+        userId: userId,
+        storeName: storeName,
+        storeAddress: storeAddress,
+        storePhone: storePhone,
+        logoPath: logoPath ?? state.user?.logoPath,
+      );
+      state = AuthState(
+        user: updated,
+        isLoading: false,
+        isFirstRun: false,
+      );
+      return true;
+    } catch (e) {
+      state = state.copyWith(isLoading: false, error: e.toString());
+      return false;
+    }
+  }
+
+  /// Perbarui state setelah logo diganti, tanpa menulis ulang info toko.
+  Future<void> refreshUser() async {
+    final user = await _repo.getCurrentUser();
+    if (user == null) return;
+    state = AuthState(user: user, isLoading: false, isFirstRun: false);
+  }
+
   /// Clear error message.
   void clearError() {
     state = state.copyWith();

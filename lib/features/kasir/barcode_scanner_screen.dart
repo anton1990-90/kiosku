@@ -5,10 +5,28 @@ import '../../data/models/product_model.dart';
 import '../../data/repositories/product_repository.dart';
 
 /// Barcode scanner screen — scan a product barcode (EAN-13 / UPC).
-/// Returns the scanned [ProductModel] via Navigator.pop, or the raw barcode
-/// string if no product matches.
+///
+/// Dua mode:
+///   * [rawMode] false (default) — cari produk berdasarkan barcode, lalu
+///     kembalikan [ProductModel] lewat Navigator.pop. Dipakai di layar Kasir.
+///   * [rawMode] true — langsung kembalikan string barcode apa adanya.
+///     Dipakai saat menambah produk baru, karena produknya belum ada.
 class BarcodeScannerScreen extends StatefulWidget {
-  const BarcodeScannerScreen({super.key});
+  final bool rawMode;
+
+  const BarcodeScannerScreen({super.key, this.rawMode = false});
+
+  /// Buka layar scan dan tunggu hasil berupa string barcode.
+  /// Mengembalikan null kalau pengguna menutup layar tanpa scan.
+  static Future<String?> scanRaw(BuildContext context) async {
+    final result = await Navigator.push<String>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => const BarcodeScannerScreen(rawMode: true),
+      ),
+    );
+    return result;
+  }
 
   @override
   State<BarcodeScannerScreen> createState() => _BarcodeScannerScreenState();
@@ -36,6 +54,12 @@ class _BarcodeScannerScreenState extends State<BarcodeScannerScreen> {
     _isProcessing = true;
 
     try {
+      // Mode isi form: kembalikan barcode apa adanya, tanpa cari produk.
+      if (widget.rawMode) {
+        if (mounted) Navigator.pop(context, rawValue);
+        return;
+      }
+
       // Look up product by barcode
       final product = await _repo.findByBarcode(rawValue);
       if (product != null && mounted) {
@@ -68,7 +92,7 @@ class _BarcodeScannerScreenState extends State<BarcodeScannerScreen> {
       appBar: AppBar(
         backgroundColor: Colors.black,
         foregroundColor: Colors.white,
-        title: const Text('Scan Barcode'),
+        title: Text(widget.rawMode ? 'Scan Barcode Produk' : 'Scan Barcode'),
         actions: [
           IconButton(
             icon: const Icon(Icons.flash_on),
@@ -106,9 +130,12 @@ class _BarcodeScannerScreenState extends State<BarcodeScannerScreen> {
                 color: Colors.black.withOpacity(0.6),
                 borderRadius: BorderRadius.circular(20),
               ),
-              child: const Text(
-                'Arahkan kamera ke barcode produk',
-                style: TextStyle(color: Colors.white, fontSize: 14),
+              child: Text(
+                widget.rawMode
+                    ? 'Arahkan kamera ke barcode pada kemasan produk'
+                    : 'Arahkan kamera ke barcode produk',
+                style: const TextStyle(color: Colors.white, fontSize: 14),
+                textAlign: TextAlign.center,
               ),
             ),
           ),

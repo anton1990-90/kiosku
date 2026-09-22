@@ -5,10 +5,15 @@ import 'package:package_info_plus/package_info_plus.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/utils/formatters.dart';
 import '../../providers/auth_provider.dart';
+import '../../providers/debt_provider.dart';
 import '../../providers/license_provider.dart';
+import '../../providers/note_provider.dart';
+import '../../providers/payment_method_provider.dart';
 import '../../providers/product_provider.dart';
 import '../../providers/sale_provider.dart';
+import '../../providers/supplier_provider.dart';
 import '../../shared/services/update_service.dart';
+import '../../shared/widgets/shared_widgets.dart';
 import '../../shared/widgets/update_dialog.dart';
 
 /// Profile screen — store info, settings, and logout.
@@ -162,6 +167,10 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     final productState = ref.watch(productProvider);
     final salesAsync = ref.watch(saleProvider);
     final licenseState = ref.watch(licenseProvider);
+    final debtState = ref.watch(debtProvider);
+    final noteState = ref.watch(noteProvider);
+    final supplierState = ref.watch(supplierProvider);
+    final paymentState = ref.watch(paymentMethodProvider);
     final user = authState.user;
 
     final totalTransactions =
@@ -174,7 +183,12 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           // Profile header
           SliverToBoxAdapter(
             child: Container(
-              padding: const EdgeInsets.fromLTRB(20, 20, 20, 28),
+              padding: EdgeInsets.fromLTRB(
+                20,
+                topSafePadding(context, extra: 20),
+                20,
+                28,
+              ),
               decoration: const BoxDecoration(
                 gradient: LinearGradient(
                   colors: [AppColors.primary, AppColors.primaryDark],
@@ -184,29 +198,13 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               ),
               child: Column(
                 children: [
-                  Container(
-                    width: 72,
-                    height: 72,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: Colors.white.withOpacity(0.2),
-                      border: Border.all(
-                        color: Colors.white.withOpacity(0.3),
-                        width: 3,
-                      ),
-                    ),
-                    child: Center(
-                      child: Text(
-                        (user?.storeName.isNotEmpty == true)
-                            ? user!.storeName.substring(0, 2).toUpperCase()
-                            : 'TS',
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 28,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ),
+                  StoreAvatar(
+                    logoPath: user?.logoPath,
+                    initials: user?.initials ?? 'TS',
+                    radius: 36,
+                    backgroundColor: Colors.white.withOpacity(0.2),
+                    foregroundColor: Colors.white,
+                    borderColor: Colors.white.withOpacity(0.3),
                   ),
                   const SizedBox(height: 12),
                   Text(
@@ -300,25 +298,61 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                         icon: Icons.store_outlined,
                         color: AppColors.primary,
                         title: 'Info toko',
-                        subtitle: user?.storeAddress ?? 'Lengkapi alamat toko',
+                        subtitle: user?.storeAddress?.isNotEmpty == true
+                            ? user!.storeAddress!
+                            : 'Nama, alamat, telepon & logo usaha',
                         trailing: Icons.chevron_right,
-                        onTap: () {},
+                        onTap: () => context.push('/profile/toko'),
                       ),
                       _MenuItem(
                         icon: Icons.payments_outlined,
                         color: AppColors.accentMid,
                         title: 'Metode pembayaran',
-                        subtitle: 'Tunai, QRIS, e-wallet',
+                        subtitle: paymentState.methods.isEmpty
+                            ? 'Belum ada metode'
+                            : paymentState.active
+                                .map((m) => m.name)
+                                .join(', '),
                         trailing: Icons.chevron_right,
-                        onTap: () {},
+                        onTap: () => context.push('/profile/pembayaran'),
                       ),
                       _MenuItem(
                         icon: Icons.people_outline,
                         color: AppColors.infoMid,
                         title: 'Supplier',
-                        subtitle: 'Kelola data supplier',
+                        subtitle: supplierState.suppliers.isEmpty
+                            ? 'Kelola data supplier'
+                            : '${supplierState.suppliers.length} supplier terdaftar',
                         trailing: Icons.chevron_right,
-                        onTap: () {},
+                        onTap: () => context.push('/profile/supplier'),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 20),
+                  const _MenuGroupTitle('Hutang & catatan'),
+                  _MenuCard(
+                    children: [
+                      _MenuItem(
+                        icon: Icons.handshake_outlined,
+                        color: AppColors.infoMid,
+                        title: 'Hutang & piutang',
+                        subtitle: debtState.totalPiutang == 0 &&
+                                debtState.totalHutang == 0
+                            ? 'Belum ada hutang tercatat'
+                            : 'Piutang ${Formatters.rupiahCompact(debtState.totalPiutang)} · '
+                                'Hutang ${Formatters.rupiahCompact(debtState.totalHutang)}',
+                        trailing: Icons.chevron_right,
+                        onTap: () => context.push('/hutang'),
+                      ),
+                      _MenuItem(
+                        icon: Icons.note_alt_outlined,
+                        color: AppColors.dangerMid,
+                        title: 'Catatan',
+                        subtitle: noteState.notes.isEmpty
+                            ? 'Tulis catatan toko'
+                            : '${noteState.notes.length} catatan tersimpan',
+                        trailing: Icons.chevron_right,
+                        onTap: () => context.push('/catatan'),
                       ),
                     ],
                   ),

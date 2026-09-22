@@ -79,7 +79,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _licenseRow('Kode lisensi', license?.code ?? '-'),
+            _licenseRow('Kode aktivasi', license?.code ?? '-'),
             _licenseRow('Pemilik', license?.customerName.isNotEmpty == true
                 ? license!.customerName
                 : '-'),

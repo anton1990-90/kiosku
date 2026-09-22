@@ -18,7 +18,7 @@ dari Anda.
 | Bagian | Status |
 |---|---|
 | Kode lisensi + aktivasi + cek pembaruan | Selesai, sudah di-commit & build sukses |
-| Fitur hutang, catatan, laporan harian/mingguan/bulanan, scan barcode, profil toko | Selesai — versi **1.2.0** |
+| Fitur hutang, catatan, laporan harian/mingguan/bulanan, scan barcode, profil toko | Selesai — versi **1.2.1** |
 | Portal aktivasi pelanggan + halaman admin penjual | Selesai — ada di folder `cloudflare/` |
 | APK bisa diunduh | Selesai — [tautan rilis terbaru](https://github.com/anton1990-90/kiosku/releases/latest/download/app-release.apk) |
 | **Kunci tanda tangan (BAGIAN A)** | **Belum** — 4 GitHub Secrets masih kosong, jadi APK saat ini masih ditandatangani debug key |

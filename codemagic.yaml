@@ -1,38 +1,71 @@
+# ============================================================================
+# TokoKu — build APK di Codemagic (jalur alternatif selain GitHub Actions)
+#
+# PENTING: seluruh penambalan Android dikerjakan oleh tools/ci_patch.py.
+# JANGAN menambal AndroidManifest.xml atau build.gradle secara manual di sini.
+#
+# Versi lama berkas ini menambal izin sendiri dan LUPA menambahkan izin
+# INTERNET. Akibatnya APK hasil build Codemagic tidak akan pernah bisa
+# aktivasi lisensi — pelanggan mentok di layar aktivasi selamanya. Karena itu
+# sekarang jalur ini memakai skrip yang sama persis dengan GitHub Actions,
+# supaya tidak bisa berbeda lagi.
+#
+# ---------------------------------------------------------------------------
+# SEBELUM DIPAKAI — buat Environment Group bernama `tokoku`
+# Codemagic > aplikasi Anda > Environment variables > Add group
+# Isi 4 variabel berikut, semuanya ditandai "Secure":
+#
+#   KEYSTORE_BASE64     seluruh isi release-signing/keystore-base64.txt
+#   KEYSTORE_PASSWORD   seluruh isi release-signing/storepass.txt
+#   KEY_ALIAS           tokoku
+#   KEY_PASSWORD        seluruh isi release-signing/storepass.txt
+#
+# Kalau grup `tokoku` belum ada, build akan GAGAL sejak awal — itu disengaja,
+# lebih baik gagal daripada diam-diam menghasilkan APK debug key yang tidak
+# boleh dijual.
+# ============================================================================
+
 workflows:
   android-build:
     name: TokoKu Android Build
     max_build_duration: 60
     instance_type: mac_mini_m2
     environment:
-      flutter: stable
+      # Disamakan dengan GitHub Actions — jangan pakai `stable`, versi Flutter
+      # yang berubah-ubah pernah menggagalkan build tanpa perubahan kode.
+      flutter: 3.27.0
       java: 17
+      groups:
+        - tokoku
     scripts:
-      - name: Generate android folder (jika belum ada)
+      - name: Generate folder android
         script: flutter create . --project-name tokoku --platforms android
-      - name: Tambah izin Android
+
+      - name: Beri izin eksekusi Gradle
+        script: chmod +x android/gradlew
+
+      - name: Siapkan keystore rilis
         script: |
-          python3 - <<'EOF'
-          p = 'android/app/src/main/AndroidManifest.xml'
-          with open(p) as f:
-              content = f.read()
-          perms = '''    <uses-permission android:name="android.permission.CAMERA" />
-              <uses-permission android:name="android.permission.BLUETOOTH" />
-              <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" />
-              <uses-permission android:name="android.permission.BLUETOOTH_SCAN" />
-              <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
-              <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
-      '''
-          content = content.replace('<application', perms + '    <application', 1)
-          with open(p, 'w') as f:
-              f.write(content)
-          EOF
+          if [ -n "$KEYSTORE_BASE64" ]; then
+            printf '%s' "$KEYSTORE_BASE64" | base64 -d > android/app/tokoku-release.jks
+            echo "Keystore rilis terpasang: $(wc -c < android/app/tokoku-release.jks) byte"
+          else
+            echo "PERINGATAN: KEYSTORE_BASE64 kosong."
+            echo "APK akan ditandatangani DEBUG KEY dan tidak bisa dipakai untuk update."
+            echo "Jangan dijual sebelum keempat variabel di grup 'tokoku' diisi."
+          fi
+
+      - name: Patch konfigurasi Android
+        script: python3 tools/ci_patch.py
+
       - name: Install dependencies
         script: flutter pub get
+
+      - name: Analisa kode (hanya info, tidak menggagalkan build)
+        script: flutter analyze --no-fatal-infos --no-fatal-warnings || true
+
       - name: Build APK release
         script: flutter build apk --release
+
     artifacts:
       - build/app/outputs/flutter-apk/app-release.apk
-    publishing:
-      email:
-        recipients:
-          - user@example.com

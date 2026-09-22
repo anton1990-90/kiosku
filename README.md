@@ -1,4 +1,4 @@
-# TokoKu — Aplikasi UMKM Toko Sembako & Penjualan (v1.2.0)
+# TokoKu — Aplikasi UMKM Toko Sembako & Penjualan (v1.2.1)
 
 Aplikasi mobile cross-platform (Android & iOS) untuk toko sembako UMKM. Dibuat dengan Flutter, bekerja **offline-first** dengan autentikasi email.
 
@@ -69,14 +69,29 @@ git remote add origin https://github.com/USERNAME/tokoku.git
 git push -u origin main
 ```
 
-### Opsi B: Codemagic (gratis untuk project open-source)
+### Opsi B: Codemagic (jalur alternatif)
 
-1. Daftar di [Codemagic](https://codemagic.io) dengan akun GitHub
-2. Tambahkan repository → pilih project
-3. Codemagic otomatis membaca `codemagic.yaml`
-4. Klik **Start build** → APK bisa diunduh setelah selesai
+Codemagic membaca `codemagic.yaml` dan menjalankan langkah yang **sama persis** dengan
+GitHub Actions — termasuk `tools/ci_patch.py`, yang mengurus izin Android, `namespace`,
+`compileSdk`, dan tanda tangan rilis. Jangan menambal Android secara manual di
+`codemagic.yaml`; versi lama melakukannya sendiri dan lupa izin `INTERNET`, sehingga APK
+hasilnya tidak akan pernah bisa aktivasi lisensi.
 
-> **Catatan**: Kedua opsi di atas sudah otomatis menambahkan izin kamera & bluetooth ke AndroidManifest. Untuk build lokal, tambahkan izin manual (lihat `docs/android-permissions.md`).
+Sebelum build pertama, buat **Environment Group** bernama `tokoku` di
+Codemagic → Environment variables, isi 4 variabel (semuanya ditandai *Secure*):
+
+| Variabel | Isi |
+|---|---|
+| `KEYSTORE_BASE64` | seluruh isi `release-signing/keystore-base64.txt` |
+| `KEYSTORE_PASSWORD` | seluruh isi `release-signing/storepass.txt` |
+| `KEY_ALIAS` | `tokoku` |
+| `KEY_PASSWORD` | seluruh isi `release-signing/storepass.txt` |
+
+Kalau grup itu belum ada, build **gagal sejak awal** — disengaja, supaya tidak ada APK
+debug key yang lolos tanpa disadari.
+
+> **Catatan**: Untuk build lokal di komputer sendiri, izin Android perlu ditambahkan manual
+> (lihat `docs/android-permissions.md`). Kedua jalur online di atas sudah otomatis.
 
 ## Arsitektur
 

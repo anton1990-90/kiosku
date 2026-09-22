@@ -11,6 +11,10 @@ class BluetoothPrinterService {
   BluetoothPrinterService._();
   static final BluetoothPrinterService instance = BluetoothPrinterService._();
 
+  /// Discovered GATT services per connected device id.
+  /// Stored manually so we do not depend on version-specific getters.
+  final Map<String, List<BluetoothService>> _services = {};
+
   /// Scan for nearby devices, filtered by common thermal printer names.
   Future<List<BluetoothDevice>> scanPrinters({Duration timeout = const Duration(seconds: 8)}) async {
     final found = <String, BluetoothDevice>{};
@@ -47,16 +51,20 @@ class BluetoothPrinterService {
     return keywords.any(lower.contains);
   }
 
-  /// Connect to a device and return it (ready for writing).
+  /// Connect to a device, discover its services, and return it (ready for writing).
   Future<BluetoothDevice> connect(BluetoothDevice device) async {
     await device.connect(timeout: const Duration(seconds: 10));
-    await device.discoverServices();
+    final services = await device.discoverServices();
+    _services[device.remoteId.str] = services;
     return device;
   }
 
   /// Find a writable characteristic on the connected device.
   BluetoothCharacteristic? findWriteCharacteristic(BluetoothDevice device) {
-    for (final service in device.servicesList) {
+    final services = _services[device.remoteId.str];
+    if (services == null) return null;
+
+    for (final service in services) {
       for (final characteristic in service.characteristics) {
         // Properties.write or Properties.writeWithoutResponse
         if (characteristic.properties.write ||
@@ -87,6 +95,7 @@ class BluetoothPrinterService {
 
   /// Disconnect from a device.
   Future<void> disconnect(BluetoothDevice device) async {
+    _services.remove(device.remoteId.str);
     await device.disconnect();
   }
 }

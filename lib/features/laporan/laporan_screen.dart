@@ -248,7 +248,7 @@ class _LaporanScreenState extends ConsumerState<LaporanScreen> {
           children: [
             Container(
               width: 24,
-              height: (100 * heightPercent).clamp(4, 100),
+              height: (100 * heightPercent).clamp(4.0, 100.0).toDouble(),
               decoration: BoxDecoration(
                 color: isHighlight
                     ? AppColors.primary

@@ -28,6 +28,22 @@ class CartState {
   int get totalItems => items.fold(0, (sum, i) => sum + i.quantity);
   bool get isEmpty => items.isEmpty;
 
+  /// Convert cart items to sale items.
+  /// saleId is a placeholder (0) — it is overwritten during the DB transaction.
+  List<SaleItemModel> toSaleItems() {
+    return items
+        .map((i) => SaleItemModel(
+              saleId: 0,
+              productId: i.product.id!,
+              productName: i.product.name,
+              costPrice: i.product.costPrice,
+              sellPrice: i.product.sellPrice,
+              quantity: i.quantity,
+              subtotal: i.subtotal,
+            ))
+        .toList();
+  }
+
   CartState copyWith({
     List<CartItem>? items,
     String? customerName,
@@ -106,22 +122,6 @@ class CartNotifier extends StateNotifier<CartState> {
 
   void clearCart() {
     state = const CartState();
-  }
-
-  /// Convert cart items to sale items.
-  /// saleId is a placeholder (0) — it is overwritten during the DB transaction.
-  List<SaleItemModel> toSaleItems() {
-    return state.items
-        .map((i) => SaleItemModel(
-              saleId: 0,
-              productId: i.product.id!,
-              productName: i.product.name,
-              costPrice: i.product.costPrice,
-              sellPrice: i.product.sellPrice,
-              quantity: i.quantity,
-              subtotal: i.subtotal,
-            ))
-        .toList();
   }
 }
 

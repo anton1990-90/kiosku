@@ -14,7 +14,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Setup Java 17
-        uses: actions/setup-java@v5
+        uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
           java-version: '17'
@@ -23,9 +23,11 @@ jobs:
         uses: subosito/flutter-action@v2
         with:
           channel: 'stable'
-          # Menggunakan versi stabil terbaru yang spesifik
           flutter-version: '3.27.0'
-          cache: false # Ubah jadi false
+          cache: false
+
+      - name: Tampilkan versi Flutter
+        run: flutter --version
 
       - name: Generate folder android
         run: flutter create . --project-name tokoku --platforms android
@@ -33,7 +35,7 @@ jobs:
       - name: Beri izin eksekusi Gradle
         run: chmod +x android/gradlew
 
-      - name: Tambah izin Android
+      - name: Tambah izin Android (kamera & bluetooth)
         run: |
           python3 -c "
           p = 'android/app/src/main/AndroidManifest.xml'
@@ -42,10 +44,26 @@ jobs:
           if '<uses-permission' not in content:
               content = content.replace('<application', perms + '    <application')
               with open(p, 'w') as f: f.write(content)
+          print(content)
+          "
+
+      - name: Set compileSdk 35 dan minSdk 21
+        run: |
+          python3 -c "
+          import re
+          p = 'android/app/build.gradle'
+          s = open(p).read()
+          s = re.sub(r'compileSdk(?:Version)?\s*=?\s*flutter\.compileSdkVersion', 'compileSdk = 35', s)
+          s = re.sub(r'minSdk(?:Version)?\s*=?\s*flutter\.minSdkVersion', 'minSdk = 21', s)
+          open(p, 'w').write(s)
+          print(s)
           "
 
       - name: Install dependencies
         run: flutter pub get
+
+      - name: Analisa kode (hanya info, tidak menggagalkan build)
+        run: flutter analyze --no-fatal-infos --no-fatal-warnings || true
 
       - name: Build APK release
         run: flutter build apk --release

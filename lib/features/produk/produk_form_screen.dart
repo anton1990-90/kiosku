@@ -160,6 +160,7 @@ class _ProdukFormScreenState extends ConsumerState<ProdukFormScreen> {
                   child: TextFormField(
                     controller: _costPriceController,
                     keyboardType: TextInputType.number,
+                    onChanged: (_) => setState(() {}),
                     decoration: const InputDecoration(
                       labelText: 'Harga modal',
                       prefixText: 'Rp ',
@@ -173,6 +174,7 @@ class _ProdukFormScreenState extends ConsumerState<ProdukFormScreen> {
                   child: TextFormField(
                     controller: _sellPriceController,
                     keyboardType: TextInputType.number,
+                    onChanged: (_) => setState(() {}),
                     decoration: const InputDecoration(
                       labelText: 'Harga jual',
                       prefixText: 'Rp ',

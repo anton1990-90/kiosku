@@ -203,8 +203,9 @@ class _StokItem extends StatelessWidget {
         : isLow
             ? AppColors.warning
             : AppColors.success;
-    final maxDisplay = (product.minStock * 3).clamp(1, 100);
-    final barPercent = (product.stock / maxDisplay).clamp(0.0, 1.0);
+    final maxDisplay = (product.minStock * 3).clamp(1, 100).toInt();
+    final barPercent =
+        (product.stock / maxDisplay).clamp(0.0, 1.0).toDouble();
 
     return Container(
       margin: const EdgeInsets.fromLTRB(16, 0, 16, 8),

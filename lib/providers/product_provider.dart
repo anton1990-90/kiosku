@@ -97,6 +97,29 @@ class ProductNotifier extends StateNotifier<ProductState> {
     await loadProducts();
   }
 
+  /// Restok lengkap — mencatat riwayat stok, kas keluar, dan hutang supplier
+  /// kalau belanjanya belum dibayar penuh.
+  Future<void> restockProduct({
+    required ProductModel product,
+    required int quantity,
+    int? costPerUnit,
+    int paidNow = 0,
+    String? supplierName,
+    String? note,
+    DateTime? dueDate,
+  }) async {
+    await _repo.restockProduct(
+      product: product,
+      quantity: quantity,
+      costPerUnit: costPerUnit,
+      paidNow: paidNow,
+      supplierName: supplierName,
+      note: note,
+      dueDate: dueDate,
+    );
+    await loadProducts();
+  }
+
   Future<List<ProductModel>> getLowStock() async {
     return await _repo.getLowStock();
   }

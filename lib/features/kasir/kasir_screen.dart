@@ -52,11 +52,12 @@ class _KasirScreenState extends ConsumerState<KasirScreen> {
     // Capture items & user before clearing the cart
     final saleItems = cart.toSaleItems();
 
-    // Show payment dialog
-    final result = await showDialog<({int paid, String method})>(
+    // Dialog pembayaran — termasuk ceklist "apakah hutang?".
+    final result = await showDialog<_HasilBayar>(
       context: context,
       builder: (context) => _PaymentDialog(
         totalAmount: cart.totalAmount,
+        initialCustomer: cart.customerName,
       ),
     );
 
@@ -66,9 +67,11 @@ class _KasirScreenState extends ConsumerState<KasirScreen> {
     final sale = await saleNotifier.checkout(
       userId: user.id!,
       items: saleItems,
-      customerName: cart.customerName,
+      customerName: result.customerName,
       paymentMethod: result.method,
       paidAmount: result.paid,
+      isDebt: result.isDebt,
+      dueDate: result.dueDate,
     );
 
     if (sale != null) {
@@ -615,12 +618,38 @@ class _KasirScreenState extends ConsumerState<KasirScreen> {
   }
 }
 
-/// Payment dialog — choose payment method and enter paid amount.
-/// Pilihan metode diambil dari pengaturan "Metode pembayaran" di Profil.
+/// Hasil dialog pembayaran.
+class _HasilBayar {
+  final int paid;
+  final String method;
+  final bool isDebt;
+  final String? customerName;
+  final DateTime? dueDate;
+
+  const _HasilBayar({
+    required this.paid,
+    required this.method,
+    this.isDebt = false,
+    this.customerName,
+    this.dueDate,
+  });
+}
+
+/// Payment dialog — pilih metode, isi jumlah dibayar, dan tandai apakah
+/// transaksi ini hutang.
+///
+/// Ceklist "Transaksi ini hutang" inilah yang membuat sisa pembayaran
+/// otomatis tercatat sebagai piutang pelanggan, terhubung ke nota dan
+/// produk yang dibeli. Pilihan metode diambil dari pengaturan
+/// "Metode pembayaran" di Profil.
 class _PaymentDialog extends ConsumerStatefulWidget {
   final int totalAmount;
+  final String? initialCustomer;
 
-  const _PaymentDialog({required this.totalAmount});
+  const _PaymentDialog({
+    required this.totalAmount,
+    this.initialCustomer,
+  });
 
   @override
   ConsumerState<_PaymentDialog> createState() => _PaymentDialogState();
@@ -629,11 +658,16 @@ class _PaymentDialog extends ConsumerStatefulWidget {
 class _PaymentDialogState extends ConsumerState<_PaymentDialog> {
   String _method = 'tunai';
   final _paidController = TextEditingController();
+  late final TextEditingController _customerController;
+  bool _isDebt = false;
+  DateTime? _dueDate;
 
   @override
   void initState() {
     super.initState();
     _paidController.text = widget.totalAmount.toString();
+    _customerController =
+        TextEditingController(text: widget.initialCustomer ?? '');
     // Muat metode terbaru, lalu pilih yang pertama sebagai default.
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       await ref.read(paymentMethodProvider.notifier).loadMethods();
@@ -648,96 +682,240 @@ class _PaymentDialogState extends ConsumerState<_PaymentDialog> {
   @override
   void dispose() {
     _paidController.dispose();
+    _customerController.dispose();
     super.dispose();
+  }
+
+  int get _paid => int.tryParse(_paidController.text.trim()) ?? 0;
+
+  int get _sisa {
+    final s = widget.totalAmount - _paid;
+    return s < 0 ? 0 : s;
+  }
+
+  int get _kembalian =>
+      _paid > widget.totalAmount ? _paid - widget.totalAmount : 0;
+
+  /// Nama pelanggan wajib diisi kalau ada sisa yang jadi piutang.
+  bool get _namaWajib => _isDebt && _sisa > 0;
+
+  bool get _bolehBayar {
+    if (_isDebt) {
+      if (_paid < 0 || _paid > widget.totalAmount) return false;
+      if (_namaWajib && _customerController.text.trim().isEmpty) return false;
+      return true;
+    }
+    return _paid >= widget.totalAmount;
+  }
+
+  void _ubahHutang(bool value) {
+    setState(() {
+      _isDebt = value;
+      // Kalau ditandai hutang, pembayaran dimulai dari 0 supaya jelas
+      // berapa sisanya.
+      _paidController.text = value ? '0' : widget.totalAmount.toString();
+    });
+  }
+
+  Future<void> _pilihJatuhTempo() async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: DateTime.now().add(const Duration(days: 7)),
+      firstDate: DateTime.now(),
+      lastDate: DateTime.now().add(const Duration(days: 365 * 3)),
+      helpText: 'Jatuh tempo pembayaran',
+      cancelText: 'Batal',
+      confirmText: 'Pilih',
+    );
+    if (picked != null) setState(() => _dueDate = picked);
   }
 
   @override
   Widget build(BuildContext context) {
-    final paid = int.tryParse(_paidController.text) ?? 0;
-    final change = paid - widget.totalAmount;
-
     return AlertDialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       title: const Text('Pembayaran'),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Total: ${Formatters.rupiah(widget.totalAmount)}',
-            style: const TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.w800,
-              color: AppColors.textMain,
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Total: ${Formatters.rupiah(widget.totalAmount)}',
+              style: const TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w800,
+                color: AppColors.textMain,
+              ),
             ),
-          ),
-          const SizedBox(height: 16),
-          const Text('Metode pembayaran',
-              style: TextStyle(fontSize: 13, color: AppColors.textSecondary)),
-          const SizedBox(height: 8),
-          Builder(builder: (context) {
-            final methods = ref.watch(paymentMethodProvider).active;
-            // Kalau pengguna belum mengatur metode apa pun, sediakan Tunai
-            // supaya transaksi tetap bisa diselesaikan.
-            final List<({String code, String name})> choices = methods.isEmpty
-                ? <({String code, String name})>[
-                    (code: 'tunai', name: 'Tunai'),
-                  ]
-                : methods.map((m) => (code: m.code, name: m.name)).toList();
+            const SizedBox(height: 14),
 
-            return Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: choices
-                  .map((c) => _methodChip(c.code, c.name))
-                  .toList(),
-            );
-          }),
-          const SizedBox(height: 16),
-          TextField(
-            controller: _paidController,
-            keyboardType: TextInputType.number,
-            decoration: InputDecoration(
-              labelText: 'Jumlah dibayar',
-              prefixText: 'Rp ',
+            // Nama pelanggan — wajib kalau transaksinya hutang.
+            Text(
+              _namaWajib ? 'Nama pelanggan (wajib)' : 'Nama pelanggan',
+              style: const TextStyle(
+                fontSize: 13,
+                color: AppColors.textSecondary,
+              ),
             ),
-            onChanged: (_) => setState(() {}),
-          ),
-          const SizedBox(height: 8),
-          // Quick amount buttons
-          Wrap(
-            spacing: 8,
-            children: [
-              _quickAmount(widget.totalAmount),
-              _quickAmount((widget.totalAmount / 50000).ceil() * 50000),
-              _quickAmount((widget.totalAmount / 100000).ceil() * 100000),
-            ],
-          ),
-          if (change >= 0) ...[
-            const SizedBox(height: 12),
+            const SizedBox(height: 6),
+            TextField(
+              controller: _customerController,
+              textCapitalization: TextCapitalization.words,
+              onChanged: (_) => setState(() {}),
+              decoration: InputDecoration(
+                hintText: 'Contoh: Bu Sri',
+                prefixIcon: const Icon(Icons.person_outline,
+                    color: AppColors.textTertiary),
+                errorText: _namaWajib &&
+                        _customerController.text.trim().isEmpty
+                    ? 'Wajib diisi untuk transaksi hutang'
+                    : null,
+              ),
+            ),
+            const SizedBox(height: 16),
+
+            const Text('Metode pembayaran',
+                style: TextStyle(fontSize: 13, color: AppColors.textSecondary)),
+            const SizedBox(height: 8),
+            Builder(builder: (context) {
+              final methods = ref.watch(paymentMethodProvider).active;
+              // Kalau pengguna belum mengatur metode apa pun, sediakan Tunai
+              // supaya transaksi tetap bisa diselesaikan.
+              final List<({String code, String name})> choices =
+                  methods.isEmpty
+                      ? <({String code, String name})>[
+                          (code: 'tunai', name: 'Tunai'),
+                        ]
+                      : methods.map((m) => (code: m.code, name: m.name)).toList();
+
+              return Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children:
+                    choices.map((c) => _methodChip(c.code, c.name)).toList(),
+              );
+            }),
+            const SizedBox(height: 10),
+
+            // ---- Ceklist hutang ----
             Container(
-              padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: AppColors.successLight,
-                borderRadius: BorderRadius.circular(8),
+                color: _isDebt ? AppColors.warningLight : AppColors.bgSoft,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: _isDebt ? AppColors.accent : AppColors.border,
+                ),
               ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text('Kembalian',
-                      style: TextStyle(color: AppColors.successMid)),
-                  Text(
-                    Formatters.rupiah(change),
-                    style: const TextStyle(
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.successMid,
-                    ),
+              child: CheckboxListTile(
+                value: _isDebt,
+                onChanged: (v) => _ubahHutang(v ?? false),
+                controlAffinity: ListTileControlAffinity.leading,
+                activeColor: AppColors.primary,
+                title: const Text(
+                  'Transaksi ini hutang?',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.textMain,
                   ),
-                ],
+                ),
+                subtitle: const Text(
+                  'Centang kalau pelanggan belum bayar penuh. Sisanya '
+                  'tercatat sebagai piutang dan muncul di menu Hutang.',
+                  style: TextStyle(fontSize: 11.5, color: AppColors.textSecondary),
+                ),
               ),
             ),
+            const SizedBox(height: 14),
+
+            TextField(
+              controller: _paidController,
+              keyboardType: TextInputType.number,
+              decoration: InputDecoration(
+                labelText: _isDebt ? 'Dibayar sekarang' : 'Jumlah dibayar',
+                prefixText: 'Rp ',
+                helperText: _isDebt
+                    ? 'Isi 0 kalau pelanggan belum bayar sama sekali'
+                    : null,
+              ),
+              onChanged: (_) => setState(() {}),
+            ),
+            const SizedBox(height: 10),
+
+            // Quick amount buttons
+            Wrap(
+              spacing: 8,
+              children: [
+                _quickAmount(widget.totalAmount),
+                _quickAmount((widget.totalAmount / 50000).ceil() * 50000),
+                _quickAmount((widget.totalAmount / 100000).ceil() * 100000),
+              ],
+            ),
+
+            // Kembalian — hanya untuk pembayaran penuh.
+            if (!_isDebt && _kembalian > 0) ...[
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: AppColors.successLight,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text('Kembalian',
+                        style: TextStyle(color: AppColors.successMid)),
+                    Text(
+                      Formatters.rupiah(_kembalian),
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.successMid,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+
+            // Sisa piutang + jatuh tempo.
+            if (_isDebt && _sisa > 0) ...[
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: AppColors.dangerLight,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text('Jadi piutang pelanggan',
+                        style: TextStyle(color: AppColors.dangerMid)),
+                    Text(
+                      Formatters.rupiah(_sisa),
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.dangerMid,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 8),
+              OutlinedButton.icon(
+                onPressed: _pilihJatuhTempo,
+                icon: const Icon(Icons.event, size: 16),
+                label: Text(
+                  _dueDate == null
+                      ? 'Tentukan jatuh tempo (opsional)'
+                      : 'Jatuh tempo ${Formatters.date(_dueDate!)}',
+                ),
+              ),
+            ],
           ],
-        ],
+        ),
       ),
       actions: [
         TextButton(
@@ -745,13 +923,21 @@ class _PaymentDialogState extends ConsumerState<_PaymentDialog> {
           child: const Text('Batal'),
         ),
         ElevatedButton(
-          onPressed: paid < widget.totalAmount
-              ? null
-              : () => Navigator.pop(
+          onPressed: _bolehBayar
+              ? () => Navigator.pop(
                     context,
-                    (paid: paid, method: _method),
-                  ),
-          child: const Text('Bayar'),
+                    _HasilBayar(
+                      paid: _isDebt ? _paid : widget.totalAmount,
+                      method: _method,
+                      isDebt: _isDebt && _sisa > 0,
+                      customerName: _customerController.text.trim().isEmpty
+                          ? null
+                          : _customerController.text.trim(),
+                      dueDate: _dueDate,
+                    ),
+                  )
+              : null,
+          child: Text(_isDebt ? 'Simpan sebagai hutang' : 'Bayar'),
         ),
       ],
     );

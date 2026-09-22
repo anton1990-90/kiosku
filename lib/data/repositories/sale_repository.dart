@@ -1,30 +1,54 @@
 import 'package:sqflite/sqflite.dart';
 import '../database/database_helper.dart';
+import '../models/cash_model.dart';
+import '../models/debt_model.dart';
 import '../models/sale_item_model.dart';
 import '../models/sale_model.dart';
 
 /// Sale repository — handles transaction creation and history queries.
 /// All offline: transactions are stored locally in SQLite.
+///
+/// Satu transaksi penjualan menyentuh beberapa tabel sekaligus supaya semua
+/// laporan konsisten:
+///   * `sales` + `sale_items` — nota dan rincian barang
+///   * `products`             — stok berkurang
+///   * `stock_movements`      — jejak stok keluar
+///   * `cash_transactions`    — uang yang benar-benar diterima
+///   * `debts`                — piutang, kalau pelanggan belum bayar penuh
 class SaleRepository {
   final DatabaseHelper _db = DatabaseHelper.instance;
 
   /// Create a new sale transaction with all line items.
   /// Also reduces product stock for each item.
+  ///
+  /// [isDebt] menandai transaksi yang dicatat sebagai hutang pelanggan.
+  /// Kalau [paidAmount] kurang dari total, sisa otomatis dibuatkan catatan
+  /// piutang — jadi tidak perlu dicatat dua kali secara manual.
   Future<SaleModel> createSale({
     required int userId,
     required List<SaleItemModel> items,
     String? customerName,
     required String paymentMethod,
     required int paidAmount,
+    bool isDebt = false,
+    DateTime? dueDate,
   }) async {
     final db = await _db.database;
 
     final totalAmount = items.fold(0, (sum, i) => sum + i.subtotal);
     final totalProfit = items.fold(0, (sum, i) => sum + i.profit);
     final totalItems = items.fold(0, (sum, i) => sum + i.quantity);
-    final changeAmount = paidAmount - totalAmount;
+
+    // Pembayaran tidak boleh negatif atau melebihi total.
+    final dibayar = paidAmount < 0
+        ? 0
+        : (paidAmount > totalAmount ? totalAmount : paidAmount);
+    final changeAmount = dibayar - totalAmount > 0 ? dibayar - totalAmount : 0;
+    final sisa = totalAmount - dibayar;
+    final catatPiutang = isDebt && sisa > 0;
 
     final invoiceNumber = _generateInvoiceNumber();
+    final now = DateTime.now();
 
     final sale = SaleModel(
       invoiceNumber: invoiceNumber,
@@ -34,14 +58,17 @@ class SaleRepository {
       totalProfit: totalProfit,
       totalItems: totalItems,
       paymentMethod: paymentMethod,
-      paidAmount: paidAmount,
+      paidAmount: dibayar,
       changeAmount: changeAmount,
-      createdAt: DateTime.now(),
+      isDebt: catatPiutang,
+      createdAt: now,
     );
 
-    // Transaction: insert sale, insert items, reduce stock
+    int? saleId;
+    int? debtId;
+
     await db.transaction((txn) async {
-      final saleId = await txn.insert('sales', sale.toMap());
+      saleId = await txn.insert('sales', sale.toMap());
 
       for (final item in items) {
         await txn.insert('sale_items', {
@@ -50,12 +77,79 @@ class SaleRepository {
         });
         await txn.rawUpdate(
           'UPDATE products SET stock = stock - ?, updated_at = ? WHERE id = ?',
-          [item.quantity, DateTime.now().toIso8601String(), item.productId],
+          [item.quantity, now.toIso8601String(), item.productId],
         );
+        await txn.insert('stock_movements', {
+          'product_id': item.productId,
+          'product_name': item.productName,
+          'type': 'out',
+          'quantity': item.quantity,
+          'total_cost': item.costPrice * item.quantity,
+          'note': 'Penjualan $invoiceNumber',
+          'ref_type': 'sale',
+          'ref_id': saleId,
+          'date': now.toIso8601String(),
+          'created_at': now.toIso8601String(),
+        });
+      }
+
+      // Piutang pelanggan — hanya dibuat kalau memang belum dibayar penuh.
+      if (catatPiutang) {
+        debtId = await txn.insert('debts', {
+          'party_name': (customerName == null || customerName.trim().isEmpty)
+              ? 'Pelanggan'
+              : customerName.trim(),
+          'type': DebtType.piutang,
+          'amount': totalAmount,
+          'paid_amount': dibayar,
+          'note': 'Hutang dari transaksi $invoiceNumber',
+          'due_date': dueDate?.toIso8601String(),
+          'status': DebtStatus.belumLunas,
+          'sale_id': saleId,
+          'product_id': items.length == 1 ? items.first.productId : null,
+          'created_at': now.toIso8601String(),
+          'updated_at': now.toIso8601String(),
+        });
+        await txn.update(
+          'sales',
+          {'debt_id': debtId},
+          where: 'id = ?',
+          whereArgs: [saleId],
+        );
+      }
+
+      // Uang yang benar-benar masuk ke kas hari ini.
+      if (dibayar > 0) {
+        await txn.insert('cash_transactions', {
+          'type': CashType.masuk,
+          'amount': dibayar,
+          'category': CashCategory.penjualan,
+          'note': catatPiutang
+              ? 'Pembayaran sebagian $invoiceNumber'
+              : 'Penjualan $invoiceNumber',
+          'ref_type': 'sale',
+          'ref_id': saleId,
+          'date': now.toIso8601String(),
+          'created_at': now.toIso8601String(),
+        });
       }
     });
 
-    return sale;
+    return SaleModel(
+      id: saleId,
+      invoiceNumber: sale.invoiceNumber,
+      userId: sale.userId,
+      customerName: sale.customerName,
+      totalAmount: sale.totalAmount,
+      totalProfit: sale.totalProfit,
+      totalItems: sale.totalItems,
+      paymentMethod: sale.paymentMethod,
+      paidAmount: sale.paidAmount,
+      changeAmount: sale.changeAmount,
+      isDebt: sale.isDebt,
+      debtId: debtId,
+      createdAt: sale.createdAt,
+    );
   }
 
   /// Generate invoice number: TK-YYYYMMDD-HHMMSS

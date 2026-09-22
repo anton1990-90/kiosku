@@ -1,10 +1,17 @@
 import 'package:sqflite/sqflite.dart';
 import '../database/database_helper.dart';
+import '../models/cash_model.dart';
 import '../models/debt_model.dart';
+import 'cash_repository.dart';
 
 /// Repositori hutang / piutang. Semua data lokal (offline).
+///
+/// Setiap pembayaran cicilan otomatis tercatat di kas:
+///   * piutang (pelanggan bayar) -> uang masuk
+///   * hutang  (kita bayar supplier) -> uang keluar
 class DebtRepository {
   final DatabaseHelper _db = DatabaseHelper.instance;
+  final CashRepository _cash = CashRepository();
 
   Future<List<DebtModel>> getAll({
     String? type,
@@ -70,14 +77,20 @@ class DebtRepository {
     return await db.delete('debts', where: 'id = ?', whereArgs: [id]);
   }
 
-  /// Catat pembayaran (bisa sebagian). Menghitung ulang sisa dan status.
+  /// Catat pembayaran (bisa sebagian). Menghitung ulang sisa dan status,
+  /// lalu mencatat mutasi kas yang sesuai.
   Future<void> addPayment({
     required int debtId,
     required int amount,
     String? note,
+    DateTime? date,
   }) async {
     if (amount <= 0) return;
     final db = await _db.database;
+    final now = date ?? DateTime.now();
+
+    String jenis = DebtType.piutang;
+    String nama = '-';
 
     await db.transaction((txn) async {
       final rows = await txn.query(
@@ -89,6 +102,8 @@ class DebtRepository {
       if (rows.isEmpty) return;
 
       final debt = DebtModel.fromMap(rows.first);
+      jenis = debt.type;
+      nama = debt.partyName;
       final newPaid = debt.paidAmount + amount;
       final isLunas = newPaid >= debt.amount;
 
@@ -96,7 +111,7 @@ class DebtRepository {
         'debt_id': debtId,
         'amount': amount,
         'note': note,
-        'created_at': DateTime.now().toIso8601String(),
+        'created_at': now.toIso8601String(),
       });
 
       await txn.update(
@@ -104,12 +119,53 @@ class DebtRepository {
         {
           'paid_amount': isLunas ? debt.amount : newPaid,
           'status': isLunas ? DebtStatus.lunas : DebtStatus.belumLunas,
-          'updated_at': DateTime.now().toIso8601String(),
+          'updated_at': now.toIso8601String(),
         },
         where: 'id = ?',
         whereArgs: [debtId],
       );
     });
+
+    // Pelanggan membayar hutang -> uang masuk. Kita membayar supplier ->
+    // uang keluar. Keduanya harus muncul di riwayat kas.
+    final isPiutang = jenis == DebtType.piutang;
+    await _cash.catat(
+      type: isPiutang ? CashType.masuk : CashType.keluar,
+      amount: amount,
+      category:
+          isPiutang ? CashCategory.terimaPiutang : CashCategory.bayarHutang,
+      note: note == null || note.isEmpty
+          ? '${isPiutang ? 'Terima piutang' : 'Bayar hutang'} $nama'
+          : note,
+      refType: 'debt_payment',
+      refId: debtId,
+      date: now,
+    );
+  }
+
+  /// Hutang/piutang yang berasal dari satu transaksi penjualan.
+  Future<DebtModel?> getBySaleId(int saleId) async {
+    final db = await _db.database;
+    final rows = await db.query(
+      'debts',
+      where: 'sale_id = ?',
+      whereArgs: [saleId],
+      limit: 1,
+    );
+    if (rows.isEmpty) return null;
+    return DebtModel.fromMap(rows.first);
+  }
+
+  /// Hutang yang terkait satu produk tertentu.
+  Future<List<DebtModel>> getByProductId(int productId) async {
+    final db = await _db.database;
+    final rows = await db.query(
+      'debts',
+      where: 'product_id = ?',
+      whereArgs: [productId],
+      orderBy: 'created_at DESC',
+    );
+    return rows.map((m) => DebtModel.fromMap(m)).toList();
   }
 
   Future<List<DebtPaymentModel>> getPayments(int debtId) async {

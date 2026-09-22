@@ -13,6 +13,9 @@ class DebtStatus {
 }
 
 /// Catatan hutang / piutang.
+///
+/// Terhubung ke transaksi penjualan ([saleId]) dan/atau produk ([productId])
+/// supaya pemilik toko bisa melihat hutang ini berasal dari barang apa.
 class DebtModel {
   final int? id;
   final String partyName; // nama pelanggan atau supplier
@@ -24,6 +27,8 @@ class DebtModel {
   final DateTime? dueDate; // jatuh tempo (opsional)
   final String status; // DebtStatus
   final int? supplierId; // terisi kalau terkait supplier
+  final int? saleId; // terisi kalau berasal dari transaksi penjualan
+  final int? productId; // terisi kalau hutang ini untuk satu produk
   final DateTime createdAt;
   final DateTime updatedAt;
 
@@ -38,6 +43,8 @@ class DebtModel {
     this.dueDate,
     this.status = DebtStatus.belumLunas,
     this.supplierId,
+    this.saleId,
+    this.productId,
     required this.createdAt,
     required this.updatedAt,
   });
@@ -80,6 +87,8 @@ class DebtModel {
       'due_date': dueDate?.toIso8601String(),
       'status': status,
       'supplier_id': supplierId,
+      'sale_id': saleId,
+      'product_id': productId,
       'created_at': createdAt.toIso8601String(),
       'updated_at': updatedAt.toIso8601String(),
     };
@@ -98,6 +107,8 @@ class DebtModel {
       dueDate: dueRaw == null ? null : DateTime.tryParse(dueRaw),
       status: (map['status'] as String?) ?? DebtStatus.belumLunas,
       supplierId: map['supplier_id'] as int?,
+      saleId: map['sale_id'] as int?,
+      productId: map['product_id'] as int?,
       createdAt: DateTime.parse(map['created_at'] as String),
       updatedAt: DateTime.parse(map['updated_at'] as String),
     );
@@ -114,6 +125,8 @@ class DebtModel {
     DateTime? dueDate,
     String? status,
     int? supplierId,
+    int? saleId,
+    int? productId,
     DateTime? createdAt,
     DateTime? updatedAt,
   }) {
@@ -128,6 +141,8 @@ class DebtModel {
       dueDate: dueDate ?? this.dueDate,
       status: status ?? this.status,
       supplierId: supplierId ?? this.supplierId,
+      saleId: saleId ?? this.saleId,
+      productId: productId ?? this.productId,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
     );

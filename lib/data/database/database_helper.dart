@@ -9,12 +9,15 @@ import 'package:sqflite/sqflite.dart';
 ///   1 — users, products, sales, sale_items
 ///   2 — + debts, debt_payments, notes, suppliers, payment_methods,
 ///       kolom store_phone & logo_path pada users
+///   3 — + cash_transactions (kas), expenses (beban), prive,
+///       stock_movements (riwayat stok), kolom penghubung hutang↔penjualan
+///       dan hutang↔produk
 class DatabaseHelper {
   DatabaseHelper._();
   static final DatabaseHelper instance = DatabaseHelper._();
 
   static const _dbName = 'tokoku.db';
-  static const _dbVersion = 2;
+  static const _dbVersion = 3;
 
   Database? _database;
 
@@ -41,6 +44,7 @@ class DatabaseHelper {
   Future<void> _onCreate(Database db, int version) async {
     await _createBaseTables(db);
     await _createV2Tables(db);
+    await _createV3Tables(db);
     await _seedProducts(db);
     await _seedPaymentMethods(db);
   }
@@ -197,6 +201,94 @@ class DatabaseHelper {
 
   // --------------------------------------------------------------- upgrade
 
+  /// Tabel versi 3 — kas, beban, prive, dan riwayat stok.
+  ///
+  /// Semua `CREATE TABLE` memakai `IF NOT EXISTS` supaya aman dijalankan
+  /// berkali-kali (baik dari `onCreate` maupun `onUpgrade`).
+  Future<void> _createV3Tables(Database db) async {
+    // Kas — setiap uang masuk dan keluar dari toko.
+    // `date` disimpan ISO-8601 supaya bisa difilter per hari/bulan.
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS cash_transactions (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        type TEXT NOT NULL,
+        amount INTEGER NOT NULL,
+        category TEXT NOT NULL,
+        note TEXT,
+        ref_type TEXT,
+        ref_id INTEGER,
+        date TEXT NOT NULL,
+        created_at TEXT NOT NULL
+      )
+    ''');
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS idx_cash_date ON cash_transactions(date)',
+    );
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS idx_cash_type ON cash_transactions(type, date)',
+    );
+
+    // Beban operasional — dipakai untuk menyusun laporan laba rugi.
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS expenses (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        category TEXT NOT NULL,
+        amount INTEGER NOT NULL,
+        note TEXT,
+        date TEXT NOT NULL,
+        created_at TEXT NOT NULL
+      )
+    ''');
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS idx_expenses_date ON expenses(date)',
+    );
+
+    // Prive — pengambilan uang toko oleh pemilik (bukan beban usaha).
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS prive (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        amount INTEGER NOT NULL,
+        note TEXT,
+        date TEXT NOT NULL,
+        created_at TEXT NOT NULL
+      )
+    ''');
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS idx_prive_date ON prive(date)',
+    );
+
+    // Riwayat keluar-masuk stok — jejak setiap penambahan/pengurangan.
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS stock_movements (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        product_id INTEGER NOT NULL,
+        product_name TEXT NOT NULL,
+        type TEXT NOT NULL,
+        quantity INTEGER NOT NULL,
+        total_cost INTEGER NOT NULL DEFAULT 0,
+        note TEXT,
+        ref_type TEXT,
+        ref_id INTEGER,
+        date TEXT NOT NULL,
+        created_at TEXT NOT NULL
+      )
+    ''');
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS idx_stock_mov_date ON stock_movements(date)',
+    );
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS idx_stock_mov_product '
+      'ON stock_movements(product_id, date)',
+    );
+
+    // Kolom penghubung. Ditambahkan di sini supaya tabel versi 1 & 2 tetap
+    // utuh dan tidak ada data lama yang perlu ditulis ulang.
+    await _addColumnIfMissing(db, 'sales', 'is_debt', 'INTEGER NOT NULL DEFAULT 0');
+    await _addColumnIfMissing(db, 'sales', 'debt_id', 'INTEGER');
+    await _addColumnIfMissing(db, 'debts', 'sale_id', 'INTEGER');
+    await _addColumnIfMissing(db, 'debts', 'product_id', 'INTEGER');
+  }
+
   /// Migrasi dari versi lama. Data yang sudah ada tidak boleh hilang.
   Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
     if (oldVersion < 2) {
@@ -204,6 +296,9 @@ class DatabaseHelper {
       await _addColumnIfMissing(db, 'users', 'store_phone', 'TEXT');
       await _addColumnIfMissing(db, 'users', 'logo_path', 'TEXT');
       await _seedPaymentMethods(db);
+    }
+    if (oldVersion < 3) {
+      await _createV3Tables(db);
     }
   }
 

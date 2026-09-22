@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/utils/formatters.dart';
 import '../../core/utils/report_period.dart';
@@ -70,9 +71,35 @@ class _LaporanScreenState extends ConsumerState<LaporanScreen> {
             _topProducts(state.topProducts),
             const SizedBox(height: 16),
             _itemDetailSection(state.items, period),
+            const SizedBox(height: 16),
+            _menuLaporan(period),
           ],
         ),
       ),
+    );
+  }
+
+  // --------------------------------------------------- pintu laporan lanjutan
+
+  /// Pintu masuk ke laporan lanjutan: rincian lengkap produk terjual dan
+  /// laporan keuangan standar akuntansi (laba rugi, ekuitas, neraca, arus kas).
+  Widget _menuLaporan(ReportPeriod period) {
+    return Column(
+      children: [
+        _MenuLaporanTile(
+          ikon: Icons.receipt_long_outlined,
+          judul: 'Rincian produk terjual',
+          keterangan: 'Filter harian, total pendapatan & laba, ekspor PDF/CSV',
+          onTap: () => context.push('/laporan/rincian', extra: period),
+        ),
+        const SizedBox(height: 10),
+        _MenuLaporanTile(
+          ikon: Icons.account_balance_outlined,
+          judul: 'Laporan keuangan',
+          keterangan: 'Laba rugi, ekuitas, neraca, arus kas, dan prive',
+          onTap: () => context.push('/laporan/keuangan'),
+        ),
+      ],
     );
   }
 
@@ -497,13 +524,22 @@ class _LaporanScreenState extends ConsumerState<LaporanScreen> {
 
   /// Rincian tiap produk yang terjual, dikelompokkan per tanggal.
   /// Setiap baris memuat jam transaksi, jumlah, harga satuan, dan subtotal.
+  ///
+  /// Di beranda laporan ini hanya menampilkan **maksimal 5 baris** supaya
+  /// ringkas. Kalau barisnya lebih banyak, muncul tombol "Lihat semua" yang
+  /// membuka layar rincian lengkap (bisa difilter harian dan diekspor ke
+  /// PDF maupun CSV).
   Widget _itemDetailSection(
     List<ReportItemDetail> items,
     ReportPeriod period,
   ) {
+    const maxBaris = 5;
+    final tampil = items.take(maxBaris).toList();
+    final adaSisa = items.length > maxBaris;
+
     // Kelompokkan per hari, urut dari yang terbaru.
     final grouped = <String, List<ReportItemDetail>>{};
-    for (final item in items) {
+    for (final item in tampil) {
       final key = '${item.soldAt.year}-${item.soldAt.month}-'
           '${item.soldAt.day}';
       grouped.putIfAbsent(key, () => []).add(item);
@@ -534,7 +570,9 @@ class _LaporanScreenState extends ConsumerState<LaporanScreen> {
               ),
               if (items.isNotEmpty)
                 Text(
-                  '${items.length} baris',
+                  adaSisa
+                      ? '${tampil.length} dari ${items.length} baris'
+                      : '${items.length} baris',
                   style: const TextStyle(
                     fontSize: 11,
                     color: AppColors.textTertiary,
@@ -609,6 +647,38 @@ class _LaporanScreenState extends ConsumerState<LaporanScreen> {
                 ],
               );
             }),
+          if (adaSisa) ...[
+            const SizedBox(height: 2),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: () =>
+                    context.push('/laporan/rincian', extra: period),
+                icon: const Icon(Icons.unfold_more, size: 18),
+                label: Text('Lihat semua ${items.length} baris'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: AppColors.primary,
+                  side: BorderSide(
+                    color: AppColors.primary.withOpacity(0.4),
+                  ),
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 6),
+            const Text(
+              'Di layar rincian kamu bisa memfilter harian, melihat total '
+              'pendapatan beserta labanya, lalu mengekspor ke PDF atau CSV.',
+              style: TextStyle(
+                fontSize: 11,
+                color: AppColors.textTertiary,
+                height: 1.4,
+              ),
+            ),
+          ],
         ],
       ),
     );
@@ -810,6 +880,83 @@ class _ChartCard extends StatelessWidget {
           const SizedBox(height: 16),
           child,
         ],
+      ),
+    );
+  }
+}
+
+/// Kartu menu untuk membuka laporan lanjutan dari layar Laporan.
+class _MenuLaporanTile extends StatelessWidget {
+  final IconData ikon;
+  final String judul;
+  final String keterangan;
+  final VoidCallback onTap;
+
+  const _MenuLaporanTile({
+    required this.ikon,
+    required this.judul,
+    required this.keterangan,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: AppColors.bgCard,
+      borderRadius: BorderRadius.circular(12),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: AppColors.border, width: 0.5),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(ikon, size: 20, color: AppColors.primary),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      judul,
+                      style: const TextStyle(
+                        fontSize: 13.5,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.textMain,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      keterangan,
+                      style: const TextStyle(
+                        fontSize: 11,
+                        color: AppColors.textTertiary,
+                        height: 1.35,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const Icon(
+                Icons.chevron_right,
+                size: 20,
+                color: AppColors.textTertiary,
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

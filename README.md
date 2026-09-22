@@ -1,4 +1,4 @@
-# TokoKu — Aplikasi UMKM Toko Sembako & Penjualan (v1.2.1)
+# TokoKu — Aplikasi UMKM Toko Sembako & Penjualan (v1.3.0)
 
 Aplikasi mobile cross-platform (Android & iOS) untuk toko sembako UMKM. Dibuat dengan Flutter, bekerja **offline-first** dengan autentikasi email.
 
@@ -10,11 +10,14 @@ Aplikasi mobile cross-platform (Android & iOS) untuk toko sembako UMKM. Dibuat d
 - **Scan barcode**: Scan barcode produk (EAN-13/UPC) langsung dari kamera — untuk menambah barang ke keranjang maupun mengisi barcode saat menambah produk baru.
 - **Cetak struk thermal**: Cetak struk ke printer thermal Bluetooth 58mm/80mm setelah transaksi.
 - **Manajemen produk**: Tambah, edit, hapus produk dengan kategori, harga modal & jual, barcode, dan stok. Supplier dipilih dari daftar yang bisa diedit.
-- **Manajemen stok**: Visual progress bar, peringatan stok menipis & habis, restok mudah.
+- **Manajemen stok**: Visual progress bar, peringatan stok menipis & habis, restok mudah. Daftar produk bisa langsung diklik untuk restok, dan kartu "stok menipis" di beranda membuka rincian produk yang perlu ditambah.
 - **Laporan berkala**: Laporan **harian, mingguan, dan bulanan** dengan grafik, ringkasan laba, produk terlaris, dan **detail produk per item** lengkap dengan tanggal, waktu, harga, dan laba per transaksi.
-- **Hutang & piutang**: Catat piutang pelanggan dan hutang ke supplier, cicilan pembayaran, riwayat bayar, serta peringatan jatuh tempo.
+- **Rincian produk terjual**: Maksimal 5 baris di layar Laporan, lalu "Lihat semua" membuka rincian lengkap yang bisa difilter harian/mingguan/bulanan, menampilkan total pendapatan beserta labanya, dan bisa **diekspor ke PDF & CSV**.
+- **Kas**: Satu buku kas untuk semua uang masuk & keluar. Beranda menampilkan saldo kas di tengah, uang keluar di kiri bawah, uang masuk di kanan bawah. Setiap penjualan, pembayaran hutang/piutang, restok, beban, dan prive tercatat otomatis — plus riwayat lengkap dan pencatatan manual.
+- **Laporan keuangan standar akuntansi**: **Laba rugi**, **perubahan ekuitas**, **neraca**, dan **arus kas**, semuanya bisa diekspor ke PDF & CSV. Ada juga pencatatan **beban usaha** dan **prive** (pengambilan pemilik).
+- **Hutang & piutang**: Catat piutang pelanggan dan hutang ke supplier, cicilan pembayaran, riwayat bayar, serta peringatan jatuh tempo. Terhubung ke stok produk: restok yang belum dibayar penuh otomatis jadi hutang supplier, dan transaksi yang belum dibayar penuh jadi piutang pelanggan (dengan ceklist "Transaksi ini hutang?" di layar kasir).
 - **Catatan**: Catatan bebas berwarna untuk pemilik toko, bisa disematkan (pin).
-- **Profile**: Logo usaha bisa diganti dari galeri, info toko, metode pembayaran yang bisa diaktifkan/dinonaktifkan, dan daftar supplier yang bisa diedit.
+- **Profile**: Logo usaha bisa diganti dari galeri, info toko, metode pembayaran yang bisa diaktifkan/dinonaktifkan, daftar supplier yang bisa diedit, serta pintasan ke **Kas** dan **Laporan Keuangan**.
 - **Lisensi & pembaruan**: Aktivasi satu perangkat, plus notifikasi otomatis saat ada versi baru.
 
 ## Prasyarat
@@ -145,19 +148,33 @@ cloudflare/                          # Server aktivasi lisensi (Worker + D1)
 
 ## Skema Database (SQLite)
 
-Versi skema: **2**. Migrasi dari versi 1 berjalan otomatis dan tidak menghapus data yang sudah ada.
+Versi skema: **3**. Migrasi dari versi 1 & 2 berjalan otomatis dan tidak menghapus data yang sudah ada.
 
 | Table | Purpose |
 |-------|---------|
 | `users` | Akun dengan email, password hash, nama toko, telepon toko, path logo |
 | `products` | Produk dengan nama, kategori, harga modal/jual, stok |
-| `sales` | Transaksi dengan invoice number, total, laba, metode bayar |
+| `sales` | Transaksi dengan invoice number, total, laba, metode bayar, penanda hutang |
 | `sale_items` | Line items per transaksi (product, qty, subtotal) |
 | `suppliers` | Data pemasok yang bisa diedit |
 | `payment_methods` | Metode pembayaran yang bisa diaktifkan/dinonaktifkan |
-| `debts` | Piutang pelanggan & hutang ke supplier |
+| `debts` | Piutang pelanggan & hutang ke supplier (terhubung ke `sale_id` / `product_id`) |
 | `debt_payments` | Riwayat pembayaran cicilan hutang |
 | `notes` | Catatan bebas pemilik toko |
+| `cash_transactions` | **Buku kas** — satu-satunya sumber saldo, uang masuk/keluar, dan arus kas |
+| `expenses` | Beban usaha (listrik, sewa, gaji, dll.) |
+| `prive` | Pengambilan uang toko oleh pemilik (bukan beban) |
+| `stock_movements` | Riwayat pergerakan stok (masuk/keluar) beserta nilai belanjanya |
+
+### Catatan laporan keuangan
+
+Laporan keuangan dihitung dari data transaksi (**derived**), bukan jurnal
+berpasangan. Untuk UMKM ini pilihan tersebut lebih jujur dan lebih mudah
+dirawat: setiap laporan bisa ditelusuri balik ke transaksi aslinya.
+
+Neraca selalu seimbang. Karena stok awal contoh tidak punya jurnal pembuka,
+muncul satu baris penyeimbang bernama **"Modal awal & penyesuaian"** dengan
+penjelasan di layar maupun di PDF — bukan ketidakseimbangan yang disembunyikan.
 
 ## Palet Warna
 
@@ -181,6 +198,14 @@ Versi skema: **2**. Migrasi dari versi 1 berjalan otomatis dan tidak menghapus d
 - **esc_pos_utils** — ESC/POS thermal receipt generation
 - **flutter_blue_plus** — Bluetooth connection to thermal printer
 - **mobile_scanner** — barcode scanning (camera + ML Kit)
+- **share_plus** — membuka menu "bagikan" Android untuk hasil ekspor
+- **PDF buatan sendiri** — `lib/shared/services/pdf_builder.dart` menulis PDF
+  langsung (PDF 1.4, font Helvetica base-14, tabel xref manual) tanpa pustaka
+  tambahan. Ini disengaja: paket `pdf` versi apa pun butuh `image ^4.x`,
+  sedangkan `esc_pos_utils` (printer termal) mengunci `image ^3.x` — keduanya
+  tidak bisa dipasang bersamaan.
+- **CSV** — UTF-8 dengan BOM dan pemisah `;` supaya langsung rapi di Excel
+  berbahasa Indonesia.
 
 ## Lisensi & Aktivasi
 

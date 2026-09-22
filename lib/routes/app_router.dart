@@ -5,6 +5,7 @@ import '../providers/auth_provider.dart';
 import '../providers/license_provider.dart';
 import '../core/config/app_config.dart';
 import '../core/constants/app_colors.dart';
+import '../core/utils/report_period.dart';
 import '../data/models/debt_model.dart';
 import '../data/models/note_model.dart';
 import '../features/auth/login_screen.dart';
@@ -15,13 +16,18 @@ import '../features/hutang/hutang_form_screen.dart';
 import '../features/hutang/hutang_screen.dart';
 import '../features/license/activation_screen.dart';
 import '../features/dashboard/dashboard_screen.dart';
+import '../features/kas/kas_screen.dart';
 import '../features/kasir/kasir_screen.dart';
 import '../features/produk/produk_screen.dart';
 import '../features/profile/payment_methods_screen.dart';
 import '../features/profile/store_info_screen.dart';
 import '../features/profile/supplier_screen.dart';
+import '../features/stok/stok_menipis_screen.dart';
 import '../features/stok/stok_screen.dart';
+import '../features/transaksi/transaksi_screen.dart';
+import '../features/laporan/laporan_keuangan_screen.dart';
 import '../features/laporan/laporan_screen.dart';
+import '../features/laporan/rincian_penjualan_screen.dart';
 import '../features/profile/profile_screen.dart';
 import '../shared/widgets/bottom_nav_shell.dart';
 
@@ -147,6 +153,38 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/profile/supplier',
         name: 'supplier',
         builder: (context, state) => const SupplierScreen(),
+      ),
+      // Kas & riwayat uang masuk/keluar.
+      GoRoute(
+        path: '/kas',
+        name: 'kas',
+        builder: (context, state) => const KasScreen(),
+      ),
+      // Detail transaksi (hari ini / minggu / bulan).
+      GoRoute(
+        path: '/transaksi',
+        name: 'transaksi',
+        builder: (context, state) => const TransaksiScreen(),
+      ),
+      // Detail produk yang stoknya menipis / habis.
+      GoRoute(
+        path: '/stok/menipis',
+        name: 'stokMenipis',
+        builder: (context, state) => const StokMenipisScreen(),
+      ),
+      // Rincian produk terjual (filter harian + ekspor PDF/CSV).
+      GoRoute(
+        path: '/laporan/rincian',
+        name: 'laporanRincian',
+        builder: (context, state) => RincianPenjualanScreen(
+          initialPeriod: state.extra as ReportPeriod?,
+        ),
+      ),
+      // Laporan keuangan standar akuntansi (laba rugi, ekuitas, neraca, arus kas).
+      GoRoute(
+        path: '/laporan/keuangan',
+        name: 'laporanKeuangan',
+        builder: (context, state) => const LaporanKeuanganScreen(),
       ),
       // Main app routes (with bottom nav shell)
       ShellRoute(

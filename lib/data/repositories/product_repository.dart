@@ -1,5 +1,7 @@
 import 'package:sqflite/sqflite.dart';
 import '../database/database_helper.dart';
+import '../models/cash_model.dart';
+import '../models/debt_model.dart';
 import '../models/product_model.dart';
 
 /// Product repository — CRUD operations for products, all offline.
@@ -90,6 +92,101 @@ class ProductRepository {
       'UPDATE products SET stock = stock + ?, updated_at = ? WHERE id = ?',
       [quantity, DateTime.now().toIso8601String(), productId],
     );
+  }
+
+  /// Restok lengkap: menambah stok, mencatat riwayat stok, mencatat uang
+  /// keluar ke kas, dan membuat hutang ke supplier kalau belum dibayar penuh.
+  ///
+  /// Semua ditulis dalam satu transaksi database supaya laporan tidak pernah
+  /// melihat data setengah jadi.
+  Future<void> restockProduct({
+    required ProductModel product,
+    required int quantity,
+    int? costPerUnit,
+    int paidNow = 0,
+    String? supplierName,
+    String? note,
+    DateTime? dueDate,
+  }) async {
+    if (quantity <= 0) return;
+
+    final db = await _db.database;
+    final now = DateTime.now();
+
+    final hargaModal = (costPerUnit != null && costPerUnit > 0)
+        ? costPerUnit
+        : product.costPrice;
+    final totalCost = hargaModal * quantity;
+    final dibayar = paidNow < 0
+        ? 0
+        : (paidNow > totalCost ? totalCost : paidNow);
+    final sisa = totalCost - dibayar;
+
+    await db.transaction((txn) async {
+      await txn.rawUpdate(
+        'UPDATE products SET stock = stock + ?, cost_price = ?, '
+        'updated_at = ? WHERE id = ?',
+        [quantity, hargaModal, now.toIso8601String(), product.id],
+      );
+
+      await txn.insert('stock_movements', {
+        'product_id': product.id,
+        'product_name': product.name,
+        'type': 'in',
+        'quantity': quantity,
+        'total_cost': totalCost,
+        'note': note,
+        'ref_type': 'restock',
+        'ref_id': null,
+        'date': now.toIso8601String(),
+        'created_at': now.toIso8601String(),
+      });
+
+      if (dibayar > 0) {
+        await txn.insert('cash_transactions', {
+          'type': CashType.keluar,
+          'amount': dibayar,
+          'category': CashCategory.restok,
+          'note': note ?? 'Belanja stok ${product.name}',
+          'ref_type': 'restock',
+          'ref_id': product.id,
+          'date': now.toIso8601String(),
+          'created_at': now.toIso8601String(),
+        });
+      }
+
+      // Belum dibayar penuh -> jadi hutang ke supplier, terhubung ke produk.
+      if (sisa > 0) {
+        await txn.insert('debts', {
+          'party_name': (supplierName == null || supplierName.trim().isEmpty)
+              ? 'Supplier'
+              : supplierName.trim(),
+          'type': DebtType.hutang,
+          'amount': totalCost,
+          'paid_amount': dibayar,
+          'note': 'Belanja ${quantity}x ${product.name}',
+          'due_date': dueDate?.toIso8601String(),
+          'status': DebtStatus.belumLunas,
+          'product_id': product.id,
+          'created_at': now.toIso8601String(),
+          'updated_at': now.toIso8601String(),
+        });
+      }
+    });
+  }
+
+  /// Produk dengan stok di bawah atau sama dengan batas minimum, lengkap
+  /// dengan nilai persediaannya. Dipakai di beranda dan layar stok menipis.
+  Future<List<({ProductModel product, int nilaiModal, int nilaiJual})>>
+      getLowStockDetail() async {
+    final products = await getLowStock();
+    return products
+        .map((p) => (
+              product: p,
+              nilaiModal: p.stock * p.costPrice,
+              nilaiJual: p.stock * p.sellPrice,
+            ))
+        .toList();
   }
 
   /// Get products with stock at or below minimum.

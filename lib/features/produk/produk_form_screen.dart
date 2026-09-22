@@ -229,7 +229,10 @@ class _ProdukFormScreenState extends ConsumerState<ProdukFormScreen> {
                 Expanded(
                   child: TextFormField(
                     controller: _barcodeController,
-                    keyboardType: TextInputType.number,
+                    // Barcode bisa berisi huruf (Code128/Code39), jadi jangan
+                    // dikunci ke papan angka saja.
+                    keyboardType: TextInputType.text,
+                    textCapitalization: TextCapitalization.characters,
                     decoration: const InputDecoration(
                       hintText: '8991002101234',
                       prefixIcon: Icon(Icons.qr_code,
@@ -252,6 +255,17 @@ class _ProdukFormScreenState extends ConsumerState<ProdukFormScreen> {
                   ),
                 ),
               ],
+            ),
+            const SizedBox(height: 6),
+            Text(
+              'Ketuk "Scan" untuk memindai lewat kamera, atau ketik angkanya '
+              'langsung. Kalau kamera bermasalah, di layar scan ada tombol '
+              '"Masukkan manual".',
+              style: const TextStyle(
+                fontSize: 11,
+                color: AppColors.textTertiary,
+                height: 1.4,
+              ),
             ),
             const SizedBox(height: 20),
             // Emoji picker

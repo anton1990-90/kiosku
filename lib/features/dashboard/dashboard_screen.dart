@@ -152,69 +152,178 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                   ),
                 ),
               ),
-            // Revenue hero card
+            // Kartu Kas — saldo di tengah, uang masuk di kanan bawah,
+            // uang keluar di kiri bawah. Ketuk untuk melihat riwayat.
             SliverToBoxAdapter(
-              child: Container(
-                margin: const EdgeInsets.fromLTRB(16, 16, 16, 20),
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [AppColors.primary, AppColors.primaryDark],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'Penjualan hari ini',
-                      style: TextStyle(
-                        color: Colors.white70,
-                        fontSize: 13,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 20),
+                child: Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    onTap: () => context.push('/kas'),
+                    borderRadius: BorderRadius.circular(16),
+                    child: Container(
+                      padding: const EdgeInsets.fromLTRB(20, 16, 20, 18),
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          colors: [AppColors.primary, AppColors.primaryDark],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
+                        borderRadius: BorderRadius.circular(16),
                       ),
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      Formatters.rupiah(dashState.todaySales),
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 30,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: -0.5,
-                      ),
-                    ),
-                    const SizedBox(height: 14),
-                    Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 8, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.15),
-                            borderRadius: BorderRadius.circular(20),
+                      child: Column(
+                        children: [
+                          const Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Row(
+                                children: [
+                                  Icon(
+                                    Icons.account_balance_wallet_outlined,
+                                    size: 16,
+                                    color: Colors.white70,
+                                  ),
+                                  SizedBox(width: 6),
+                                  Text(
+                                    'Kas',
+                                    style: TextStyle(
+                                      color: Colors.white70,
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              Row(
+                                children: [
+                                  Text(
+                                    'Riwayat',
+                                    style: TextStyle(
+                                      color: Colors.white70,
+                                      fontSize: 11,
+                                    ),
+                                  ),
+                                  Icon(Icons.chevron_right,
+                                      size: 16, color: Colors.white70),
+                                ],
+                              ),
+                            ],
                           ),
-                          child: const Text(
-                            '+18%',
-                            style: TextStyle(
+                          const SizedBox(height: 8),
+                          Text(
+                            Formatters.rupiah(dashState.kasSaldo),
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(
                               color: Colors.white,
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
+                              fontSize: 30,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: -0.5,
                             ),
                           ),
-                        ),
-                        const SizedBox(width: 8),
-                        Text(
-                          '${dashState.todayTransactions} transaksi',
-                          style: const TextStyle(
-                            color: Colors.white70,
-                            fontSize: 13,
+                          const SizedBox(height: 2),
+                          const Text(
+                            'Saldo kas sekarang',
+                            style: TextStyle(
+                              color: Colors.white60,
+                              fontSize: 11,
+                            ),
                           ),
-                        ),
-                      ],
+                          const SizedBox(height: 16),
+                          Container(
+                            height: 1,
+                            color: Colors.white.withOpacity(0.18),
+                          ),
+                          const SizedBox(height: 12),
+                          Row(
+                            children: [
+                              // Kiri bawah — uang keluar.
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    const Row(
+                                      children: [
+                                        Icon(Icons.arrow_downward,
+                                            size: 13,
+                                            color: Color(0xFFFFC9C7)),
+                                        SizedBox(width: 4),
+                                        Text(
+                                          'Uang keluar',
+                                          style: TextStyle(
+                                            color: Colors.white70,
+                                            fontSize: 11.5,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 3),
+                                    Text(
+                                      Formatters.rupiahCompact(
+                                          dashState.kasKeluarHariIni),
+                                      style: const TextStyle(
+                                        color: Color(0xFFFFD9D8),
+                                        fontSize: 15,
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
+                                    const Text(
+                                      'hari ini',
+                                      style: TextStyle(
+                                        color: Colors.white54,
+                                        fontSize: 10,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              // Kanan bawah — uang masuk.
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.end,
+                                  children: [
+                                    const Row(
+                                      mainAxisAlignment: MainAxisAlignment.end,
+                                      children: [
+                                        Icon(Icons.arrow_upward,
+                                            size: 13,
+                                            color: Color(0xFFB6F0D8)),
+                                        SizedBox(width: 4),
+                                        Text(
+                                          'Uang masuk',
+                                          style: TextStyle(
+                                            color: Colors.white70,
+                                            fontSize: 11.5,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 3),
+                                    Text(
+                                      Formatters.rupiahCompact(
+                                          dashState.kasMasukHariIni),
+                                      style: const TextStyle(
+                                        color: Color(0xFFC6F6E2),
+                                        fontSize: 15,
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
+                                    const Text(
+                                      'hari ini',
+                                      style: TextStyle(
+                                        color: Colors.white54,
+                                        fontSize: 10,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
                     ),
-                  ],
+                  ),
                 ),
               ),
             ),
@@ -296,6 +405,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                       iconBgColor: AppColors.dangerLight,
                       value: '${productState.products.where((p) => p.stock <= p.minStock).length}',
                       label: 'Stok menipis',
+                      onTap: () => context.push('/stok/menipis'),
                     ),
                     StatCard(
                       icon: Icons.receipt_outlined,
@@ -303,6 +413,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                       iconBgColor: AppColors.infoLight,
                       value: '${dashState.todayTransactions}',
                       label: 'Transaksi hari ini',
+                      onTap: () => context.push('/transaksi'),
                     ),
                   ],
                 ),

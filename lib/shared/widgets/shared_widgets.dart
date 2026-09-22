@@ -74,6 +74,7 @@ class StoreAvatar extends StatelessWidget {
 }
 
 /// Stat card for dashboard — shows a metric with icon and trend.
+/// Kalau [onTap] diisi, kartu bisa diketuk dan muncul tanda panah kecil.
 class StatCard extends StatelessWidget {
   final IconData icon;
   final Color iconColor;
@@ -82,6 +83,7 @@ class StatCard extends StatelessWidget {
   final String label;
   final String? trend;
   final bool? isUp;
+  final VoidCallback? onTap;
 
   const StatCard({
     super.key,
@@ -92,11 +94,12 @@ class StatCard extends StatelessWidget {
     required this.label,
     this.trend,
     this.isUp,
+    this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    final card = Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: AppColors.bgCard,
@@ -138,6 +141,12 @@ class StatCard extends StatelessWidget {
                           : AppColors.dangerMid,
                     ),
                   ),
+                )
+              else if (onTap != null)
+                const Icon(
+                  Icons.chevron_right,
+                  size: 18,
+                  color: AppColors.textTertiary,
                 ),
             ],
           ),
@@ -160,6 +169,17 @@ class StatCard extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+
+    if (onTap == null) return card;
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: card,
       ),
     );
   }

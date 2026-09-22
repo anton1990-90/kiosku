@@ -5,6 +5,7 @@ import 'package:package_info_plus/package_info_plus.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/utils/formatters.dart';
 import '../../providers/auth_provider.dart';
+import '../../providers/cash_provider.dart';
 import '../../providers/debt_provider.dart';
 import '../../providers/license_provider.dart';
 import '../../providers/note_provider.dart';
@@ -36,6 +37,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ref.read(productProvider.notifier).loadProducts();
+      ref.read(cashProvider.notifier).load();
     });
     _loadVersion();
   }
@@ -171,6 +173,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     final noteState = ref.watch(noteProvider);
     final supplierState = ref.watch(supplierProvider);
     final paymentState = ref.watch(paymentMethodProvider);
+    final cashState = ref.watch(cashProvider);
     final user = authState.user;
 
     final totalTransactions =
@@ -353,6 +356,41 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                             : '${noteState.notes.length} catatan tersimpan',
                         trailing: Icons.chevron_right,
                         onTap: () => context.push('/catatan'),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 20),
+                  const _MenuGroupTitle('Kas & laporan keuangan'),
+                  _MenuCard(
+                    children: [
+                      _MenuItem(
+                        icon: Icons.account_balance_wallet_outlined,
+                        color: AppColors.primary,
+                        title: 'Kas',
+                        subtitle: cashState.saldo == 0
+                            ? 'Catat uang masuk & keluar'
+                            : 'Saldo ${Formatters.rupiah(cashState.saldo)} · '
+                                'riwayat kas masuk & keluar',
+                        trailing: Icons.chevron_right,
+                        onTap: () => context.push('/kas'),
+                      ),
+                      _MenuItem(
+                        icon: Icons.account_balance_outlined,
+                        color: AppColors.accentMid,
+                        title: 'Laporan keuangan',
+                        subtitle:
+                            'Laba rugi, ekuitas, neraca, arus kas & prive',
+                        trailing: Icons.chevron_right,
+                        onTap: () => context.push('/laporan/keuangan'),
+                      ),
+                      _MenuItem(
+                        icon: Icons.receipt_long_outlined,
+                        color: AppColors.infoMid,
+                        title: 'Rincian produk terjual',
+                        subtitle:
+                            'Filter harian, total pendapatan & laba, ekspor',
+                        trailing: Icons.chevron_right,
+                        onTap: () => context.push('/laporan/rincian'),
                       ),
                     ],
                   ),

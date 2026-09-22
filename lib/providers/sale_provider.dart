@@ -22,12 +22,17 @@ class SaleNotifier extends StateNotifier<AsyncValue<List<SaleModel>>> {
   }
 
   /// Process checkout — create a sale from a list of sale items.
+  ///
+  /// Kalau [isDebt] true dan pembayaran kurang dari total, repositori
+  /// sekaligus membuat catatan piutang pelanggan.
   Future<SaleModel?> checkout({
     required int userId,
     required List<SaleItemModel> items,
     String? customerName,
     required String paymentMethod,
     required int paidAmount,
+    bool isDebt = false,
+    DateTime? dueDate,
   }) async {
     try {
       final sale = await _repo.createSale(
@@ -36,6 +41,8 @@ class SaleNotifier extends StateNotifier<AsyncValue<List<SaleModel>>> {
         customerName: customerName,
         paymentMethod: paymentMethod,
         paidAmount: paidAmount,
+        isDebt: isDebt,
+        dueDate: dueDate,
       );
 
       await loadSales();

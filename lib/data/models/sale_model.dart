@@ -10,6 +10,8 @@ class SaleModel {
   final String paymentMethod; // 'tunai', 'qris', 'ewallet'
   final int paidAmount;
   final int changeAmount;
+  final bool isDebt; // true kalau sebagian/seluruhnya belum dibayar
+  final int? debtId; // id catatan piutang yang dibuat dari transaksi ini
   final DateTime createdAt;
 
   SaleModel({
@@ -23,8 +25,16 @@ class SaleModel {
     required this.paymentMethod,
     required this.paidAmount,
     required this.changeAmount,
+    this.isDebt = false,
+    this.debtId,
     required this.createdAt,
   });
+
+  /// Sisa yang belum dibayar pelanggan.
+  int get unpaidAmount {
+    final sisa = totalAmount - paidAmount;
+    return sisa < 0 ? 0 : sisa;
+  }
 
   Map<String, dynamic> toMap() {
     return {
@@ -38,6 +48,8 @@ class SaleModel {
       'payment_method': paymentMethod,
       'paid_amount': paidAmount,
       'change_amount': changeAmount,
+      'is_debt': isDebt ? 1 : 0,
+      'debt_id': debtId,
       'created_at': createdAt.toIso8601String(),
     };
   }
@@ -54,6 +66,8 @@ class SaleModel {
       paymentMethod: map['payment_method'] as String,
       paidAmount: map['paid_amount'] as int,
       changeAmount: map['change_amount'] as int,
+      isDebt: ((map['is_debt'] as int?) ?? 0) == 1,
+      debtId: map['debt_id'] as int?,
       createdAt: DateTime.parse(map['created_at'] as String),
     );
   }

@@ -12,6 +12,9 @@ import 'dart:typed_data';
 ///     diganti '?' supaya berkas tidak rusak.
 ///   * Satuan ukuran titik (pt). A4 = 595 x 842 pt.
 ///   * Titik asal (0,0) ada di kiri-bawah, sama seperti PDF pada umumnya.
+///   * Teks panjang dilipat otomatis (`text`, `note`) dan label panjang
+///     dipotong dengan '...' (`keyValue`) supaya tidak ada tulisan yang
+///     melewati tepi kanan halaman dan terpotong saat dicetak.
 class SimplePdf {
   static const double pageWidth = 595.28;
   static const double pageHeight = 841.89;
@@ -91,17 +94,67 @@ class SimplePdf {
   }
 
   /// Lebar teks menurut metrik font Helvetica (satuan 1/1000 em).
-  static double textWidth(String text, double size) {
+  ///
+  /// [bold] harus sama dengan yang dipakai saat menggambar teks. Helvetica
+  /// Bold lebih lebar dari Helvetica biasa, jadi mengukur teks tebal dengan
+  /// tabel biasa membuat tulisan (dan nilai rata kanan) melewati margin kanan.
+  static double textWidth(String text, double size, {bool bold = false}) {
+    final tabel = bold ? _helveticaBoldWidths : _helveticaWidths;
     var total = 0;
     for (final rune in text.runes) {
       final c = rune > 0xFF ? 0x3F : rune;
       if (c >= 32 && c <= 126) {
-        total += _helveticaWidths[c - 32];
+        total += tabel[c - 32];
       } else {
         total += 556; // rata-rata untuk karakter di luar ASCII
       }
     }
     return total * size / 1000;
+  }
+
+  /// Potong [value] supaya muat dalam [maxWidth], tambahkan '...' kalau dipotong.
+  ///
+  /// Dipakai untuk kolom tabel dan label. [minKeep] adalah jumlah karakter
+  /// paling sedikit yang dipertahankan sebelum titik-titik — teks yang sudah
+  /// lebih pendek dari itu dibiarkan apa adanya. Aman untuk [maxWidth] <= 0
+  /// (menyusut sampai [minKeep] karakter lalu berhenti).
+  static String _fit(String value, double size, double maxWidth,
+      {int minKeep = 3, bool bold = false}) {
+    if (textWidth(value, size, bold: bold) <= maxWidth ||
+        value.length <= minKeep) {
+      return value;
+    }
+    var out = value;
+    while (out.length > minKeep &&
+        textWidth('$out...', size, bold: bold) > maxWidth) {
+      out = out.substring(0, out.length - 1);
+    }
+    return '$out...';
+  }
+
+  /// Lipat [value] jadi beberapa baris yang muat dalam [maxWidth].
+  ///
+  /// Baris baru yang sudah ada di dalam teks tetap dihormati. Satu kata yang
+  /// lebih panjang dari [maxWidth] ditaruh sendiri di barisnya (tidak dipotong)
+  /// supaya tidak ada perulangan tak berujung.
+  static List<String> _wrap(String value, double size, double maxWidth,
+      {bool bold = false}) {
+    if (maxWidth <= 0) return [value];
+    final lines = <String>[];
+    for (final paragraf in value.split('\n')) {
+      var baris = '';
+      for (final kata in paragraf.split(' ')) {
+        final calon = baris.isEmpty ? kata : '$baris $kata';
+        if (baris.isEmpty || textWidth(calon, size, bold: bold) <= maxWidth) {
+          baris = calon;
+        } else {
+          lines.add(baris);
+          baris = kata;
+        }
+      }
+      lines.add(baris);
+    }
+    return lines;
   }
 
   void _text(
@@ -131,7 +184,7 @@ class SimplePdf {
   }) {
     _text(
       text,
-      rightX - textWidth(text, size),
+      rightX - textWidth(text, size, bold: bold),
       y,
       size: size,
       bold: bold,
@@ -163,7 +216,9 @@ class SimplePdf {
   /// Judul utama halaman.
   void heading(String text) {
     _ensure(40);
-    _text(text, marginLeft, _y - 14, size: 15, bold: true);
+    // Judul dipotong kalau terlalu panjang supaya tidak menembus tepi kanan.
+    _text(_fit(text, 15, contentWidth, bold: true), marginLeft, _y - 14,
+        size: 15, bold: true);
     _y -= 21;
     _line(marginLeft, _y, contentRight, _y, width: 1.2, gray: 70);
     _y -= 14;
@@ -177,11 +232,13 @@ class SimplePdf {
     _y -= 16;
   }
 
-  /// Satu baris teks biasa.
+  /// Satu baris teks biasa (dilipat otomatis kalau terlalu panjang).
   void text(String value, {double size = 9.5, int gray = 70, bool bold = false}) {
-    _ensure(14);
-    _text(value, marginLeft, _y - size, size: size, gray: gray, bold: bold);
-    _y -= size + 4;
+    for (final baris in _wrap(value, size, contentWidth, bold: bold)) {
+      _ensure(14);
+      _text(baris, marginLeft, _y - size, size: size, gray: gray, bold: bold);
+      _y -= size + 4;
+    }
   }
 
   /// Baris "label .... nilai" dengan nilai rata kanan.
@@ -202,7 +259,17 @@ class SimplePdf {
       _y -= 6;
     }
     final x = marginLeft + (indent ? 12 : 0);
-    _text(label, x, _y - size, size: size, gray: gray, bold: bold);
+    // Label tidak boleh bertabrakan dengan nilai yang rata kanan. Kalau nilainya
+    // begitu lebar sampai tidak ada sisa ruang, label dibiarkan utuh.
+    final maxLabel = contentRight - x - textWidth(value, size, bold: bold) - 12;
+    _text(
+      maxLabel > 0 ? _fit(label, size, maxLabel, minKeep: 2, bold: bold) : label,
+      x,
+      _y - size,
+      size: size,
+      gray: gray,
+      bold: bold,
+    );
     _textRight(value, contentRight, _y - size, size: size, gray: gray, bold: bold);
     _y -= size + 6;
     if (bottomRule) {
@@ -238,24 +305,27 @@ class SimplePdf {
       _rect(marginLeft, _y - rowHeight + 3, contentWidth, rowHeight, gray: 242);
     }
 
-    final totalWeight = w.fold<double>(0, (s, v) => s + v);
+    // Bobot nol semua akan membuat pembagian di bawah menghasilkan Infinity
+    // dan PDF-nya rusak tanpa pesan yang jelas. Jatuhkan ke bobot rata.
+    final jumlahBobot = w.fold<double>(0, (s, v) => s + v);
+    final totalWeight = jumlahBobot > 0 ? jumlahBobot : cells.length.toDouble();
     var x = marginLeft + leftPad;
     for (var i = 0; i < cells.length; i++) {
-      final colWidth = contentWidth * (w[i] / totalWeight);
+      final bobot = jumlahBobot > 0 ? w[i] : 1.0;
+      final colWidth = contentWidth * (bobot / totalWeight);
       final isLast = i == cells.length - 1;
       if (isLast && alignLastRight) {
         _textRight(cells[i], contentRight, _y - size, size: size, bold: bold, gray: gray);
       } else {
         // Potong teks yang lebih panjang dari kolomnya.
-        var value = cells[i];
-        final maxWidth = colWidth - 4;
-        if (textWidth(value, size) > maxWidth && value.length > 3) {
-          while (value.length > 3 && textWidth('$value...', size) > maxWidth) {
-            value = value.substring(0, value.length - 1);
-          }
-          value = '$value...';
-        }
-        _text(value, x, _y - size, size: size, bold: bold, gray: gray);
+        _text(
+          _fit(cells[i], size, colWidth - 4, bold: bold),
+          x,
+          _y - size,
+          size: size,
+          bold: bold,
+          gray: gray,
+        );
       }
       x += colWidth;
     }
@@ -274,11 +344,13 @@ class SimplePdf {
     _y -= bottomGap;
   }
 
-  /// Catatan kecil berwarna abu-abu.
+  /// Catatan kecil berwarna abu-abu (dilipat otomatis).
   void note(String value) {
-    _ensure(12);
-    _text(value, marginLeft, _y - 8, size: 8, gray: 130);
-    _y -= 12;
+    for (final baris in _wrap(value, 8, contentWidth)) {
+      _ensure(12);
+      _text(baris, marginLeft, _y - 8, size: 8, gray: 130);
+      _y -= 12;
+    }
   }
 
   void space(double height) {
@@ -378,6 +450,9 @@ class SimplePdf {
   }
 
   /// Lebar karakter Helvetica untuk kode ASCII 32..126 (1/1000 em).
+  ///
+  /// Diambil dari metrik AFM Adobe (Core 14). Sudah dicocokkan satu per satu
+  /// dengan berkas AFM resmi.
   static const List<int> _helveticaWidths = [
     278, 278, 355, 556, 556, 889, 667, 191, 333, 333, //  32..41
     389, 584, 278, 333, 278, 278, //                      42..47
@@ -391,6 +466,25 @@ class SimplePdf {
     500, 222, 833, 556, 556, 556, 556, 333, 500, 278, // 107..116
     556, 500, 722, 500, 500, 500, //                     117..122
     334, 260, 334, 584, //                               123..126
+  ];
+
+  /// Lebar karakter Helvetica-Bold untuk kode ASCII 32..126 (1/1000 em).
+  ///
+  /// Dipakai kalau teks digambar dengan /F2. Tanpa tabel ini, teks tebal
+  /// diukur terlalu sempit dan bisa melewati tepi kanan halaman.
+  static const List<int> _helveticaBoldWidths = [
+    278, 333, 474, 556, 556, 889, 722, 238, 333, 333, //  32..41
+    389, 584, 278, 333, 278, 278, //                      42..47
+    556, 556, 556, 556, 556, 556, 556, 556, 556, 556, //  48..57
+    333, 333, 584, 584, 584, 611, 975, //                58..64
+    722, 722, 722, 722, 667, 611, 778, 722, 278, 556, //  65..74
+    722, 611, 833, 722, 778, 667, 778, 722, 667, 611, //  75..84
+    722, 667, 944, 667, 667, 611, //                      85..90
+    333, 278, 333, 584, 556, 333, //                      91..96
+    556, 611, 556, 611, 556, 333, 611, 611, 278, 278, //  97..106
+    556, 278, 889, 611, 611, 611, 611, 389, 556, 333, // 107..116
+    611, 556, 778, 556, 556, 500, //                     117..122
+    389, 280, 389, 584, //                               123..126
   ];
 }
 

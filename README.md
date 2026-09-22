@@ -207,6 +207,26 @@ penjelasan di layar maupun di PDF — bukan ketidakseimbangan yang disembunyikan
 - **CSV** — UTF-8 dengan BOM dan pemisah `;` supaya langsung rapi di Excel
   berbahasa Indonesia.
 
+## Pengujian tanpa Flutter
+
+Beberapa bagian paling mudah salah tidak bisa diuji dengan menjalankan
+aplikasinya (mis. saat mesin pengembangan tidak punya Flutter/Dart SDK).
+Untuk itu ada skrip Python di `tools/` yang membaca sumber Dart apa adanya
+dan menguji perilakunya dengan alat sungguhan:
+
+```bash
+python tools/uji-akuntansi.py    # 57 pemeriksaan - laporan keuangan vs SQLite
+python tools/uji-pdf-metrik.py   # 25 pemeriksaan - metrik font & tata letak PDF
+```
+
+- **`uji-akuntansi.py`** — membuat skema v3 di SQLite sungguhan, menjalankan
+  alur uang, lalu menguji identitas akuntansi (laba kotor, laba bersih, neraca
+  seimbang, arus kas, HPP saat terjual, prive bukan beban).
+- **`uji-pdf-metrik.py`** — mencocokkan tabel lebar Helvetica dan
+  Helvetica-Bold dengan berkas AFM resmi Adobe, lalu memastikan teks tebal
+  diukur dengan metrik yang benar dan teks panjang dilipat. Kesalahan di sini
+  tidak menggagalkan build — akibatnya hanya tulisan terpotong saat dicetak.
+
 ## Lisensi & Aktivasi
 
 Sistem jual lepas: **bayar sekali, 1 voucher = 1 HP**. Aktivasi butuh internet

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/utils/formatters.dart';
+import '../../core/utils/responsive.dart';
 import '../../data/models/debt_model.dart';
 import '../../providers/debt_provider.dart';
 import '../../providers/supplier_provider.dart';
@@ -127,154 +128,156 @@ class _HutangFormScreenState extends ConsumerState<HutangFormScreen> {
       ),
       body: Form(
         key: _formKey,
-        child: ListView(
-          padding: const EdgeInsets.all(20),
-          children: [
-            // Jenis
-            const Text(
-              'Jenis',
-              style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
-            ),
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                Expanded(
-                  child: _typeOption(
-                    value: DebtType.piutang,
-                    label: 'Piutang',
-                    hint: 'Pelanggan berhutang ke toko',
-                    icon: Icons.south_west,
+        child: Responsive.centered(
+          ListView(
+            padding: const EdgeInsets.all(20),
+            children: [
+              // Jenis
+              const Text(
+                'Jenis',
+                style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
+              ),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Expanded(
+                    child: _typeOption(
+                      value: DebtType.piutang,
+                      label: 'Piutang',
+                      hint: 'Pelanggan berhutang ke toko',
+                      icon: Icons.south_west,
+                    ),
                   ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: _typeOption(
+                      value: DebtType.hutang,
+                      label: 'Hutang',
+                      hint: 'Toko berhutang ke supplier',
+                      icon: Icons.north_east,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 20),
+              TextFormField(
+                controller: _nameController,
+                textCapitalization: TextCapitalization.words,
+                decoration: InputDecoration(
+                  labelText:
+                      _type == DebtType.piutang ? 'Nama pelanggan' : 'Nama supplier',
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: _typeOption(
-                    value: DebtType.hutang,
-                    label: 'Hutang',
-                    hint: 'Toko berhutang ke supplier',
-                    icon: Icons.north_east,
+                validator: (v) =>
+                    v == null || v.trim().isEmpty ? 'Wajib diisi' : null,
+              ),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: _phoneController,
+                keyboardType: TextInputType.phone,
+                decoration: const InputDecoration(
+                  labelText: 'Nomor HP (opsional)',
+                  prefixIcon:
+                      Icon(Icons.phone_outlined, color: AppColors.textTertiary),
+                ),
+              ),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: _amountController,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(
+                  labelText: 'Nilai hutang',
+                  prefixText: 'Rp ',
+                ),
+                validator: (v) {
+                  final n = int.tryParse((v ?? '').trim());
+                  if (n == null || n <= 0) return 'Masukkan nilai yang benar';
+                  return null;
+                },
+              ),
+              // Kaitkan ke supplier terdaftar kalau jenisnya hutang.
+              if (_type == DebtType.hutang) ...[
+                const SizedBox(height: 16),
+                DropdownButtonFormField<int>(
+                  value: _supplierId,
+                  decoration: const InputDecoration(
+                    labelText: 'Supplier terdaftar (opsional)',
                   ),
+                  items: [
+                    const DropdownMenuItem<int>(
+                      value: 0,
+                      child: Text('Tidak dikaitkan'),
+                    ),
+                    ...supplierState.suppliers
+                        .where((s) => s.id != null)
+                        .map(
+                          (s) => DropdownMenuItem<int>(
+                            value: s.id!,
+                            child: Text(s.name),
+                          ),
+                        ),
+                  ],
+                  onChanged: (v) => setState(() => _supplierId = v ?? 0),
                 ),
               ],
-            ),
-            const SizedBox(height: 20),
-            TextFormField(
-              controller: _nameController,
-              textCapitalization: TextCapitalization.words,
-              decoration: InputDecoration(
-                labelText:
-                    _type == DebtType.piutang ? 'Nama pelanggan' : 'Nama supplier',
-              ),
-              validator: (v) =>
-                  v == null || v.trim().isEmpty ? 'Wajib diisi' : null,
-            ),
-            const SizedBox(height: 16),
-            TextFormField(
-              controller: _phoneController,
-              keyboardType: TextInputType.phone,
-              decoration: const InputDecoration(
-                labelText: 'Nomor HP (opsional)',
-                prefixIcon:
-                    Icon(Icons.phone_outlined, color: AppColors.textTertiary),
-              ),
-            ),
-            const SizedBox(height: 16),
-            TextFormField(
-              controller: _amountController,
-              keyboardType: TextInputType.number,
-              decoration: const InputDecoration(
-                labelText: 'Nilai hutang',
-                prefixText: 'Rp ',
-              ),
-              validator: (v) {
-                final n = int.tryParse((v ?? '').trim());
-                if (n == null || n <= 0) return 'Masukkan nilai yang benar';
-                return null;
-              },
-            ),
-            // Kaitkan ke supplier terdaftar kalau jenisnya hutang.
-            if (_type == DebtType.hutang) ...[
               const SizedBox(height: 16),
-              DropdownButtonFormField<int>(
-                value: _supplierId,
-                decoration: const InputDecoration(
-                  labelText: 'Supplier terdaftar (opsional)',
-                ),
-                items: [
-                  const DropdownMenuItem<int>(
-                    value: 0,
-                    child: Text('Tidak dikaitkan'),
+              // Jatuh tempo
+              InkWell(
+                onTap: _pickDueDate,
+                borderRadius: BorderRadius.circular(8),
+                child: InputDecorator(
+                  decoration: InputDecoration(
+                    labelText: 'Jatuh tempo (opsional)',
+                    suffixIcon: _dueDate == null
+                        ? const Icon(Icons.event, color: AppColors.textTertiary)
+                        : IconButton(
+                            tooltip: 'Hapus tanggal',
+                            icon: const Icon(Icons.close,
+                                color: AppColors.textTertiary),
+                            onPressed: () => setState(() => _dueDate = null),
+                          ),
                   ),
-                  ...supplierState.suppliers
-                      .where((s) => s.id != null)
-                      .map(
-                        (s) => DropdownMenuItem<int>(
-                          value: s.id!,
-                          child: Text(s.name),
-                        ),
-                      ),
-                ],
-                onChanged: (v) => setState(() => _supplierId = v ?? 0),
+                  child: Text(
+                    _dueDate == null
+                        ? 'Tidak ditentukan'
+                        : Formatters.dateWithDay(_dueDate!),
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: _dueDate == null
+                          ? AppColors.textTertiary
+                          : AppColors.textMain,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: _noteController,
+                maxLines: 3,
+                textCapitalization: TextCapitalization.sentences,
+                decoration: const InputDecoration(
+                  labelText: 'Catatan (opsional)',
+                  alignLabelWithHint: true,
+                ),
+              ),
+              const SizedBox(height: 28),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: _saving ? null : _save,
+                  child: _saving
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
+                      : Text(isEditing ? 'Simpan Perubahan' : 'Simpan'),
+                ),
               ),
             ],
-            const SizedBox(height: 16),
-            // Jatuh tempo
-            InkWell(
-              onTap: _pickDueDate,
-              borderRadius: BorderRadius.circular(8),
-              child: InputDecorator(
-                decoration: InputDecoration(
-                  labelText: 'Jatuh tempo (opsional)',
-                  suffixIcon: _dueDate == null
-                      ? const Icon(Icons.event, color: AppColors.textTertiary)
-                      : IconButton(
-                          tooltip: 'Hapus tanggal',
-                          icon: const Icon(Icons.close,
-                              color: AppColors.textTertiary),
-                          onPressed: () => setState(() => _dueDate = null),
-                        ),
-                ),
-                child: Text(
-                  _dueDate == null
-                      ? 'Tidak ditentukan'
-                      : Formatters.dateWithDay(_dueDate!),
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: _dueDate == null
-                        ? AppColors.textTertiary
-                        : AppColors.textMain,
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(height: 16),
-            TextFormField(
-              controller: _noteController,
-              maxLines: 3,
-              textCapitalization: TextCapitalization.sentences,
-              decoration: const InputDecoration(
-                labelText: 'Catatan (opsional)',
-                alignLabelWithHint: true,
-              ),
-            ),
-            const SizedBox(height: 28),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: _saving ? null : _save,
-                child: _saving
-                    ? const SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: Colors.white,
-                        ),
-                      )
-                    : Text(isEditing ? 'Simpan Perubahan' : 'Simpan'),
-              ),
-            ),
-          ],
+          ),
         ),
       ),
     );

@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/utils/formatters.dart';
+import '../../core/utils/responsive.dart';
 import '../../data/models/note_model.dart';
 import '../../providers/note_provider.dart';
 import '../../shared/widgets/shared_widgets.dart';
@@ -99,12 +100,14 @@ class _CatatanScreenState extends ConsumerState<CatatanScreen> {
                             'Simpan catatan penting: daftar belanja, pesanan '
                             'pelanggan, atau pengingat lainnya.',
                       )
-                    : ListView.builder(
-                        padding: const EdgeInsets.fromLTRB(16, 8, 16, 96),
-                        itemCount: state.notes.length,
-                        itemBuilder: (context, i) =>
-                            _noteCard(state.notes[i]),
-                      ),
+                    : Responsive.centered(
+                      ListView.builder(
+                          padding: const EdgeInsets.fromLTRB(16, 8, 16, 96),
+                          itemCount: state.notes.length,
+                          itemBuilder: (context, i) =>
+                              _noteCard(state.notes[i]),
+                        ),
+                    ),
           ),
         ],
       ),

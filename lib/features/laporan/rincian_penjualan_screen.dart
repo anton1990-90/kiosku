@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/utils/formatters.dart';
 import '../../core/utils/report_period.dart';
+import '../../core/utils/responsive.dart';
 import '../../data/models/report_models.dart';
 import '../../data/repositories/accounting_repository.dart';
 import '../../data/repositories/report_repository.dart';
@@ -189,7 +190,8 @@ class _RincianPenjualanScreenState
       body: RefreshIndicator(
         color: AppColors.primary,
         onRefresh: _muat,
-        child: ListView(
+        child: Responsive.centered(
+          ListView(
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 40),
           children: [
             _tabs(),
@@ -284,6 +286,7 @@ class _RincianPenjualanScreenState
               }),
             ],
           ],
+        ),
         ),
       ),
     );
@@ -452,8 +455,103 @@ class _RincianPenjualanScreenState
               ),
             ],
           ),
+          if (_items.isNotEmpty) ...[
+            const Divider(height: 20),
+            _ringkasanStatus(),
+          ],
         ],
       ),
+    );
+  }
+
+  /// Ringkasan status pembayaran **per nota**. Satu nota bisa berisi beberapa
+  /// barang, jadi dihitung sekali saja per nomor nota — kalau tidak, nota
+  /// dengan 5 barang akan terhitung sebagai 5 transaksi piutang.
+  Widget _ringkasanStatus() {
+    final sudahDihitung = <String>{};
+    var tunai = 0;
+    var piutang = 0;
+    var piutangLunas = 0;
+    var sisa = 0;
+
+    for (final item in _items) {
+      if (!sudahDihitung.add(item.invoiceNumber)) continue;
+      if (!item.isDebt) {
+        tunai++;
+      } else if (item.unpaidAmount > 0) {
+        piutang++;
+        sisa += item.unpaidAmount;
+      } else {
+        piutangLunas++;
+      }
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Status pembayaran (per nota)',
+          style: TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.w700,
+            color: AppColors.textSecondary,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            Expanded(
+              child: _angkaStatus('$tunai', 'Cash', AppColors.successMid),
+            ),
+            Expanded(
+              child: _angkaStatus('$piutang', 'Piutang', AppColors.dangerMid),
+            ),
+            Expanded(
+              child: _angkaStatus('$piutangLunas', 'Lunas', AppColors.infoMid),
+            ),
+          ],
+        ),
+        if (sisa > 0) ...[
+          const SizedBox(height: 10),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+            decoration: BoxDecoration(
+              color: AppColors.dangerLight,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Text(
+              'Sisa piutang belum dibayar: ${Formatters.rupiah(sisa)}',
+              style: const TextStyle(
+                fontSize: 11.5,
+                fontWeight: FontWeight.w700,
+                color: AppColors.dangerMid,
+              ),
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
+  Widget _angkaStatus(String value, String label, Color warna) {
+    return Column(
+      children: [
+        Text(
+          value,
+          style: TextStyle(
+            fontSize: 17,
+            fontWeight: FontWeight.w800,
+            color: warna,
+          ),
+        ),
+        const SizedBox(height: 2),
+        Text(
+          label,
+          textAlign: TextAlign.center,
+          style: const TextStyle(fontSize: 10.5, color: AppColors.textSecondary),
+        ),
+      ],
     );
   }
 
@@ -646,12 +744,22 @@ class _RincianPenjualanScreenState
                     color: AppColors.textSecondary,
                   ),
                 ),
-                Text(
-                  '${item.invoiceNumber} · ${item.paymentMethod}',
-                  style: const TextStyle(
-                    fontSize: 10,
-                    color: AppColors.textTertiary,
-                  ),
+                Row(
+                  children: [
+                    Flexible(
+                      child: Text(
+                        '${item.invoiceNumber} · ${item.paymentMethod}',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 10,
+                          color: AppColors.textTertiary,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    _badgeStatus(item),
+                  ],
                 ),
               ],
             ),
@@ -675,7 +783,64 @@ class _RincianPenjualanScreenState
                   color: AppColors.successMid,
                 ),
               ),
+              if (item.isPiutang) ...[
+                const SizedBox(height: 1),
+                Text(
+                  'sisa ${Formatters.rupiahCompact(item.unpaidAmount)}',
+                  style: const TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.dangerMid,
+                  ),
+                ),
+              ],
             ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Badge status pembayaran satu baris rincian. Tujuannya supaya jelas
+  /// transaksi ini cash, piutang yang belum dibayar, atau piutang yang sudah
+  /// lunas — tanpa harus membuka detail nota.
+  Widget _badgeStatus(ReportItemDetail item) {
+    late final Color warna;
+    late final Color latar;
+    late final IconData ikon;
+
+    if (!item.isDebt) {
+      warna = AppColors.successMid;
+      latar = AppColors.successLight;
+      ikon = Icons.payments_outlined;
+    } else if (item.unpaidAmount > 0) {
+      warna = AppColors.dangerMid;
+      latar = AppColors.dangerLight;
+      ikon = Icons.schedule;
+    } else {
+      warna = AppColors.infoMid;
+      latar = AppColors.infoLight;
+      ikon = Icons.verified_outlined;
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: latar,
+        borderRadius: BorderRadius.circular(5),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(ikon, size: 10, color: warna),
+          const SizedBox(width: 3),
+          Text(
+            item.paymentStatusLabel,
+            style: TextStyle(
+              fontSize: 9,
+              fontWeight: FontWeight.w700,
+              color: warna,
+            ),
           ),
         ],
       ),

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/utils/formatters.dart';
+import '../../core/utils/responsive.dart';
 import '../../data/models/product_model.dart';
 import '../../data/models/supplier_model.dart';
 import '../../data/repositories/product_repository.dart';
@@ -215,239 +216,241 @@ class _ProdukFormScreenState extends ConsumerState<ProdukFormScreen> {
       ),
       body: Form(
         key: _formKey,
-        child: ListView(
-          padding: const EdgeInsets.all(20),
-          children: [
-            // Barcode ditaruh paling atas supaya bisa langsung scan dulu.
-            const Text(
-              'Barcode',
-              style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
-            ),
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                Expanded(
-                  child: TextFormField(
-                    controller: _barcodeController,
-                    // Barcode bisa berisi huruf (Code128/Code39), jadi jangan
-                    // dikunci ke papan angka saja.
-                    keyboardType: TextInputType.text,
-                    textCapitalization: TextCapitalization.characters,
-                    decoration: const InputDecoration(
-                      hintText: '8991002101234',
-                      prefixIcon: Icon(Icons.qr_code,
-                          color: AppColors.textTertiary),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                SizedBox(
-                  height: 52,
-                  child: ElevatedButton.icon(
-                    onPressed: _scanBarcode,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.primary,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                    ),
-                    icon: const Icon(Icons.qr_code_scanner, size: 20),
-                    label: const Text('Scan'),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 6),
-            Text(
-              'Ketuk "Scan" untuk memindai lewat kamera, atau ketik angkanya '
-              'langsung. Kalau kamera bermasalah, di layar scan ada tombol '
-              '"Masukkan manual".',
-              style: const TextStyle(
-                fontSize: 11,
-                color: AppColors.textTertiary,
-                height: 1.4,
+        child: Responsive.centered(
+          ListView(
+            padding: const EdgeInsets.all(20),
+            children: [
+              // Barcode ditaruh paling atas supaya bisa langsung scan dulu.
+              const Text(
+                'Barcode',
+                style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
               ),
-            ),
-            const SizedBox(height: 20),
-            // Emoji picker
-            const Text('Ikon produk',
-                style: TextStyle(fontSize: 13, color: AppColors.textSecondary)),
-            const SizedBox(height: 8),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: _emojis.map((e) {
-                final isSelected = _emoji == e;
-                return GestureDetector(
-                  onTap: () => setState(() => _emoji = e),
-                  child: Container(
-                    width: 44,
-                    height: 44,
-                    decoration: BoxDecoration(
-                      color: isSelected
-                          ? AppColors.primaryLight
-                          : AppColors.bgCard,
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(
-                        color: isSelected
-                            ? AppColors.primary
-                            : AppColors.border,
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Expanded(
+                    child: TextFormField(
+                      controller: _barcodeController,
+                      // Barcode bisa berisi huruf (Code128/Code39), jadi jangan
+                      // dikunci ke papan angka saja.
+                      keyboardType: TextInputType.text,
+                      textCapitalization: TextCapitalization.characters,
+                      decoration: const InputDecoration(
+                        hintText: '8991002101234',
+                        prefixIcon: Icon(Icons.qr_code,
+                            color: AppColors.textTertiary),
                       ),
                     ),
-                    child: Center(
-                      child: Text(e, style: const TextStyle(fontSize: 20)),
+                  ),
+                  const SizedBox(width: 10),
+                  SizedBox(
+                    height: 52,
+                    child: ElevatedButton.icon(
+                      onPressed: _scanBarcode,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primary,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                      ),
+                      icon: const Icon(Icons.qr_code_scanner, size: 20),
+                      label: const Text('Scan'),
                     ),
                   ),
-                );
-              }).toList(),
-            ),
-            const SizedBox(height: 16),
-            TextFormField(
-              controller: _nameController,
-              textCapitalization: TextCapitalization.words,
-              decoration: const InputDecoration(labelText: 'Nama produk'),
-              validator: (v) =>
-                  v == null || v.trim().isEmpty ? 'Wajib diisi' : null,
-            ),
-            const SizedBox(height: 16),
-            DropdownButtonFormField<String>(
-              value: _category,
-              decoration: const InputDecoration(labelText: 'Kategori'),
-              items: _categories
-                  .map((c) => DropdownMenuItem(value: c, child: Text(c)))
-                  .toList(),
-              onChanged: (v) => setState(() => _category = v ?? 'Sembako'),
-            ),
-            const SizedBox(height: 16),
-            Row(
-              children: [
-                Expanded(
-                  child: TextFormField(
-                    controller: _costPriceController,
-                    keyboardType: TextInputType.number,
-                    onChanged: (_) => setState(() {}),
-                    decoration: const InputDecoration(
-                      labelText: 'Harga modal',
-                      prefixText: 'Rp ',
-                    ),
-                    validator: (v) =>
-                        v == null || v.trim().isEmpty ? 'Wajib diisi' : null,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: TextFormField(
-                    controller: _sellPriceController,
-                    keyboardType: TextInputType.number,
-                    onChanged: (_) => setState(() {}),
-                    decoration: const InputDecoration(
-                      labelText: 'Harga jual',
-                      prefixText: 'Rp ',
-                    ),
-                    validator: (v) =>
-                        v == null || v.trim().isEmpty ? 'Wajib diisi' : null,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            if (_costPriceController.text.isNotEmpty &&
-                _sellPriceController.text.isNotEmpty)
-              Builder(builder: (context) {
-                final cost = int.tryParse(_costPriceController.text) ?? 0;
-                final sell = int.tryParse(_sellPriceController.text) ?? 0;
-                final profit = sell - cost;
-                return Padding(
-                  padding: const EdgeInsets.only(left: 4, bottom: 8),
-                  child: Text(
-                    'Laba per unit: ${Formatters.rupiah(profit)}',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: profit > 0
-                          ? AppColors.successMid
-                          : AppColors.dangerMid,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                );
-              }),
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                Expanded(
-                  child: TextFormField(
-                    controller: _stockController,
-                    keyboardType: TextInputType.number,
-                    decoration: const InputDecoration(labelText: 'Stok awal'),
-                    validator: (v) =>
-                        v == null || v.trim().isEmpty ? 'Wajib diisi' : null,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: TextFormField(
-                    controller: _minStockController,
-                    keyboardType: TextInputType.number,
-                    decoration: const InputDecoration(
-                      labelText: 'Min. stok',
-                      hintText: '5',
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            // Supplier — dipilih dari data supplier yang bisa diedit di Profil.
-            Row(
-              children: [
-                const Expanded(
-                  child: Text(
-                    'Supplier',
-                    style:
-                        TextStyle(fontSize: 13, color: AppColors.textSecondary),
-                  ),
-                ),
-                TextButton.icon(
-                  onPressed: _addSupplier,
-                  icon: const Icon(Icons.add, size: 16),
-                  label: const Text('Supplier baru'),
-                ),
-              ],
-            ),
-            DropdownButtonFormField<String>(
-              value: _supplier,
-              decoration: const InputDecoration(),
-              items: [
-                const DropdownMenuItem<String>(
-                  value: '',
-                  child: Text('Tidak ada supplier'),
-                ),
-                ...supplierNames.map(
-                  (name) => DropdownMenuItem<String>(
-                    value: name,
-                    child: Text(name),
-                  ),
-                ),
-              ],
-              onChanged: (v) => setState(() => _supplier = v ?? ''),
-            ),
-            const SizedBox(height: 28),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: _saving ? null : _save,
-                child: _saving
-                    ? const SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: Colors.white,
-                        ),
-                      )
-                    : Text(isEditing ? 'Simpan Perubahan' : 'Tambah Produk'),
+                ],
               ),
-            ),
-          ],
+              const SizedBox(height: 6),
+              Text(
+                'Ketuk "Scan" untuk memindai lewat kamera, atau ketik angkanya '
+                'langsung. Kalau kamera bermasalah, di layar scan ada tombol '
+                '"Masukkan manual".',
+                style: const TextStyle(
+                  fontSize: 11,
+                  color: AppColors.textTertiary,
+                  height: 1.4,
+                ),
+              ),
+              const SizedBox(height: 20),
+              // Emoji picker
+              const Text('Ikon produk',
+                  style: TextStyle(fontSize: 13, color: AppColors.textSecondary)),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: _emojis.map((e) {
+                  final isSelected = _emoji == e;
+                  return GestureDetector(
+                    onTap: () => setState(() => _emoji = e),
+                    child: Container(
+                      width: 44,
+                      height: 44,
+                      decoration: BoxDecoration(
+                        color: isSelected
+                            ? AppColors.primaryLight
+                            : AppColors.bgCard,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                          color: isSelected
+                              ? AppColors.primary
+                              : AppColors.border,
+                        ),
+                      ),
+                      child: Center(
+                        child: Text(e, style: const TextStyle(fontSize: 20)),
+                      ),
+                    ),
+                  );
+                }).toList(),
+              ),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: _nameController,
+                textCapitalization: TextCapitalization.words,
+                decoration: const InputDecoration(labelText: 'Nama produk'),
+                validator: (v) =>
+                    v == null || v.trim().isEmpty ? 'Wajib diisi' : null,
+              ),
+              const SizedBox(height: 16),
+              DropdownButtonFormField<String>(
+                value: _category,
+                decoration: const InputDecoration(labelText: 'Kategori'),
+                items: _categories
+                    .map((c) => DropdownMenuItem(value: c, child: Text(c)))
+                    .toList(),
+                onChanged: (v) => setState(() => _category = v ?? 'Sembako'),
+              ),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  Expanded(
+                    child: TextFormField(
+                      controller: _costPriceController,
+                      keyboardType: TextInputType.number,
+                      onChanged: (_) => setState(() {}),
+                      decoration: const InputDecoration(
+                        labelText: 'Harga modal',
+                        prefixText: 'Rp ',
+                      ),
+                      validator: (v) =>
+                          v == null || v.trim().isEmpty ? 'Wajib diisi' : null,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: TextFormField(
+                      controller: _sellPriceController,
+                      keyboardType: TextInputType.number,
+                      onChanged: (_) => setState(() {}),
+                      decoration: const InputDecoration(
+                        labelText: 'Harga jual',
+                        prefixText: 'Rp ',
+                      ),
+                      validator: (v) =>
+                          v == null || v.trim().isEmpty ? 'Wajib diisi' : null,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              if (_costPriceController.text.isNotEmpty &&
+                  _sellPriceController.text.isNotEmpty)
+                Builder(builder: (context) {
+                  final cost = int.tryParse(_costPriceController.text) ?? 0;
+                  final sell = int.tryParse(_sellPriceController.text) ?? 0;
+                  final profit = sell - cost;
+                  return Padding(
+                    padding: const EdgeInsets.only(left: 4, bottom: 8),
+                    child: Text(
+                      'Laba per unit: ${Formatters.rupiah(profit)}',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: profit > 0
+                            ? AppColors.successMid
+                            : AppColors.dangerMid,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  );
+                }),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Expanded(
+                    child: TextFormField(
+                      controller: _stockController,
+                      keyboardType: TextInputType.number,
+                      decoration: const InputDecoration(labelText: 'Stok awal'),
+                      validator: (v) =>
+                          v == null || v.trim().isEmpty ? 'Wajib diisi' : null,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: TextFormField(
+                      controller: _minStockController,
+                      keyboardType: TextInputType.number,
+                      decoration: const InputDecoration(
+                        labelText: 'Min. stok',
+                        hintText: '5',
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              // Supplier — dipilih dari data supplier yang bisa diedit di Profil.
+              Row(
+                children: [
+                  const Expanded(
+                    child: Text(
+                      'Supplier',
+                      style:
+                          TextStyle(fontSize: 13, color: AppColors.textSecondary),
+                    ),
+                  ),
+                  TextButton.icon(
+                    onPressed: _addSupplier,
+                    icon: const Icon(Icons.add, size: 16),
+                    label: const Text('Supplier baru'),
+                  ),
+                ],
+              ),
+              DropdownButtonFormField<String>(
+                value: _supplier,
+                decoration: const InputDecoration(),
+                items: [
+                  const DropdownMenuItem<String>(
+                    value: '',
+                    child: Text('Tidak ada supplier'),
+                  ),
+                  ...supplierNames.map(
+                    (name) => DropdownMenuItem<String>(
+                      value: name,
+                      child: Text(name),
+                    ),
+                  ),
+                ],
+                onChanged: (v) => setState(() => _supplier = v ?? ''),
+              ),
+              const SizedBox(height: 28),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: _saving ? null : _save,
+                  child: _saving
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
+                      : Text(isEditing ? 'Simpan Perubahan' : 'Tambah Produk'),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

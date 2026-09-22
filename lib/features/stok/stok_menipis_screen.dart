@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/utils/formatters.dart';
+import '../../core/utils/responsive.dart';
 import '../../data/models/product_model.dart';
 import '../../providers/product_provider.dart';
 import 'restok_sheet.dart';
@@ -65,43 +66,45 @@ class _StokMenipisScreenState extends ConsumerState<StokMenipisScreen> {
       body: RefreshIndicator(
         color: AppColors.primary,
         onRefresh: () => ref.read(productProvider.notifier).loadProducts(),
-        child: ListView(
-          padding: const EdgeInsets.fromLTRB(16, 16, 16, 40),
-          children: [
-            _ringkasan(semua.length, habis.length, menipis.length, nilaiBelanja),
-            const SizedBox(height: 16),
-            _filterChips(semua.length, habis.length, menipis.length),
-            const SizedBox(height: 16),
-            if (tampil.isEmpty)
-              const Padding(
-                padding: EdgeInsets.symmetric(vertical: 48),
-                child: Column(
-                  children: [
-                    Icon(Icons.check_circle_outline,
-                        size: 52, color: AppColors.successMid),
-                    SizedBox(height: 12),
-                    Text(
-                      'Semua stok aman',
-                      style: TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.successMid,
+        child: Responsive.centered(
+          ListView(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 40),
+            children: [
+              _ringkasan(semua.length, habis.length, menipis.length, nilaiBelanja),
+              const SizedBox(height: 16),
+              _filterChips(semua.length, habis.length, menipis.length),
+              const SizedBox(height: 16),
+              if (tampil.isEmpty)
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 48),
+                  child: Column(
+                    children: [
+                      Icon(Icons.check_circle_outline,
+                          size: 52, color: AppColors.successMid),
+                      SizedBox(height: 12),
+                      Text(
+                        'Semua stok aman',
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.successMid,
+                        ),
                       ),
-                    ),
-                    SizedBox(height: 4),
-                    Text(
-                      'Tidak ada produk yang perlu direstok.',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: AppColors.textTertiary,
+                      SizedBox(height: 4),
+                      Text(
+                        'Tidak ada produk yang perlu direstok.',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: AppColors.textTertiary,
+                        ),
                       ),
-                    ),
-                  ],
-                ),
-              )
-            else
-              ...tampil.map(_kartuProduk),
-          ],
+                    ],
+                  ),
+                )
+              else
+                ...tampil.map(_kartuProduk),
+            ],
+          ),
         ),
       ),
     );

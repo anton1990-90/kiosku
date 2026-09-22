@@ -58,6 +58,8 @@ class ReportExport {
   // ------------------------------------------------ rincian produk terjual
 
   static List<List<String>> rincianPenjualanCsv(RincianPenjualanData data) {
+    final status = _statusPerNota(data.items);
+
     final rows = <List<String>>[
       ['Laporan Rincian Produk Terjual'],
       [data.storeName],
@@ -69,6 +71,12 @@ class ReportExport {
       ['Laba kotor', data.summary.totalProfit.toString()],
       ['Jumlah transaksi', data.summary.transactions.toString()],
       ['Produk terjual (pcs)', data.summary.itemsSold.toString()],
+      [],
+      ['STATUS PEMBAYARAN'],
+      ['Transaksi tunai (cash)', status.tunai.toString()],
+      ['Transaksi piutang belum lunas', status.piutang.toString()],
+      ['Transaksi piutang sudah lunas', status.piutangLunas.toString()],
+      ['Nilai piutang belum dibayar', status.sisa.toString()],
       [],
       ['REKAP PER PRODUK'],
       ['Produk', 'Jumlah terjual', 'Pendapatan', 'Laba'],
@@ -96,6 +104,8 @@ class ReportExport {
       'Pelanggan',
       'No. nota',
       'Metode',
+      'Status bayar',
+      'Sisa piutang',
     ]);
 
     for (final item in data.items) {
@@ -110,10 +120,46 @@ class ReportExport {
         item.customerName ?? '-',
         item.invoiceNumber,
         item.paymentMethod,
+        item.paymentStatusLabel,
+        item.unpaidAmount.toString(),
       ]);
     }
 
     return rows;
+  }
+
+  /// Ringkasan status pembayaran, dihitung **per nomor nota**.
+  ///
+  /// Satu nota bisa berisi beberapa produk, jadi kalau dihitung per baris
+  /// barang jumlahnya jadi berlipat. Dipakai CSV maupun PDF supaya keduanya
+  /// menampilkan angka yang sama.
+  static ({int tunai, int piutang, int piutangLunas, int sisa}) _statusPerNota(
+    List<ReportItemDetail> items,
+  ) {
+    final sudahDihitung = <String>{};
+    var tunai = 0;
+    var piutang = 0;
+    var piutangLunas = 0;
+    var sisa = 0;
+
+    for (final item in items) {
+      if (!sudahDihitung.add(item.invoiceNumber)) continue;
+      if (!item.isDebt) {
+        tunai++;
+      } else if (item.unpaidAmount > 0) {
+        piutang++;
+        sisa += item.unpaidAmount;
+      } else {
+        piutangLunas++;
+      }
+    }
+
+    return (
+      tunai: tunai,
+      piutang: piutang,
+      piutangLunas: piutangLunas,
+      sisa: sisa,
+    );
   }
 
   static Uint8List rincianPenjualanPdf(RincianPenjualanData data) {
@@ -132,6 +178,29 @@ class ReportExport {
     pdf.keyValue(
       'Rata-rata per transaksi',
       Formatters.rupiah(data.summary.averagePerTransaction),
+      topRule: true,
+    );
+
+    // Status pembayaran — supaya jelas berapa transaksi yang tunai dan berapa
+    // yang masih menjadi piutang, dihitung per nota.
+    final status = _statusPerNota(data.items);
+    pdf.space(4);
+    pdf.text('Status pembayaran', size: 9, gray: 110);
+    pdf.keyValue('Transaksi tunai (cash)', '${status.tunai}', indent: true);
+    pdf.keyValue(
+      'Transaksi piutang belum lunas',
+      '${status.piutang}',
+      indent: true,
+    );
+    pdf.keyValue(
+      'Transaksi piutang sudah lunas',
+      '${status.piutangLunas}',
+      indent: true,
+    );
+    pdf.keyValue(
+      'Nilai piutang belum dibayar',
+      Formatters.rupiah(status.sisa),
+      indent: true,
       topRule: true,
     );
 

@@ -100,11 +100,18 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
   /// Simpan perubahan info toko dari layar "Info toko".
   /// Mengembalikan true kalau berhasil.
+  ///
+  /// Field yang tidak dikirim (null) dipertahankan dari state sekarang, jadi
+  /// mengganti logo tidak menghapus QRIS, dan sebaliknya.
   Future<bool> updateStore({
     required String storeName,
     String? storeAddress,
     String? storePhone,
     String? logoPath,
+    String? qrisPath,
+    String? bankName,
+    String? bankAccountNumber,
+    String? bankAccountName,
   }) async {
     final userId = state.user?.id;
     if (userId == null) return false;
@@ -116,6 +123,10 @@ class AuthNotifier extends StateNotifier<AuthState> {
         storeAddress: storeAddress,
         storePhone: storePhone,
         logoPath: logoPath ?? state.user?.logoPath,
+        qrisPath: qrisPath ?? state.user?.qrisPath,
+        bankName: bankName ?? state.user?.bankName,
+        bankAccountNumber: bankAccountNumber ?? state.user?.bankAccountNumber,
+        bankAccountName: bankAccountName ?? state.user?.bankAccountName,
       );
       state = AuthState(
         user: updated,
@@ -127,6 +138,18 @@ class AuthNotifier extends StateNotifier<AuthState> {
       state = state.copyWith(isLoading: false, error: e.toString());
       return false;
     }
+  }
+
+  /// Konfirmasi password akun yang sedang login — dipakai sebelum tindakan
+  /// berbahaya seperti menghapus semua data.
+  Future<bool> verifyPassword(String password) {
+    return _repo.verifyCurrentPassword(password);
+  }
+
+  /// Hapus seluruh data usaha setelah password dikonfirmasi.
+  /// Akun dan profil toko tidak ikut terhapus.
+  Future<bool> resetAllData(String password) {
+    return _repo.resetBusinessData(password);
   }
 
   /// Perbarui state setelah logo diganti, tanpa menulis ulang info toko.

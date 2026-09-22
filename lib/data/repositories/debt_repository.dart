@@ -229,4 +229,83 @@ class DebtRepository {
     );
     return Sqflite.firstIntValue(result) ?? 0;
   }
+
+  /// Rincian lengkap satu catatan hutang: siapa pihaknya, barang apa saja
+  /// yang terkait, dan berapa sisa tanggungannya.
+  ///
+  /// Dipakai riwayat Kas — satu baris "Terima piutang" atau "Bayar hutang"
+  /// bisa diketuk dan menampilkan asalnya. Barang diambil dari nota penjualan
+  /// kalau hutangnya lahir dari transaksi; kalau tidak, dari produk yang
+  /// tertaut langsung.
+  Future<DebtDetail?> getDetail(int debtId) async {
+    final db = await _db.database;
+    final rows = await db.query(
+      'debts',
+      where: 'id = ?',
+      whereArgs: [debtId],
+      limit: 1,
+    );
+    if (rows.isEmpty) return null;
+
+    final debt = DebtModel.fromMap(rows.first);
+    var invoiceNumber = '';
+    final goods = <DebtGoods>[];
+
+    if (debt.saleId != null) {
+      final sales = await db.query(
+        'sales',
+        columns: ['invoice_number'],
+        where: 'id = ?',
+        whereArgs: [debt.saleId],
+        limit: 1,
+      );
+      if (sales.isNotEmpty) {
+        invoiceNumber = (sales.first['invoice_number'] as String?) ?? '';
+      }
+
+      final items = await db.query(
+        'sale_items',
+        where: 'sale_id = ?',
+        whereArgs: [debt.saleId],
+        orderBy: 'id ASC',
+      );
+      for (final item in items) {
+        goods.add(DebtGoods(
+          name: (item['product_name'] as String?) ?? '-',
+          quantity: (item['quantity'] as int?) ?? 0,
+          price: (item['sell_price'] as int?) ?? 0,
+        ));
+      }
+    }
+
+    if (goods.isEmpty && debt.productId != null) {
+      final produk = await db.query(
+        'products',
+        columns: ['name', 'sell_price'],
+        where: 'id = ?',
+        whereArgs: [debt.productId],
+        limit: 1,
+      );
+      if (produk.isNotEmpty) {
+        goods.add(DebtGoods(
+          name: (produk.first['name'] as String?) ?? '-',
+          quantity: 1,
+          price: (produk.first['sell_price'] as int?) ?? 0,
+        ));
+      }
+    }
+
+    return DebtDetail(
+      partyName: debt.partyName,
+      partyPhone: debt.partyPhone,
+      type: debt.type,
+      amount: debt.amount,
+      paidAmount: debt.paidAmount,
+      status: debt.status,
+      dueDate: debt.dueDate,
+      note: debt.note,
+      invoiceNumber: invoiceNumber,
+      goods: goods,
+    );
+  }
 }

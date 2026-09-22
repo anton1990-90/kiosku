@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/utils/formatters.dart';
+import '../../core/utils/responsive.dart';
 import '../../data/models/product_model.dart';
 import '../../providers/product_provider.dart';
 import '../../shared/widgets/shared_widgets.dart';
@@ -143,25 +144,29 @@ class _ProdukScreenState extends ConsumerState<ProdukScreen> {
                         title: 'Belum ada produk',
                         subtitle: 'Tambahkan produk pertama Anda',
                       )
-                    : ListView.builder(
-                        padding: const EdgeInsets.fromLTRB(16, 0, 16, 100),
-                        itemCount: products.length,
-                        itemBuilder: (context, index) {
-                          final p = products[index];
-                          return _ProductCard(
-                            product: p,
-                            onEdit: () async {
-                              await Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) =>
-                                      ProdukFormScreen(product: p),
-                                ),
-                              );
-                            },
-                            onDelete: () => _confirmDelete(context, p),
-                          );
-                        },
+                    // Di tablet daftarnya dibatasi lebarnya supaya barisnya
+                    // tidak melebar penuh dan tetap enak dibaca.
+                    : Responsive.centered(
+                        ListView.builder(
+                          padding: const EdgeInsets.fromLTRB(16, 0, 16, 100),
+                          itemCount: products.length,
+                          itemBuilder: (context, index) {
+                            final p = products[index];
+                            return _ProductCard(
+                              product: p,
+                              onEdit: () async {
+                                await Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) =>
+                                        ProdukFormScreen(product: p),
+                                  ),
+                                );
+                              },
+                              onDelete: () => _confirmDelete(context, p),
+                            );
+                          },
+                        ),
                       ),
           ),
         ],

@@ -1,6 +1,6 @@
 name: tokoku
 description: Aplikasi UMKM toko sembako & penjualan - offline-first dengan autentikasi email.
-version: 1.3.0+6
+version: 1.4.0+7
 publish_to: 'none'
 
 environment:
@@ -28,6 +28,11 @@ dependencies:
 
   # Thermal receipt printing (ESC/POS)
   esc_pos_utils: ^1.1.0
+
+  # Membaca gambar logo usaha & QRIS untuk dicetak di struk.
+  # Dideklarasikan eksplisit karena esc_pos_utils sudah memakai `image ^3.0.2`
+  # secara transitif — versinya sengaja disamakan supaya tidak ada bentrok.
+  image: ^3.0.2
 
   # Bluetooth for thermal printer connection
   flutter_blue_plus: ^1.32.0

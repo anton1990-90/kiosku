@@ -97,7 +97,7 @@ class AuthRepository {
     return UserModel.fromMap(results.first);
   }
 
-  /// Simpan perubahan info toko (nama, alamat, telepon, logo).
+  /// Simpan perubahan info toko (nama, alamat, telepon, logo, QRIS, bank).
   /// Mengembalikan user yang sudah diperbarui.
   Future<UserModel> updateStore({
     required int userId,
@@ -105,20 +105,34 @@ class AuthRepository {
     String? storeAddress,
     String? storePhone,
     String? logoPath,
+    String? qrisPath,
+    String? bankName,
+    String? bankAccountNumber,
+    String? bankAccountName,
   }) async {
     final db = await _db.database;
 
     final current = await getCurrentUser();
+
+    /// Kolom teks opsional: spasi saja dianggap kosong supaya tidak
+    /// tersimpan sebagai string berisi spasi.
+    String? bersih(String? value) {
+      final trimmed = (value ?? '').trim();
+      return trimmed.isEmpty ? null : trimmed;
+    }
+
     final merged = UserModel(
       id: userId,
       email: current?.email ?? '',
       passwordHash: current?.passwordHash ?? '',
       storeName: storeName,
-      storeAddress: (storeAddress ?? '').trim().isEmpty
-          ? null
-          : storeAddress!.trim(),
-      storePhone: (storePhone ?? '').trim().isEmpty ? null : storePhone!.trim(),
+      storeAddress: bersih(storeAddress),
+      storePhone: bersih(storePhone),
       logoPath: logoPath,
+      qrisPath: qrisPath,
+      bankName: bersih(bankName),
+      bankAccountNumber: bersih(bankAccountNumber),
+      bankAccountName: bersih(bankAccountName),
       createdAt: current?.createdAt ?? DateTime.now(),
     );
 
@@ -129,12 +143,51 @@ class AuthRepository {
         'store_address': merged.storeAddress,
         'store_phone': merged.storePhone,
         'logo_path': merged.logoPath,
+        'qris_path': merged.qrisPath,
+        'bank_name': merged.bankName,
+        'bank_account_number': merged.bankAccountNumber,
+        'bank_account_name': merged.bankAccountName,
       },
       where: 'id = ?',
       whereArgs: [userId],
     );
 
     return merged;
+  }
+
+  /// Cocokkan password yang diketik pengguna dengan akun yang sedang login.
+  ///
+  /// Dipakai sebagai konfirmasi sebelum tindakan berbahaya seperti "Reset
+  /// semua data". Password tidak pernah disimpan mentah — yang dibandingkan
+  /// adalah hash SHA-256, sama seperti saat login.
+  Future<bool> verifyCurrentPassword(String password) async {
+    if (password.isEmpty) return false;
+
+    final prefs = await SharedPreferences.getInstance();
+    final userId = prefs.getInt(_sessionKey);
+    if (userId == null) return false;
+
+    final db = await _db.database;
+    final rows = await db.query(
+      'users',
+      columns: ['password_hash'],
+      where: 'id = ?',
+      whereArgs: [userId],
+      limit: 1,
+    );
+    if (rows.isEmpty) return false;
+
+    return rows.first['password_hash'] == _hashPassword(password);
+  }
+
+  /// Hapus seluruh data usaha setelah password dikonfirmasi.
+  ///
+  /// Mengembalikan `false` kalau password salah, supaya pemanggil bisa
+  /// menampilkan pesan dan tidak ada data yang terhapus.
+  Future<bool> resetBusinessData(String password) async {
+    if (!await verifyCurrentPassword(password)) return false;
+    await _db.resetBusinessData();
+    return true;
   }
 
   /// Simpan hanya path logo (dipakai setelah memilih gambar dari galeri).

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/constants/app_colors.dart';
+import '../../core/utils/responsive.dart';
 import '../../data/models/note_model.dart';
 import '../../providers/note_provider.dart';
 import 'catatan_screen.dart' show noteColorKeys, noteColors;
@@ -93,81 +94,83 @@ class _CatatanFormScreenState extends ConsumerState<CatatanFormScreen> {
       ),
       body: Form(
         key: _formKey,
-        child: ListView(
-          padding: const EdgeInsets.all(20),
-          children: [
-            // Pemilih warna
-            const Text(
-              'Warna penanda',
-              style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
-            ),
-            const SizedBox(height: 8),
-            Wrap(
-              spacing: 10,
-              children: noteColorKeys.map((key) {
-                final c = noteColors(key);
-                final isSelected = _color == key;
-                return GestureDetector(
-                  onTap: () => setState(() => _color = key),
-                  child: Container(
-                    width: 40,
-                    height: 40,
-                    decoration: BoxDecoration(
-                      color: c.background,
-                      shape: BoxShape.circle,
-                      border: Border.all(
-                        color: isSelected ? c.accent : AppColors.border,
-                        width: isSelected ? 2.5 : 0.5,
-                      ),
-                    ),
-                    child: isSelected
-                        ? Icon(Icons.check, size: 18, color: c.accent)
-                        : null,
-                  ),
-                );
-              }).toList(),
-            ),
-            const SizedBox(height: 20),
-            TextFormField(
-              controller: _titleController,
-              textCapitalization: TextCapitalization.sentences,
-              decoration: const InputDecoration(labelText: 'Judul'),
-              validator: (v) =>
-                  v == null || v.trim().isEmpty ? 'Wajib diisi' : null,
-            ),
-            const SizedBox(height: 16),
-            TextFormField(
-              controller: _bodyController,
-              maxLines: 10,
-              minLines: 5,
-              textCapitalization: TextCapitalization.sentences,
-              decoration: const InputDecoration(
-                labelText: 'Isi catatan (opsional)',
-                alignLabelWithHint: true,
+        child: Responsive.centered(
+          ListView(
+            padding: const EdgeInsets.all(20),
+            children: [
+              // Pemilih warna
+              const Text(
+                'Warna penanda',
+                style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
               ),
-            ),
-            const SizedBox(height: 24),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: _saving ? null : _save,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: colors.accent,
-                  foregroundColor: Colors.white,
-                ),
-                child: _saving
-                    ? const SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: Colors.white,
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 10,
+                children: noteColorKeys.map((key) {
+                  final c = noteColors(key);
+                  final isSelected = _color == key;
+                  return GestureDetector(
+                    onTap: () => setState(() => _color = key),
+                    child: Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        color: c.background,
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: isSelected ? c.accent : AppColors.border,
+                          width: isSelected ? 2.5 : 0.5,
                         ),
-                      )
-                    : Text(isEditing ? 'Simpan Perubahan' : 'Simpan Catatan'),
+                      ),
+                      child: isSelected
+                          ? Icon(Icons.check, size: 18, color: c.accent)
+                          : null,
+                    ),
+                  );
+                }).toList(),
               ),
-            ),
-          ],
+              const SizedBox(height: 20),
+              TextFormField(
+                controller: _titleController,
+                textCapitalization: TextCapitalization.sentences,
+                decoration: const InputDecoration(labelText: 'Judul'),
+                validator: (v) =>
+                    v == null || v.trim().isEmpty ? 'Wajib diisi' : null,
+              ),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: _bodyController,
+                maxLines: 10,
+                minLines: 5,
+                textCapitalization: TextCapitalization.sentences,
+                decoration: const InputDecoration(
+                  labelText: 'Isi catatan (opsional)',
+                  alignLabelWithHint: true,
+                ),
+              ),
+              const SizedBox(height: 24),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: _saving ? null : _save,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: colors.accent,
+                    foregroundColor: Colors.white,
+                  ),
+                  child: _saving
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
+                      : Text(isEditing ? 'Simpan Perubahan' : 'Simpan Catatan'),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

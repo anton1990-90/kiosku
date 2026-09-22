@@ -223,13 +223,47 @@ final routerProvider = Provider<GoRouter>((ref) {
         ],
       ),
     ],
+    // Alamat yang tidak dikenal tetap punya jalan keluar, jadi tombol
+    // kembali Android maupun tombol di layar tidak menemui jalan buntu.
     errorBuilder: (context, state) => Scaffold(
+      backgroundColor: AppColors.bgPage,
+      appBar: AppBar(title: const Text('Halaman tidak ditemukan')),
       body: Center(
         child: Padding(
           padding: const EdgeInsets.all(24),
-          child: Text(
-            'Halaman tidak ditemukan',
-            style: TextStyle(color: AppColors.textSecondary),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(
+                Icons.explore_off_outlined,
+                size: 56,
+                color: AppColors.textTertiary,
+              ),
+              const SizedBox(height: 14),
+              const Text(
+                'Halaman tidak ditemukan',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.textSecondary,
+                ),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                state.uri.toString(),
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  fontSize: 12,
+                  color: AppColors.textTertiary,
+                ),
+              ),
+              const SizedBox(height: 22),
+              ElevatedButton.icon(
+                onPressed: () => context.go('/dashboard'),
+                icon: const Icon(Icons.home_outlined, size: 18),
+                label: const Text('Kembali ke Beranda'),
+              ),
+            ],
           ),
         ),
       ),

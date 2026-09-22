@@ -12,12 +12,14 @@ import 'package:sqflite/sqflite.dart';
 ///   3 — + cash_transactions (kas), expenses (beban), prive,
 ///       stock_movements (riwayat stok), kolom penghubung hutang↔penjualan
 ///       dan hutang↔produk
+///   4 — + kolom pembayaran pada users: qris_path (gambar QRIS),
+///       bank_name, bank_account_number, bank_account_name
 class DatabaseHelper {
   DatabaseHelper._();
   static final DatabaseHelper instance = DatabaseHelper._();
 
   static const _dbName = 'tokoku.db';
-  static const _dbVersion = 3;
+  static const _dbVersion = 4;
 
   Database? _database;
 
@@ -45,6 +47,7 @@ class DatabaseHelper {
     await _createBaseTables(db);
     await _createV2Tables(db);
     await _createV3Tables(db);
+    await _upgradeV4(db);
     await _seedProducts(db);
     await _seedPaymentMethods(db);
   }
@@ -289,6 +292,17 @@ class DatabaseHelper {
     await _addColumnIfMissing(db, 'debts', 'product_id', 'INTEGER');
   }
 
+  /// Kolom versi 4 — data pembayaran non-tunai milik toko.
+  ///
+  /// Dipakai supaya saat pelanggan membayar dengan QRIS atau transfer bank,
+  /// gambar QRIS dan nomor rekening toko bisa ditampilkan di kasir dan struk.
+  Future<void> _upgradeV4(Database db) async {
+    await _addColumnIfMissing(db, 'users', 'qris_path', 'TEXT');
+    await _addColumnIfMissing(db, 'users', 'bank_name', 'TEXT');
+    await _addColumnIfMissing(db, 'users', 'bank_account_number', 'TEXT');
+    await _addColumnIfMissing(db, 'users', 'bank_account_name', 'TEXT');
+  }
+
   /// Migrasi dari versi lama. Data yang sudah ada tidak boleh hilang.
   Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
     if (oldVersion < 2) {
@@ -300,6 +314,57 @@ class DatabaseHelper {
     if (oldVersion < 3) {
       await _createV3Tables(db);
     }
+    if (oldVersion < 4) {
+      await _upgradeV4(db);
+    }
+  }
+
+  /// Hapus seluruh data usaha — produk, penjualan, hutang, kas, beban,
+  /// prive, catatan, supplier, dan riwayat stok.
+  ///
+  /// Dipakai oleh menu "Reset semua data" di Profil. Akun pengguna dan
+  /// profil toko (nama, alamat, logo, QRIS, rekening) **tidak** dihapus, dan
+  /// daftar metode pembayaran tetap ada supaya kasir langsung bisa dipakai.
+  ///
+  /// Urutan penghapusan mengikuti foreign key — baris anak dulu, baru induk,
+  /// karena `PRAGMA foreign_keys = ON` aktif.
+  Future<void> resetBusinessData() async {
+    final db = await database;
+
+    const urutan = [
+      'sale_items',
+      'debt_payments',
+      'stock_movements',
+      'cash_transactions',
+      'expenses',
+      'prive',
+      'sales',
+      'debts',
+      'notes',
+      'suppliers',
+      'products',
+    ];
+
+    await db.transaction((txn) async {
+      for (final table in urutan) {
+        await txn.delete(table);
+      }
+
+      // Nomor id kembali mulai dari 1, seperti aplikasi yang baru dipasang.
+      final adaSequence = await txn.rawQuery(
+        "SELECT name FROM sqlite_master WHERE type = 'table' "
+        "AND name = 'sqlite_sequence'",
+      );
+      if (adaSequence.isNotEmpty) {
+        for (final table in urutan) {
+          await txn.delete(
+            'sqlite_sequence',
+            where: 'name = ?',
+            whereArgs: [table],
+          );
+        }
+      }
+    });
   }
 
   /// `ALTER TABLE ... ADD COLUMN` gagal kalau kolom sudah ada, jadi dicek dulu.

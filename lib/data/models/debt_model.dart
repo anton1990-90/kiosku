@@ -185,3 +185,63 @@ class DebtPaymentModel {
     );
   }
 }
+
+/// Rincian satu catatan hutang untuk ditampilkan di dialog riwayat kas.
+///
+/// Isinya menjawab pertanyaan "ini piutang/utang siapa, dan barang apa saja
+/// yang terkait" — jadi satu baris "Terima piutang" di riwayat kas bisa
+/// diketuk dan langsung menjelaskan asalnya.
+class DebtDetail {
+  final String partyName;
+  final String? partyPhone;
+  final String type; // DebtType.piutang / DebtType.hutang
+  final int amount;
+  final int paidAmount;
+  final String status; // DebtStatus
+  final DateTime? dueDate;
+  final String? note;
+
+  /// Nomor nota penjualan yang menjadi asal piutang (kalau ada).
+  final String invoiceNumber;
+
+  /// Barang yang terkait dengan catatan ini.
+  final List<DebtGoods> goods;
+
+  const DebtDetail({
+    required this.partyName,
+    this.partyPhone,
+    required this.type,
+    required this.amount,
+    required this.paidAmount,
+    required this.status,
+    this.dueDate,
+    this.note,
+    this.invoiceNumber = '',
+    this.goods = const [],
+  });
+
+  bool get isPiutang => type == DebtType.piutang;
+
+  bool get isLunas => status == DebtStatus.lunas;
+
+  /// Sisa yang belum dibayar.
+  int get remaining {
+    final sisa = amount - paidAmount;
+    return sisa < 0 ? 0 : sisa;
+  }
+}
+
+/// Satu barang yang terkait dengan catatan hutang.
+class DebtGoods {
+  final String name;
+  final int quantity;
+  final int price;
+
+  const DebtGoods({
+    required this.name,
+    required this.quantity,
+    required this.price,
+  });
+
+  int get subtotal => quantity * price;
+}

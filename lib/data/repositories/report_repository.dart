@@ -34,6 +34,10 @@ class ReportRepository {
 
   /// Detail setiap produk yang terjual dalam rentang waktu, lengkap dengan
   /// tanggal & waktu transaksinya. Ini yang ditampilkan di laporan harian.
+  ///
+  /// `debts` di-join dari kiri lewat `sale_id` supaya setiap baris tahu sisa
+  /// piutangnya **saat ini** — jadi laporan bisa membedakan transaksi tunai,
+  /// piutang yang belum dibayar, dan piutang yang sudah lunas.
   Future<List<ReportItemDetail>> getItemDetails(
     DateTime start,
     DateTime end, {
@@ -43,9 +47,11 @@ class ReportRepository {
     final rows = await db.rawQuery('''
       SELECT si.product_name, si.quantity, si.cost_price, si.sell_price,
              si.subtotal, s.created_at, s.invoice_number, s.customer_name,
-             s.payment_method
+             s.payment_method, s.is_debt, s.total_amount, s.paid_amount,
+             COALESCE(d.amount - d.paid_amount, 0) AS sisa
       FROM sale_items si
       INNER JOIN sales s ON s.id = si.sale_id
+      LEFT JOIN debts d ON d.sale_id = s.id
       WHERE s.created_at >= ? AND s.created_at < ?
       ORDER BY s.created_at DESC, si.id ASC
       LIMIT ?

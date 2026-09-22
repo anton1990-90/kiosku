@@ -3,7 +3,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/utils/formatters.dart';
 import '../../core/utils/report_period.dart';
+import '../../core/utils/responsive.dart';
 import '../../data/models/cash_model.dart';
+import '../../data/models/debt_model.dart';
+import '../../data/repositories/debt_repository.dart';
 import '../../providers/cash_provider.dart';
 
 /// Layar Kas — saldo, mutasi uang masuk/keluar, dan riwayat lengkapnya.
@@ -53,115 +56,117 @@ class _KasScreenState extends ConsumerState<KasScreen> {
       body: RefreshIndicator(
         color: AppColors.primary,
         onRefresh: () => ref.read(cashProvider.notifier).load(),
-        child: ListView(
-          padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
-          children: [
-            _kartuSaldo(state),
-            const SizedBox(height: 14),
-            _ringkasHariIni(state),
-            const SizedBox(height: 18),
-            _tabs(period),
-            const SizedBox(height: 12),
-            _navigasi(period, state.canGoNext),
-            const SizedBox(height: 12),
-            _filterJenis(state),
-            const SizedBox(height: 16),
-            if (state.isLoading)
-              const Padding(
-                padding: EdgeInsets.symmetric(vertical: 40),
-                child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
-              )
-            else if (state.transactions.isEmpty)
-              const Padding(
-                padding: EdgeInsets.symmetric(vertical: 40),
-                child: Column(
-                  children: [
-                    Icon(Icons.account_balance_wallet_outlined,
-                        size: 52, color: AppColors.textTertiary),
-                    SizedBox(height: 12),
-                    Text(
-                      'Belum ada mutasi kas',
-                      style: TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.textSecondary,
+        child: Responsive.centered(
+          ListView(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
+            children: [
+              _kartuSaldo(state),
+              const SizedBox(height: 14),
+              _ringkasHariIni(state),
+              const SizedBox(height: 18),
+              _tabs(period),
+              const SizedBox(height: 12),
+              _navigasi(period, state.canGoNext),
+              const SizedBox(height: 12),
+              _filterJenis(state),
+              const SizedBox(height: 16),
+              if (state.isLoading)
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 40),
+                  child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
+                )
+              else if (state.transactions.isEmpty)
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 40),
+                  child: Column(
+                    children: [
+                      Icon(Icons.account_balance_wallet_outlined,
+                          size: 52, color: AppColors.textTertiary),
+                      SizedBox(height: 12),
+                      Text(
+                        'Belum ada mutasi kas',
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.textSecondary,
+                        ),
                       ),
-                    ),
-                    SizedBox(height: 4),
-                    Text(
-                      'Transaksi penjualan dan pembayaran hutang akan muncul '
-                      'di sini otomatis.',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: AppColors.textTertiary,
+                      SizedBox(height: 4),
+                      Text(
+                        'Transaksi penjualan dan pembayaran hutang akan muncul '
+                        'di sini otomatis.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: AppColors.textTertiary,
+                        ),
                       ),
-                    ),
-                  ],
-                ),
-              )
-            else
-              ...keys.map((key) {
-                final list = grouped[key]!;
-                final masuk = list
-                    .where((t) => t.isMasuk)
-                    .fold<int>(0, (s, t) => s + t.amount);
-                final keluar = list
-                    .where((t) => !t.isMasuk)
-                    .fold<int>(0, (s, t) => s + t.amount);
+                    ],
+                  ),
+                )
+              else
+                ...keys.map((key) {
+                  final list = grouped[key]!;
+                  final masuk = list
+                      .where((t) => t.isMasuk)
+                      .fold<int>(0, (s, t) => s + t.amount);
+                  final keluar = list
+                      .where((t) => !t.isMasuk)
+                      .fold<int>(0, (s, t) => s + t.amount);
 
-                return Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Container(
-                      margin: const EdgeInsets.only(bottom: 8, top: 4),
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 10, vertical: 7),
-                      decoration: BoxDecoration(
-                        color: AppColors.bgSoft,
-                        borderRadius: BorderRadius.circular(8),
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Container(
+                        margin: const EdgeInsets.only(bottom: 8, top: 4),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 10, vertical: 7),
+                        decoration: BoxDecoration(
+                          color: AppColors.bgSoft,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                Formatters.dateWithDay(list.first.date),
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w700,
+                                  color: AppColors.textMain,
+                                ),
+                              ),
+                            ),
+                            if (masuk > 0)
+                              Text(
+                                '+${Formatters.rupiahCompact(masuk)}',
+                                style: const TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w600,
+                                  color: AppColors.successMid,
+                                ),
+                              ),
+                            if (masuk > 0 && keluar > 0)
+                              const SizedBox(width: 8),
+                            if (keluar > 0)
+                              Text(
+                                '-${Formatters.rupiahCompact(keluar)}',
+                                style: const TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w600,
+                                  color: AppColors.dangerMid,
+                                ),
+                              ),
+                          ],
+                        ),
                       ),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              Formatters.dateWithDay(list.first.date),
-                              style: const TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w700,
-                                color: AppColors.textMain,
-                              ),
-                            ),
-                          ),
-                          if (masuk > 0)
-                            Text(
-                              '+${Formatters.rupiahCompact(masuk)}',
-                              style: const TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w600,
-                                color: AppColors.successMid,
-                              ),
-                            ),
-                          if (masuk > 0 && keluar > 0)
-                            const SizedBox(width: 8),
-                          if (keluar > 0)
-                            Text(
-                              '-${Formatters.rupiahCompact(keluar)}',
-                              style: const TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w600,
-                                color: AppColors.dangerMid,
-                              ),
-                            ),
-                        ],
-                      ),
-                    ),
-                    ...list.map(_barisKas),
-                    const SizedBox(height: 8),
-                  ],
-                );
-              }),
-          ],
+                      ...list.map(_barisKas),
+                      const SizedBox(height: 8),
+                    ],
+                  );
+                }),
+            ],
+          ),
         ),
       ),
     );
@@ -306,13 +311,41 @@ class _KasScreenState extends ConsumerState<KasScreen> {
                 color: AppColors.textSecondary),
           ),
           Expanded(
-            child: Text(
-              period.label,
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w700,
-                color: AppColors.textMain,
+            child: GestureDetector(
+              onTap: () => _pilihTanggal(period),
+              behavior: HitTestBehavior.opaque,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 6),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      period.label,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.textMain,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    const Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.calendar_month_outlined,
+                            size: 11, color: AppColors.textTertiary),
+                        SizedBox(width: 4),
+                        Text(
+                          'Ketuk untuk pilih tanggal',
+                          style: TextStyle(
+                            fontSize: 10,
+                            color: AppColors.textTertiary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
@@ -370,76 +403,86 @@ class _KasScreenState extends ConsumerState<KasScreen> {
   Widget _barisKas(CashTransaction trx) {
     final masuk = trx.isMasuk;
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: AppColors.bgCard,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.border, width: 0.5),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 34,
-            height: 34,
-            decoration: BoxDecoration(
-              color:
-                  masuk ? AppColors.successLight : AppColors.dangerLight,
-              borderRadius: BorderRadius.circular(9),
+    // Setiap baris bisa diketuk untuk melihat rinciannya. Untuk mutasi yang
+    // berasal dari hutang/piutang, dialognya menyebutkan nama pelanggan atau
+    // supplier beserta barang yang terkait.
+    return GestureDetector(
+      onTap: () => _tampilkanDetail(trx),
+      behavior: HitTestBehavior.opaque,
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 8),
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: AppColors.bgCard,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: AppColors.border, width: 0.5),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 34,
+              height: 34,
+              decoration: BoxDecoration(
+                color:
+                    masuk ? AppColors.successLight : AppColors.dangerLight,
+                borderRadius: BorderRadius.circular(9),
+              ),
+              child: Icon(
+                masuk ? Icons.arrow_upward : Icons.arrow_downward,
+                size: 16,
+                color: masuk ? AppColors.successMid : AppColors.dangerMid,
+              ),
             ),
-            child: Icon(
-              masuk ? Icons.arrow_upward : Icons.arrow_downward,
-              size: 16,
-              color: masuk ? AppColors.successMid : AppColors.dangerMid,
-            ),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  trx.categoryLabel,
-                  style: const TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.textMain,
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    trx.categoryLabel,
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.textMain,
+                    ),
                   ),
-                ),
-                const SizedBox(height: 1),
-                Text(
-                  trx.note == null || trx.note!.isEmpty
-                      ? Formatters.time(trx.date)
-                      : '${Formatters.time(trx.date)} · ${trx.note!}',
-                  style: const TextStyle(
-                    fontSize: 11,
-                    color: AppColors.textSecondary,
+                  const SizedBox(height: 1),
+                  Text(
+                    trx.note == null || trx.note!.isEmpty
+                        ? Formatters.time(trx.date)
+                        : '${Formatters.time(trx.date)} · ${trx.note!}',
+                    style: const TextStyle(
+                      fontSize: 11,
+                      color: AppColors.textSecondary,
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
                   ),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
-          const SizedBox(width: 8),
-          Text(
-            '${masuk ? '+' : '-'}${Formatters.rupiah(trx.amount)}',
-            style: TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w700,
-              color: masuk ? AppColors.successMid : AppColors.dangerMid,
+            const SizedBox(width: 8),
+            Text(
+              '${masuk ? '+' : '-'}${Formatters.rupiah(trx.amount)}',
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+                color: masuk ? AppColors.successMid : AppColors.dangerMid,
+              ),
             ),
-          ),
-          if (trx.refType == 'manual')
-            IconButton(
-              tooltip: 'Hapus catatan ini',
-              visualDensity: VisualDensity.compact,
-              onPressed: () => _konfirmasiHapus(trx),
-              icon: const Icon(Icons.delete_outline,
-                  size: 18, color: AppColors.textTertiary),
-            ),
-        ],
+            if (trx.refType == 'manual')
+              IconButton(
+                tooltip: 'Hapus catatan ini',
+                visualDensity: VisualDensity.compact,
+                onPressed: () => _konfirmasiHapus(trx),
+                icon: const Icon(Icons.delete_outline,
+                    size: 18, color: AppColors.textTertiary),
+              ),
+            // Petunjuk bahwa barisnya bisa diketuk.
+            const Icon(Icons.chevron_right,
+                size: 18, color: AppColors.textTertiary),
+          ],
+        ),
       ),
     );
   }
@@ -473,6 +516,44 @@ class _KasScreenState extends ConsumerState<KasScreen> {
     if (yakin == true) {
       await ref.read(cashProvider.notifier).deleteTransaction(trx.id!);
     }
+  }
+
+  /// Pilih tanggal lewat kalender, supaya pindah periode tidak perlu
+  /// menekan panah berkali-kali.
+  Future<void> _pilihTanggal(ReportPeriod period) async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: period.anchor,
+      firstDate: DateTime(2020),
+      lastDate: DateTime.now(),
+      helpText: 'Pilih tanggal riwayat kas',
+      cancelText: 'Batal',
+      confirmText: 'Pilih',
+    );
+    if (picked == null || !mounted) return;
+    await ref.read(cashProvider.notifier).setPeriod(period.withAnchor(picked));
+  }
+
+  /// Buka rincian satu mutasi kas.
+  ///
+  /// Mutasi yang berasal dari pembayaran hutang/piutang menampilkan nama
+  /// pelanggan atau supplier beserta barang yang terkait, supaya jelas uang
+  /// ini datang dari siapa dan untuk barang apa. Mutasi lain hanya
+  /// menampilkan keterangan yang tercatat.
+  Future<void> _tampilkanDetail(CashTransaction trx) async {
+    DebtDetail? detail;
+    if (trx.refType == 'debt_payment' && trx.refId != null) {
+      detail = await DebtRepository().getDetail(trx.refId!);
+    }
+    if (!mounted) return;
+
+    final hasil = detail;
+    await showDialog<void>(
+      context: context,
+      builder: (_) => hasil != null
+          ? _DialogDetailHutang(trx: trx, detail: hasil)
+          : _DialogDetailKas(trx: trx),
+    );
   }
 
   Future<void> _bukaCatatKas() async {
@@ -847,5 +928,255 @@ class _CatatKasSheetState extends State<_CatatKasSheet> {
         ),
       ),
     );
+  }
+}
+
+// --------------------------------------------------------- dialog rincian kas
+
+/// Satu baris "label — nilai" di dalam dialog rincian.
+Widget _barisRincian(String label, String value, {bool tebal = false}) {
+  return Padding(
+    padding: const EdgeInsets.only(bottom: 7),
+    child: Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SizedBox(
+          width: 126,
+          child: Text(
+            label,
+            style: const TextStyle(
+              fontSize: 12,
+              color: AppColors.textSecondary,
+            ),
+          ),
+        ),
+        Expanded(
+          child: Text(
+            value,
+            style: TextStyle(
+              fontSize: 12.5,
+              fontWeight: tebal ? FontWeight.w700 : FontWeight.w500,
+              color: AppColors.textMain,
+            ),
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+/// Satu baris barang di dalam dialog rincian hutang.
+Widget _barisBarang(DebtGoods barang) {
+  return Padding(
+    padding: const EdgeInsets.only(bottom: 6),
+    child: Row(
+      children: [
+        Expanded(
+          child: Text(
+            barang.name,
+            style: const TextStyle(fontSize: 12.5, color: AppColors.textMain),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+        const SizedBox(width: 8),
+        Text(
+          '${barang.quantity}x',
+          style: const TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+            color: AppColors.textSecondary,
+          ),
+        ),
+        const SizedBox(width: 10),
+        Text(
+          Formatters.rupiah(barang.price),
+          style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+        ),
+      ],
+    ),
+  );
+}
+
+/// Dialog rincian untuk mutasi kas yang berasal dari hutang/piutang.
+///
+/// Menjawab "ini piutang siapa dan barang apa" — nama pelanggan/supplier,
+/// daftar barang dari nota penjualan, dan sisa tanggungannya.
+class _DialogDetailHutang extends StatelessWidget {
+  final CashTransaction trx;
+  final DebtDetail detail;
+
+  const _DialogDetailHutang({required this.trx, required this.detail});
+
+  @override
+  Widget build(BuildContext context) {
+    final piutang = detail.isPiutang;
+    final telepon = (detail.partyPhone ?? '').trim();
+    final catatan = (trx.note ?? '').trim();
+
+    return AlertDialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      title: Row(
+        children: [
+          Icon(
+            piutang ? Icons.call_received : Icons.call_made,
+            color: piutang ? AppColors.successMid : AppColors.dangerMid,
+            size: 24,
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              piutang ? 'Terima piutang' : 'Bayar hutang',
+              style: const TextStyle(
+                fontSize: 17,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+        ],
+      ),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _barisRincian(
+              piutang ? 'Pelanggan' : 'Supplier',
+              detail.partyName,
+              tebal: true,
+            ),
+            _barisRincian(
+              'Jenis',
+              piutang ? 'Piutang pelanggan' : 'Hutang ke supplier',
+            ),
+            if (telepon.isNotEmpty) _barisRincian('Telepon', telepon),
+            if (detail.invoiceNumber.isNotEmpty)
+              _barisRincian('No. nota', detail.invoiceNumber),
+            const Divider(height: 20),
+            _barisRincian(
+              'Dibayar sekarang',
+              Formatters.rupiah(trx.amount),
+              tebal: true,
+            ),
+            _barisRincian('Tanggal bayar', Formatters.dateTime(trx.date)),
+            if (catatan.isNotEmpty) _barisRincian('Catatan', catatan),
+            const Divider(height: 20),
+            _barisRincian('Nilai awal', Formatters.rupiah(detail.amount)),
+            _barisRincian('Sudah dibayar', Formatters.rupiah(detail.paidAmount)),
+            _barisRincian(
+              piutang ? 'Sisa piutang' : 'Sisa hutang',
+              Formatters.rupiah(detail.remaining),
+              tebal: true,
+            ),
+            _barisRincian('Status', detail.isLunas ? 'Lunas' : 'Belum lunas'),
+            if (detail.dueDate != null)
+              _barisRincian('Jatuh tempo', Formatters.date(detail.dueDate!)),
+            const SizedBox(height: 14),
+            Text(
+              piutang ? 'Barang yang dibeli' : 'Barang terkait',
+              style: const TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+                color: AppColors.textMain,
+              ),
+            ),
+            const SizedBox(height: 8),
+            if (detail.goods.isEmpty)
+              const Text(
+                'Tidak ada rincian barang untuk catatan ini.',
+                style: TextStyle(fontSize: 12, color: AppColors.textTertiary),
+              )
+            else
+              ...detail.goods.map(_barisBarang),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Tutup'),
+        ),
+      ],
+    );
+  }
+}
+
+/// Dialog rincian untuk mutasi kas lain — penjualan, beban, prive, belanja
+/// stok, atau catatan manual.
+class _DialogDetailKas extends StatelessWidget {
+  final CashTransaction trx;
+
+  const _DialogDetailKas({required this.trx});
+
+  @override
+  Widget build(BuildContext context) {
+    final masuk = trx.isMasuk;
+    final catatan = (trx.note ?? '').trim();
+
+    return AlertDialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      title: Row(
+        children: [
+          Icon(
+            masuk ? Icons.arrow_upward : Icons.arrow_downward,
+            color: masuk ? AppColors.successMid : AppColors.dangerMid,
+            size: 24,
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              trx.categoryLabel,
+              style: const TextStyle(
+                fontSize: 17,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+        ],
+      ),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _barisRincian('Jenis', masuk ? 'Uang masuk' : 'Uang keluar'),
+            _barisRincian(
+              'Jumlah',
+              '${masuk ? '+' : '-'}${Formatters.rupiah(trx.amount)}',
+              tebal: true,
+            ),
+            _barisRincian('Tanggal', Formatters.dateTime(trx.date)),
+            _barisRincian('Kategori', trx.categoryLabel),
+            _barisRincian('Sumber', _labelSumber(trx.refType)),
+            if (catatan.isNotEmpty) _barisRincian('Keterangan', catatan),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Tutup'),
+        ),
+      ],
+    );
+  }
+
+  /// Asal mutasi ini, dalam bahasa yang mudah dimengerti.
+  static String _labelSumber(String? refType) {
+    switch (refType) {
+      case 'sale':
+        return 'Transaksi penjualan';
+      case 'debt':
+        return 'Catatan hutang';
+      case 'debt_payment':
+        return 'Pembayaran hutang/piutang';
+      case 'restock':
+        return 'Belanja stok';
+      case 'expense':
+        return 'Beban usaha';
+      case 'manual':
+        return 'Dicatat manual';
+    }
+    return refType == null || refType.isEmpty ? 'Lainnya' : refType;
   }
 }

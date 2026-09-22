@@ -1,7 +1,10 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/utils/formatters.dart';
+import '../../core/utils/responsive.dart';
 import '../../data/models/product_model.dart';
 import '../../data/models/sale_item_model.dart';
 import '../../data/models/sale_model.dart';
@@ -135,6 +138,11 @@ class _KasirScreenState extends ConsumerState<KasirScreen> {
         storeName: user.storeName,
         storeAddress: user.storeAddress,
         storePhone: user.storePhone,
+        logoPath: user.logoPath,
+        qrisPath: user.qrisPath,
+        bankName: user.bankName,
+        bankAccountNumber: user.bankAccountNumber,
+        bankAccountName: user.bankAccountName,
       );
       await BluetoothPrinterService.instance.printBytes(device, bytes);
       await BluetoothPrinterService.instance.disconnect(device);
@@ -352,8 +360,10 @@ class _KasirScreenState extends ConsumerState<KasirScreen> {
           Expanded(
             child: GridView.builder(
               padding: EdgeInsets.fromLTRB(16, 8, 16, cart.isEmpty ? 100 : 280),
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 2,
+              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                // Di tablet kolomnya ditambah supaya kartu produk tidak
+                // membengkak jadi sangat besar.
+                crossAxisCount: Responsive.gridColumns(context),
                 mainAxisSpacing: 12,
                 crossAxisSpacing: 12,
                 childAspectRatio: 0.78,
@@ -794,6 +804,110 @@ class _PaymentDialogState extends ConsumerState<_PaymentDialog> {
                 runSpacing: 8,
                 children:
                     choices.map((c) => _methodChip(c.code, c.name)).toList(),
+              );
+            }),
+            const SizedBox(height: 10),
+
+            // Info cara bayar — muncul begitu metode QRIS atau transfer
+            // dipilih, supaya bisa langsung ditunjukkan ke pelanggan.
+            // Gambar QRIS dan data rekening diambil dari Profil › Info toko.
+            Builder(builder: (context) {
+              if (_method != 'qris' && _method != 'transfer') {
+                return const SizedBox.shrink();
+              }
+
+              final user = ref.watch(authProvider).user;
+              final qrisPath = (user?.qrisPath ?? '').trim();
+              final namaBank = (user?.bankName ?? '').trim();
+              final nomorRek = (user?.bankAccountNumber ?? '').trim();
+              final pemilikRek = (user?.bankAccountName ?? '').trim();
+
+              final tampilkanQris = _method == 'qris' && qrisPath.isNotEmpty;
+              final tampilkanBank =
+                  _method == 'transfer' && nomorRek.isNotEmpty;
+              if (!tampilkanQris && !tampilkanBank) {
+                return const SizedBox.shrink();
+              }
+
+              return Container(
+                margin: const EdgeInsets.only(bottom: 14),
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: AppColors.infoLight,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (tampilkanQris) ...[
+                      const Text(
+                        'Tunjukkan QRIS ini ke pelanggan',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.infoMid,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Center(
+                        child: Container(
+                          padding: const EdgeInsets.all(6),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Image.file(
+                            File(qrisPath),
+                            height: 190,
+                            fit: BoxFit.contain,
+                            errorBuilder: (_, __, ___) => const Text(
+                              'Gambar QRIS tidak bisa dibuka',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: AppColors.textTertiary,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                    if (tampilkanBank) ...[
+                      const Text(
+                        'Pelanggan transfer ke rekening toko',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.infoMid,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      if (namaBank.isNotEmpty)
+                        Text(
+                          'Bank: $namaBank',
+                          style: const TextStyle(
+                            fontSize: 13,
+                            color: AppColors.textMain,
+                          ),
+                        ),
+                      Text(
+                        'No. rekening: $nomorRek',
+                        style: const TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w800,
+                          color: AppColors.textMain,
+                        ),
+                      ),
+                      if (pemilikRek.isNotEmpty)
+                        Text(
+                          'a.n. $pemilikRek',
+                          style: const TextStyle(
+                            fontSize: 13,
+                            color: AppColors.textMain,
+                          ),
+                        ),
+                    ],
+                  ],
+                ),
               );
             }),
             const SizedBox(height: 10),

@@ -1,7 +1,7 @@
 /// User model for email-based authentication.
 /// Stored locally in SQLite — enables offline login after initial registration.
 /// Juga menyimpan info toko yang bisa diedit pengguna (nama, alamat, telepon,
-/// dan path logo usaha di penyimpanan aplikasi).
+/// logo usaha, gambar QRIS, dan rekening bank untuk pembayaran non-tunai).
 class UserModel {
   final int? id;
   final String email;
@@ -10,6 +10,15 @@ class UserModel {
   final String? storeAddress;
   final String? storePhone;
   final String? logoPath;
+
+  /// Gambar QRIS milik toko (path di penyimpanan aplikasi).
+  final String? qrisPath;
+
+  /// Rekening bank tujuan transfer — nama bank, nomor, dan atas nama.
+  final String? bankName;
+  final String? bankAccountNumber;
+  final String? bankAccountName;
+
   final DateTime createdAt;
 
   UserModel({
@@ -20,6 +29,10 @@ class UserModel {
     this.storeAddress,
     this.storePhone,
     this.logoPath,
+    this.qrisPath,
+    this.bankName,
+    this.bankAccountNumber,
+    this.bankAccountName,
     required this.createdAt,
   });
 
@@ -38,6 +51,13 @@ class UserModel {
 
   bool get hasLogo => logoPath != null && logoPath!.isNotEmpty;
 
+  bool get hasQris => qrisPath != null && qrisPath!.isNotEmpty;
+
+  /// Rekening dianggap lengkap kalau nomornya sudah diisi. Nama bank dan
+  /// atas nama boleh kosong supaya pemilik toko tidak dipaksa mengisi.
+  bool get hasBankAccount =>
+      bankAccountNumber != null && bankAccountNumber!.trim().isNotEmpty;
+
   Map<String, dynamic> toMap() {
     return {
       if (id != null) 'id': id,
@@ -47,6 +67,10 @@ class UserModel {
       'store_address': storeAddress,
       'store_phone': storePhone,
       'logo_path': logoPath,
+      'qris_path': qrisPath,
+      'bank_name': bankName,
+      'bank_account_number': bankAccountNumber,
+      'bank_account_name': bankAccountName,
       'created_at': createdAt.toIso8601String(),
     };
   }
@@ -60,6 +84,10 @@ class UserModel {
       storeAddress: map['store_address'] as String?,
       storePhone: map['store_phone'] as String?,
       logoPath: map['logo_path'] as String?,
+      qrisPath: map['qris_path'] as String?,
+      bankName: map['bank_name'] as String?,
+      bankAccountNumber: map['bank_account_number'] as String?,
+      bankAccountName: map['bank_account_name'] as String?,
       createdAt: DateTime.parse(map['created_at'] as String),
     );
   }
@@ -72,10 +100,16 @@ class UserModel {
     String? storeAddress,
     String? storePhone,
     String? logoPath,
+    String? qrisPath,
+    String? bankName,
+    String? bankAccountNumber,
+    String? bankAccountName,
     DateTime? createdAt,
     bool clearAddress = false,
     bool clearPhone = false,
     bool clearLogo = false,
+    bool clearQris = false,
+    bool clearBank = false,
   }) {
     return UserModel(
       id: id ?? this.id,
@@ -85,6 +119,12 @@ class UserModel {
       storeAddress: clearAddress ? null : (storeAddress ?? this.storeAddress),
       storePhone: clearPhone ? null : (storePhone ?? this.storePhone),
       logoPath: clearLogo ? null : (logoPath ?? this.logoPath),
+      qrisPath: clearQris ? null : (qrisPath ?? this.qrisPath),
+      bankName: clearBank ? null : (bankName ?? this.bankName),
+      bankAccountNumber:
+          clearBank ? null : (bankAccountNumber ?? this.bankAccountNumber),
+      bankAccountName:
+          clearBank ? null : (bankAccountName ?? this.bankAccountName),
       createdAt: createdAt ?? this.createdAt,
     );
   }

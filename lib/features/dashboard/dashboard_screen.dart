@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../../core/config/app_config.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/utils/formatters.dart';
+import '../../core/utils/responsive.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/dashboard_provider.dart';
 import '../../providers/product_provider.dart';
@@ -378,10 +379,12 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                 child: GridView.count(
                   shrinkWrap: true,
                   physics: const NeverScrollableScrollPhysics(),
-                  crossAxisCount: 2,
+                  // Di tablet kartu statistik ditata 4 sejajar supaya tidak
+                  // menyisakan ruang kosong di sisi kanan.
+                  crossAxisCount: Responsive.isTablet(context) ? 4 : 2,
                   mainAxisSpacing: 12,
                   crossAxisSpacing: 12,
-                  childAspectRatio: 1.4,
+                  childAspectRatio: Responsive.isTablet(context) ? 1.25 : 1.4,
                   children: [
                     StatCard(
                       icon: Icons.trending_up,

@@ -71,6 +71,20 @@ class ExportService {
     return file;
   }
 
+  /// Tulis berkas Excel (.xlsx) dari byte yang sudah jadi.
+  ///
+  /// Dipakai oleh fitur "Backup semua data" — satu buku kerja berisi banyak
+  /// lembar, dibuat oleh [XlsxBuilder].
+  Future<File> writeXlsx({
+    required String filename,
+    required Uint8List bytes,
+  }) async {
+    final dir = await _folder();
+    final file = File('${dir.path}/$filename.xlsx');
+    await file.writeAsBytes(bytes, flush: true);
+    return file;
+  }
+
   /// Buka menu bagikan untuk satu berkas.
   Future<void> share(
     File file, {

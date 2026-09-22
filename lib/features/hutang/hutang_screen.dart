@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/utils/formatters.dart';
+import '../../core/utils/responsive.dart';
 import '../../data/models/debt_model.dart';
 import '../../providers/debt_provider.dart';
 import '../../shared/widgets/shared_widgets.dart';
@@ -52,54 +53,56 @@ class _HutangScreenState extends ConsumerState<HutangScreen> {
       body: RefreshIndicator(
         color: AppColors.primary,
         onRefresh: () => ref.read(debtProvider.notifier).loadDebts(),
-        child: ListView(
-          padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
-          children: [
-            _summaryCards(state),
-            const SizedBox(height: 16),
-            _typeFilter(state),
-            const SizedBox(height: 10),
-            _statusFilter(state),
-            const SizedBox(height: 12),
-            TextField(
-              controller: _searchController,
-              onChanged: (v) => ref.read(debtProvider.notifier).setSearch(v),
-              decoration: InputDecoration(
-                hintText: 'Cari nama pelanggan atau supplier',
-                prefixIcon: const Icon(Icons.search, color: AppColors.textTertiary),
-                filled: true,
-                fillColor: AppColors.bgCard,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
+        child: Responsive.centered(
+          ListView(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
+            children: [
+              _summaryCards(state),
+              const SizedBox(height: 16),
+              _typeFilter(state),
+              const SizedBox(height: 10),
+              _statusFilter(state),
+              const SizedBox(height: 12),
+              TextField(
+                controller: _searchController,
+                onChanged: (v) => ref.read(debtProvider.notifier).setSearch(v),
+                decoration: InputDecoration(
+                  hintText: 'Cari nama pelanggan atau supplier',
+                  prefixIcon: const Icon(Icons.search, color: AppColors.textTertiary),
+                  filled: true,
+                  fillColor: AppColors.bgCard,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  suffixIcon: state.search.isEmpty
+                      ? null
+                      : IconButton(
+                          icon: const Icon(Icons.close),
+                          onPressed: () {
+                            _searchController.clear();
+                            ref.read(debtProvider.notifier).setSearch('');
+                          },
+                        ),
                 ),
-                suffixIcon: state.search.isEmpty
-                    ? null
-                    : IconButton(
-                        icon: const Icon(Icons.close),
-                        onPressed: () {
-                          _searchController.clear();
-                          ref.read(debtProvider.notifier).setSearch('');
-                        },
-                      ),
               ),
-            ),
-            const SizedBox(height: 16),
-            if (state.isLoading)
-              const Padding(
-                padding: EdgeInsets.symmetric(vertical: 48),
-                child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
-              )
-            else if (state.debts.isEmpty)
-              const EmptyState(
-                icon: Icons.handshake_outlined,
-                title: 'Belum ada catatan hutang',
-                subtitle:
-                    'Catat piutang pelanggan dan hutang ke supplier supaya '
-                    'tidak ada yang terlewat.',
-              )
-            else
-              ...state.debts.map((d) => _debtCard(d)),
-          ],
+              const SizedBox(height: 16),
+              if (state.isLoading)
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 48),
+                  child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
+                )
+              else if (state.debts.isEmpty)
+                const EmptyState(
+                  icon: Icons.handshake_outlined,
+                  title: 'Belum ada catatan hutang',
+                  subtitle:
+                      'Catat piutang pelanggan dan hutang ke supplier supaya '
+                      'tidak ada yang terlewat.',
+                )
+              else
+                ...state.debts.map((d) => _debtCard(d)),
+            ],
+          ),
         ),
       ),
     );

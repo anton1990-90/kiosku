@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/utils/formatters.dart';
 import '../../core/utils/report_period.dart';
+import '../../core/utils/responsive.dart';
 import '../../data/models/accounting_models.dart';
 import '../../data/repositories/accounting_repository.dart';
 
@@ -69,50 +70,52 @@ class _TransaksiScreenState extends ConsumerState<TransaksiScreen> {
       body: RefreshIndicator(
         color: AppColors.primary,
         onRefresh: _muat,
-        child: ListView(
-          padding: const EdgeInsets.fromLTRB(16, 16, 16, 40),
-          children: [
-            _tabs(),
-            const SizedBox(height: 12),
-            _navigasi(),
-            const SizedBox(height: 16),
-            _ringkasan(),
-            const SizedBox(height: 18),
-            if (_loading)
-              const Padding(
-                padding: EdgeInsets.symmetric(vertical: 40),
-                child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
-              )
-            else if (_data.isEmpty)
-              const Padding(
-                padding: EdgeInsets.symmetric(vertical: 40),
-                child: Column(
-                  children: [
-                    Icon(Icons.receipt_long_outlined,
-                        size: 52, color: AppColors.textTertiary),
-                    SizedBox(height: 12),
-                    Text(
-                      'Belum ada transaksi',
-                      style: TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.textSecondary,
+        child: Responsive.centered(
+          ListView(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 40),
+            children: [
+              _tabs(),
+              const SizedBox(height: 12),
+              _navigasi(),
+              const SizedBox(height: 16),
+              _ringkasan(),
+              const SizedBox(height: 18),
+              if (_loading)
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 40),
+                  child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
+                )
+              else if (_data.isEmpty)
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 40),
+                  child: Column(
+                    children: [
+                      Icon(Icons.receipt_long_outlined,
+                          size: 52, color: AppColors.textTertiary),
+                      SizedBox(height: 12),
+                      Text(
+                        'Belum ada transaksi',
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.textSecondary,
+                        ),
                       ),
-                    ),
-                    SizedBox(height: 4),
-                    Text(
-                      'Transaksi dari menu Kasir akan muncul di sini.',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: AppColors.textTertiary,
+                      SizedBox(height: 4),
+                      Text(
+                        'Transaksi dari menu Kasir akan muncul di sini.',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: AppColors.textTertiary,
+                        ),
                       ),
-                    ),
-                  ],
-                ),
-              )
-            else
-              ..._data.map(_kartuTransaksi),
-          ],
+                    ],
+                  ),
+                )
+              else
+                ..._data.map(_kartuTransaksi),
+            ],
+          ),
         ),
       ),
     );

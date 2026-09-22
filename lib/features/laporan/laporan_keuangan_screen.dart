@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/utils/formatters.dart';
 import '../../core/utils/report_period.dart';
+import '../../core/utils/responsive.dart';
 import '../../data/models/accounting_models.dart';
 import '../../data/models/cash_model.dart';
 import '../../providers/accounting_provider.dart';
@@ -137,26 +138,28 @@ class _LaporanKeuanganScreenState extends ConsumerState<LaporanKeuanganScreen> {
       body: RefreshIndicator(
         color: AppColors.primary,
         onRefresh: () => ref.read(accountingProvider.notifier).load(),
-        child: ListView(
-          padding: const EdgeInsets.fromLTRB(16, 16, 16, 40),
-          children: [
-            _navigasiPeriode(state.period),
-            const SizedBox(height: 14),
-            _tabBar(),
-            const SizedBox(height: 16),
-            if (state.isLoading)
-              const Padding(
-                padding: EdgeInsets.symmetric(vertical: 60),
-                child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
-              )
-            else
-              switch (_tab) {
-                0 => _tabLabaRugi(state),
-                1 => _tabEkuitas(state),
-                2 => _tabNeraca(state),
-                _ => _tabArusKas(state),
-              },
-          ],
+        child: Responsive.centered(
+          ListView(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 40),
+            children: [
+              _navigasiPeriode(state.period),
+              const SizedBox(height: 14),
+              _tabBar(),
+              const SizedBox(height: 16),
+              if (state.isLoading)
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 60),
+                  child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
+                )
+              else
+                switch (_tab) {
+                  0 => _tabLabaRugi(state),
+                  1 => _tabEkuitas(state),
+                  2 => _tabNeraca(state),
+                  _ => _tabArusKas(state),
+                },
+            ],
+          ),
         ),
       ),
     );

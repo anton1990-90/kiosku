@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/utils/formatters.dart';
 import '../../core/utils/report_period.dart';
+import '../../core/utils/responsive.dart';
 import '../../data/models/report_models.dart';
 import '../../providers/report_provider.dart';
 
@@ -54,7 +55,8 @@ class _LaporanScreenState extends ConsumerState<LaporanScreen> {
       body: RefreshIndicator(
         color: AppColors.primary,
         onRefresh: () => ref.read(reportProvider.notifier).loadReport(),
-        child: ListView(
+        child: Responsive.centered(
+          ListView(
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
           children: [
             _periodTabs(period),
@@ -74,6 +76,10 @@ class _LaporanScreenState extends ConsumerState<LaporanScreen> {
             const SizedBox(height: 16),
             _menuLaporan(period),
           ],
+        ),
+          // Sedikit lebih lebar dari halaman lain supaya grafiknya lega,
+          // tapi tetap tidak melebar penuh di tablet.
+          maxWidth: 900,
         ),
       ),
     );
@@ -255,7 +261,9 @@ class _LaporanScreenState extends ConsumerState<LaporanScreen> {
     return GridView.count(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
-      crossAxisCount: 2,
+      // Di tablet keempat kartu ditata sejajar supaya tidak menyisakan
+      // ruang kosong di sisi kanan.
+      crossAxisCount: Responsive.isTablet(context) ? 4 : 2,
       mainAxisSpacing: 12,
       crossAxisSpacing: 12,
       childAspectRatio: 1.7,

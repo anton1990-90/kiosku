@@ -56,6 +56,31 @@ def write(path, text):
     Path(path).write_text(text, encoding="utf-8")
 
 
+def detect_store_type(path):
+    """Tebak jenis keystore dari magic bytes-nya: 'JKS' atau 'PKCS12'.
+
+    Gradle/AGP memakai JKS sebagai default kalau `storeType` tidak ditulis.
+    File yang isinya PKCS12 — hasil `keytool` JDK 9+ meski namanya berakhiran
+    `.jks` — hanya terbaca sebagai JKS karena JDK punya fallback
+    `keystore.type.compat`. Itu perilaku bawaan JDK yang bisa berubah, jadi
+    `storeType` ditulis eksplisit supaya build tidak bergantung padanya.
+
+    Mengembalikan None kalau formatnya tidak dikenali.
+    """
+    try:
+        with open(path, "rb") as f:
+            head = f.read(4)
+    except OSError:
+        return None
+    # JKS diawali FE ED FE ED.
+    if head == b"\xfe\xed\xfe\xed":
+        return "JKS"
+    # PKCS12 = ASN.1 SEQUENCE: 0x30 lalu panjang 2 byte (0x82) atau 4 byte (0x84).
+    if head[:1] == b"\x30" and len(head) >= 2 and head[1] in (0x82, 0x84):
+        return "PKCS12"
+    return None
+
+
 def patch_manifest():
     path = "android/app/src/main/AndroidManifest.xml"
     if not Path(path).exists():
@@ -155,37 +180,58 @@ def patch_gradle():
     # passwordnya. Kalau salah satu hilang, lebih baik APK ditandatangani debug
     # key daripada build gagal total (storeFile yang tidak ada = error Gradle).
     if store_password and keystore_ok:
-        # Catatan: cek harus pakai "signingConfigs {" (dengan kurung kurawal),
-        # karena teks asli sudah memuat "signingConfigs.debug".
-        if "signingConfigs {" not in src:
-            block = (
-                "\n    signingConfigs {\n"
-                "        release {\n"
-                '            storeFile file("%s")\n' % KEYSTORE_FILENAME
-                + '            storePassword System.getenv("KEYSTORE_PASSWORD")\n'
-                + '            keyAlias System.getenv("KEY_ALIAS")\n'
-                + '            keyPassword System.getenv("KEY_PASSWORD")\n'
-                "        }\n"
-                "    }\n\n"
+        # Jenis keystore ditulis eksplisit supaya Gradle tidak menebak. File
+        # berakhiran .jks bisa saja isinya PKCS12 (hasil keytool JDK baru).
+        store_type = detect_store_type(keystore_path)
+        if store_type is None:
+            # Jangan menulis blok signing yang sudah pasti salah — biarkan
+            # `fatal` yang menghentikan build dengan pesan yang jelas.
+            with open(keystore_path, "rb") as f:
+                head = f.read(4)
+            fatal.append(
+                "jenis keystore tidak dikenali (magic bytes %s). Harus JKS "
+                "atau PKCS12." % " ".join("%02X" % b for b in head)
             )
-            if "buildTypes" in src:
-                src = src.replace("buildTypes", block + "    buildTypes", 1)
-                notes.append("gradle: blok signingConfigs release ditambahkan")
-            else:
-                fatal.append("blok buildTypes tidak ditemukan, signing gagal dipasang")
-
-        if "signingConfig = signingConfigs.release" in src:
-            notes.append("gradle: release signing sudah aktif, dilewati")
         else:
-            src, n = re.subn(
-                r"signingConfig\s*=\s*signingConfigs\.debug",
-                "signingConfig = signingConfigs.release",
-                src,
-            )
-            if n == 0:
-                fatal.append("signingConfigs.debug tidak berhasil diganti")
+            # Catatan: cek harus pakai "signingConfigs {" (dengan kurung
+            # kurawal), karena teks asli sudah memuat "signingConfigs.debug".
+            if "signingConfigs {" not in src:
+                block = (
+                    "\n    signingConfigs {\n"
+                    "        release {\n"
+                    '            storeFile file("%s")\n' % KEYSTORE_FILENAME
+                    + '            storePassword System.getenv("KEYSTORE_PASSWORD")\n'
+                    + '            keyAlias System.getenv("KEY_ALIAS")\n'
+                    + '            keyPassword System.getenv("KEY_PASSWORD")\n'
+                    + '            storeType "%s"\n' % store_type
+                    + "        }\n"
+                    "    }\n\n"
+                )
+                if "buildTypes" in src:
+                    src = src.replace("buildTypes", block + "    buildTypes", 1)
+                    notes.append(
+                        "gradle: blok signingConfigs release ditambahkan "
+                        "(storeType=%s)" % store_type
+                    )
+                else:
+                    fatal.append(
+                        "blok buildTypes tidak ditemukan, signing gagal dipasang"
+                    )
+
+            if "signingConfig = signingConfigs.release" in src:
+                notes.append("gradle: release signing sudah aktif, dilewati")
             else:
-                notes.append("gradle: release signing AKTIF (%s)" % KEYSTORE_FILENAME)
+                src, n = re.subn(
+                    r"signingConfig\s*=\s*signingConfigs\.debug",
+                    "signingConfig = signingConfigs.release",
+                    src,
+                )
+                if n == 0:
+                    fatal.append("signingConfigs.debug tidak berhasil diganti")
+                else:
+                    notes.append(
+                        "gradle: release signing AKTIF (%s)" % KEYSTORE_FILENAME
+                    )
     elif store_password and not keystore_ok:
         notes.append(
             "gradle: KEYSTORE_PASSWORD ada tapi %s TIDAK ADA -> DEBUG KEY "
@@ -257,7 +303,10 @@ def main():
     print(read("android/app/src/main/AndroidManifest.xml"))
     print("\n--- baris penting build.gradle ---")
     for line in read("android/app/build.gradle").splitlines():
-        if re.search(r"namespace|applicationId|Sdk|signingConfig|storeFile|keyAlias", line):
+        if re.search(
+            r"namespace|applicationId|Sdk|signingConfig|storeFile|storeType|keyAlias",
+            line,
+        ):
             print(line)
     print()
 

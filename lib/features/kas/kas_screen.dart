@@ -720,7 +720,7 @@ class _CatatKasSheetState extends State<_CatatKasSheet> {
               TextFormField(
                 controller: _noteController,
                 textCapitalization: TextCapitalization.sentences,
-                decoration: const InputDecoration(
+                decoration: InputDecoration(
                   labelText: 'Keterangan (opsional)',
                   hintText: isMasuk
                       ? 'Contoh: setoran modal awal'

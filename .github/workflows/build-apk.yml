@@ -9,6 +9,8 @@ jobs:
   build:
     name: Build Android APK
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - name: Checkout kode
         uses: actions/checkout@v4
@@ -74,3 +76,17 @@ jobs:
           name: tokoku-apk
           path: build/app/outputs/flutter-apk/app-release.apk
           retention-days: 14
+
+      - name: Publish APK ke GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: apk-latest
+          name: TokoKu APK (build terbaru)
+          body: |
+            APK TokoKu - build otomatis dari branch main.
+
+            Unduh `app-release.apk` di bawah, lalu instal di HP Android
+            (aktifkan "Instal dari sumber tidak dikenal").
+          files: build/app/outputs/flutter-apk/app-release.apk
+          fail_on_unmatched_files: true
+          make_latest: true

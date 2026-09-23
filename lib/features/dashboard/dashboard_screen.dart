@@ -8,7 +8,7 @@ import '../../core/utils/responsive.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/dashboard_provider.dart';
 import '../../providers/product_provider.dart';
-import '../../shared/services/update_service.dart';
+import '../../providers/update_provider.dart';
 import '../../shared/widgets/shared_widgets.dart';
 import '../../shared/widgets/update_dialog.dart';
 
@@ -21,8 +21,9 @@ class DashboardScreen extends ConsumerStatefulWidget {
 }
 
 class _DashboardScreenState extends ConsumerState<DashboardScreen> {
-  /// Supaya dialog pembaruan hanya muncul sekali per sesi aplikasi.
-  static bool _updateChecked = false;
+  /// Supaya dialog pembaruan otomatis hanya muncul sekali per sesi aplikasi.
+  /// Lencana di lonceng pojok kanan atas tetap tampil selama aplikasi dibuka.
+  static bool _popupSudahTampil = false;
 
   @override
   void initState() {
@@ -31,19 +32,45 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       ref.read(dashboardProvider.notifier).loadStats();
       ref.read(productProvider.notifier).loadProducts();
-      await _checkForUpdate();
+      await _periksaPembaruan();
     });
   }
 
-  /// Periksa pembaruan aplikasi lewat GitHub Releases. Gagal dengan tenang
+  /// Periksa pembaruan lewat server aktivasi sendiri. Gagal dengan tenang
   /// kalau tidak ada internet.
-  Future<void> _checkForUpdate() async {
-    if (_updateChecked) return;
-    _updateChecked = true;
-
-    final info = await UpdateService.instance.checkForUpdate();
-    if (!mounted || info == null) return;
+  Future<void> _periksaPembaruan({bool tampilkanPopup = true}) async {
+    final info = await ref.read(updateProvider.notifier).periksa();
+    if (!mounted || info == null || !tampilkanPopup) return;
+    if (_popupSudahTampil) return;
+    _popupSudahTampil = true;
     await showUpdateDialog(context, info);
+  }
+
+  /// Ketukan pada lonceng di pojok kanan atas.
+  Future<void> _bukaNotifikasi() async {
+    final state = ref.read(updateProvider);
+
+    // Sudah ada pembaruan yang diketahui — langsung tampilkan.
+    if (state.adaPembaruan) {
+      await showUpdateDialog(context, state.info!);
+      return;
+    }
+
+    // Belum ada pembaruan yang diketahui. Pengguna mengetuk, jadi periksa
+    // ulang sungguhan (bukan sekadar membaca hasil lama).
+    final info = await ref.read(updateProvider.notifier).periksa(paksa: true);
+    if (!mounted) return;
+    if (info != null) {
+      await showUpdateDialog(context, info);
+      return;
+    }
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Aplikasi sudah versi terbaru, atau tidak ada koneksi.'),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
   }
 
   Future<void> _refresh() async {
@@ -109,10 +136,12 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                             ],
                           ),
                         ),
-                        IconButton(
-                          onPressed: () {},
-                          icon: const Icon(Icons.notifications_outlined,
-                              color: AppColors.textSecondary),
+                        // Lonceng di pojok kanan atas. Kalau ada versi baru,
+                        // muncul titik merah dan ketukan membuka rinciannya.
+                        _TombolNotifikasi(
+                          adaPembaruan:
+                              ref.watch(updateProvider).adaPembaruan,
+                          onTap: _bukaNotifikasi,
                         ),
                       ],
                     ),
@@ -579,6 +608,54 @@ class _AlertCard extends StatelessWidget {
               ),
             ),
           ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Lonceng notifikasi di pojok kanan atas dashboard.
+///
+/// Kalau ada pembaruan aplikasi, muncul titik merah kecil sebagai penanda.
+/// Ketukan pada lonceng membuka rincian pembaruan (atau memberi tahu bahwa
+/// aplikasi sudah versi terbaru).
+class _TombolNotifikasi extends StatelessWidget {
+  final bool adaPembaruan;
+  final VoidCallback onTap;
+
+  const _TombolNotifikasi({
+    required this.adaPembaruan,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return IconButton(
+      onPressed: onTap,
+      tooltip: adaPembaruan ? 'Ada pembaruan aplikasi' : 'Notifikasi',
+      icon: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          const Icon(
+            Icons.notifications_outlined,
+            color: AppColors.textSecondary,
+          ),
+          if (adaPembaruan)
+            Positioned(
+              top: 0,
+              right: 0,
+              child: Container(
+                width: 9,
+                height: 9,
+                decoration: BoxDecoration(
+                  color: AppColors.danger,
+                  shape: BoxShape.circle,
+                  // Cincin sewarna kartu supaya titiknya tetap terlihat jelas
+                  // di atas ikon lonceng.
+                  border: Border.all(color: AppColors.bgCard, width: 1.5),
+                ),
+              ),
+            ),
         ],
       ),
     );

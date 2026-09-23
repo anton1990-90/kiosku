@@ -17,10 +17,15 @@
  *                           diketik ke aplikasi
  *
  * Keduanya memakai satu endpoint yang sama: POST /api/aktivasi
+ *
+ * Selain aktivasi, Worker ini juga melayani unduhan aplikasi (GET /unduh dan
+ * GET /unduh/apk) serta pemeriksaan versi (GET /api/versi). Tujuannya satu:
+ * pelanggan tidak pernah melihat akun GitHub penjual.
  */
 
 import { halamanPortal } from './halaman-portal.js';
 import { halamanAdmin } from './halaman-admin.js';
+import { halamanUnduh, halamanUnduhGagal } from './halaman-unduh.js';
 
 /**
  * Alfabet kode. Huruf I, O, 0, dan 1 dibuang karena sering tertukar saat
@@ -399,6 +404,133 @@ async function tanganiDataAdmin(env) {
 }
 
 // ---------------------------------------------------------------------------
+// Pembaruan aplikasi — pelanggan tidak pernah menyentuh GitHub
+// ---------------------------------------------------------------------------
+//
+// Aplikasi memanggil dua alamat di bawah ini, BUKAN GitHub langsung:
+//
+//   GET /api/versi   → nomor versi terbaru + alamat unduhnya
+//   GET /unduh/apk   → file APK-nya (dialirkan Worker dari rilis GitHub)
+//   GET /unduh       → halaman unduh yang bisa dibagikan ke pelanggan
+//
+// Karena semuanya lewat sini, akun GitHub penjual tidak pernah muncul di HP
+// pelanggan — yang mereka lihat hanya alamat Worker ini.
+
+/** Repo GitHub tempat rilis APK disimpan. Hanya ada di sisi server. */
+function repoGithub(env) {
+  return String((env && env.GITHUB_REPO) || '').trim();
+}
+
+/**
+ * Ambil info rilis terbaru dari GitHub.
+ *
+ * Di-cache di edge Cloudflare selama 10 menit: batas GitHub untuk permintaan
+ * tanpa token hanya 60 per jam per alamat IP, dan IP Worker dipakai bersama.
+ * Tanpa cache, cek pembaruan bisa gagal begitu banyak pelanggan membukanya.
+ */
+async function ambilRilisTerbaru(env) {
+  const repo = repoGithub(env);
+  if (!repo) return null;
+
+  const res = await fetch(
+    `https://api.github.com/repos/${repo}/releases/latest`,
+    {
+      headers: {
+        Accept: 'application/vnd.github+json',
+        'User-Agent': 'tokoku-lisensi-worker',
+      },
+      cf: { cacheTtl: 600, cacheEverything: true },
+    }
+  );
+  if (!res.ok) return null;
+
+  let data;
+  try {
+    data = await res.json();
+  } catch (_) {
+    return null;
+  }
+  if (!data || typeof data !== 'object') return null;
+
+  const versi = String(data.tag_name ?? '')
+    .replace(/^v/, '')
+    .trim();
+  if (!versi) return null;
+
+  let ukuran = 0;
+  const aset = Array.isArray(data.assets) ? data.assets : [];
+  for (const a of aset) {
+    if (a && typeof a.name === 'string' && a.name.toLowerCase().endsWith('.apk')) {
+      ukuran = Number(a.size) || 0;
+      break;
+    }
+  }
+
+  return {
+    versi,
+    ukuran,
+    catatan: String(data.body ?? '').slice(0, 2000),
+    diterbitkan: String(data.published_at ?? ''),
+  };
+}
+
+/** GET /api/versi — dipakai aplikasi untuk memeriksa pembaruan. */
+async function tanganiVersi(env, url) {
+  const rilis = await ambilRilisTerbaru(env);
+  if (!rilis) return balasJson({ ok: false, reason: 'tidak_ada_rilis' });
+
+  return balasJson({
+    ok: true,
+    versi: rilis.versi,
+    ukuran: rilis.ukuran,
+    catatan: rilis.catatan,
+    diterbitkan: rilis.diterbitkan,
+    unduh: new URL('/unduh/apk', url.origin).toString(),
+    halaman: new URL('/unduh', url.origin).toString(),
+  });
+}
+
+/**
+ * GET /unduh/apk — alirkan file APK dari rilis GitHub.
+ *
+ * Badan respons dialirkan apa adanya (tidak ditahan di memori), jadi file
+ * berukuran puluhan MB tidak membebani Worker.
+ */
+async function tanganiUnduhApk(env) {
+  const repo = repoGithub(env);
+  if (!repo) return balasJson({ ok: false, reason: 'server_error' }, 500);
+
+  const res = await fetch(
+    `https://github.com/${repo}/releases/latest/download/app-release.apk`,
+    {
+      headers: { 'User-Agent': 'tokoku-lisensi-worker' },
+      redirect: 'follow',
+    }
+  );
+
+  if (!res.ok || !res.body) {
+    return balasHtml(halamanUnduhGagal(env), 502);
+  }
+
+  const rilis = await ambilRilisTerbaru(env);
+  const namaBerkas = rilis && rilis.versi ? `TokoKu-${rilis.versi}.apk` : 'TokoKu.apk';
+
+  const header = {
+    'Content-Type': 'application/vnd.android.package-archive',
+    'Content-Disposition': `attachment; filename="${namaBerkas}"`,
+    'Cache-Control': 'public, max-age=3600',
+    'X-Content-Type-Options': 'nosniff',
+  };
+
+  // Panjang isi diteruskan kalau memang ada, supaya Android bisa menampilkan
+  // progres unduhan. Kalau kosong, biarkan runtime yang mengurus.
+  const panjang = res.headers.get('content-length');
+  if (panjang && /^\d+$/.test(panjang)) header['Content-Length'] = panjang;
+
+  return new Response(res.body, { status: 200, headers: header });
+}
+
+// ---------------------------------------------------------------------------
 // Perutean
 // ---------------------------------------------------------------------------
 
@@ -420,6 +552,21 @@ export default {
 
       if (jalur === '/api/aktivasi' && metode === 'POST') {
         return await tanganiAktivasi(request, env);
+      }
+
+      // Pembaruan aplikasi — pengganti tautan GitHub supaya akun GitHub
+      // penjual tidak terlihat pelanggan.
+      if (jalur === '/api/versi' && metode === 'GET') {
+        return await tanganiVersi(env, url);
+      }
+
+      if (jalur === '/unduh/apk' && metode === 'GET') {
+        return await tanganiUnduhApk(env);
+      }
+
+      if (jalur === '/unduh' && metode === 'GET') {
+        const rilis = await ambilRilisTerbaru(env);
+        return balasHtml(halamanUnduh(env, rilis));
       }
 
       if (jalur === '/health' && metode === 'GET') {

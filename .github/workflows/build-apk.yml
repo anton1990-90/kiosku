@@ -73,6 +73,16 @@ jobs:
         run: flutter analyze --no-fatal-infos --no-fatal-warnings || true
 
       - name: Build APK release
+        # PENTING: ci_patch.py menulis `System.getenv("KEYSTORE_PASSWORD")` dan
+        # kawan-kawan ke dalam android/app/build.gradle. Artinya password itu
+        # dibaca saat LANGKAH INI berjalan, bukan saat dipatch. Kalau env-nya
+        # tidak diteruskan ke sini, Gradle berhenti dengan
+        # "SigningConfig \"release\" is missing required property
+        # \"storePassword\"".
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: flutter build apk --release
 
       - name: Upload APK sebagai artifact

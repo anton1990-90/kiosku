@@ -230,7 +230,10 @@ def patch_gradle():
                     fatal.append("signingConfigs.debug tidak berhasil diganti")
                 else:
                     notes.append(
-                        "gradle: release signing AKTIF (%s)" % KEYSTORE_FILENAME
+                        "gradle: release signing AKTIF (%s) — password dibaca "
+                        "SAAT BUILD, jadi langkah 'Build APK release' wajib "
+                        "menerima env KEYSTORE_PASSWORD/KEY_ALIAS/KEY_PASSWORD"
+                        % KEYSTORE_FILENAME
                     )
     elif store_password and not keystore_ok:
         notes.append(

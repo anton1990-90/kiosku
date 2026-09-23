@@ -13,7 +13,8 @@ class AppConfig {
   ///
   /// Contoh: https://tokoku-lisensi.nama-anda.workers.dev
   /// Jangan diakhiri garis miring.
-  static const String activationServerUrl = 'ISI_URL_SERVER_AKTIVASI';
+  static const String activationServerUrl =
+      'https://tokoku-lisensi.dompetkuai.workers.dev';
 
   /// Halaman portal aktivasi untuk pelanggan.
   ///
@@ -24,9 +25,6 @@ class AppConfig {
 
   static String get portalUrl =>
       _portalUrlKhusus.isEmpty ? activationServerUrl : _portalUrlKhusus;
-
-  /// Repo publik GitHub untuk cek pembaruan aplikasi.
-  static const String githubRepo = 'anton1990-90/kiosku';
 
   /// Nomor WhatsApp penjual untuk bantuan aktivasi.
   /// Format internasional tanpa tanda plus, contoh: 6281234567890.
@@ -43,7 +41,17 @@ class AppConfig {
       !activationServerUrl.startsWith('ISI_') &&
       activationServerUrl.startsWith('http');
 
-  /// Link unduhan APK terbaru (selalu menunjuk rilis terakhir).
+  /// Halaman unduh aplikasi yang bisa dibagikan ke pelanggan.
+  static String get downloadPageUrl => '$activationServerUrl/unduh';
+
+  /// Alamat pemeriksaan versi terbaru.
+  static String get versionCheckUrl => '$activationServerUrl/api/versi';
+
+  /// Link unduhan APK terbaru.
+  ///
+  /// Sengaja menunjuk ke server aktivasi sendiri, BUKAN ke GitHub. Server itu
+  /// yang mengambilkan file APK-nya dari rilis, jadi pelanggan tidak pernah
+  /// tahu — dan tidak bisa mencari — akun GitHub penjual.
   static String get latestApkUrl =>
-      'https://github.com/$githubRepo/releases/latest/download/app-release.apk';
+      isActivationConfigured ? '$activationServerUrl/unduh/apk' : '';
 }

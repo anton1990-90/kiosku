@@ -187,6 +187,25 @@ export function halamanPortal(env) {
 
   .bantuan { text-align: center; font-size: 12.5px; color: #6B7280; margin: 22px 0 0; }
   .bantuan a { color: #0F6E56; font-weight: 600; }
+
+  /* Tautan unduh aplikasi — untuk pelanggan yang belum memasang aplikasinya. */
+  .unduhBar {
+    display: flex; align-items: center; gap: 12px;
+    background: #fff; border: 1px solid #E8E9EB;
+    border-radius: 14px; padding: 14px 16px; margin-bottom: 14px;
+    text-decoration: none; color: #1A1A2E;
+  }
+  .unduhBar:hover { border-color: #0F6E56; }
+  .unduhBar .ikon {
+    flex: none; width: 38px; height: 38px; border-radius: 11px;
+    background: #E1F5EE;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .unduhBar .ikon svg { width: 20px; height: 20px; }
+  .unduhBar .teks { flex: 1; min-width: 0; }
+  .unduhBar .teks b { display: block; font-size: 14px; font-weight: 700; }
+  .unduhBar .teks span { font-size: 12px; color: #6B7280; }
+  .unduhBar .panah { flex: none; color: #0F6E56; font-weight: 700; }
   footer { text-align: center; font-size: 11px; color: #9CA3AF; margin-top: 20px; }
 </style>
 </head>
@@ -205,6 +224,22 @@ export function halamanPortal(env) {
   </header>
 
   <main>
+    <a class="unduhBar" href="/unduh">
+      <span class="ikon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#0F6E56" stroke-width="2"
+             stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M12 3v12"></path>
+          <path d="M7 10l5 5 5-5"></path>
+          <path d="M4 20h16"></path>
+        </svg>
+      </span>
+      <span class="teks">
+        <b>Belum punya aplikasinya?</b>
+        <span>Unduh ${namaAplikasi} untuk Android di sini</span>
+      </span>
+      <span class="panah">&rsaquo;</span>
+    </a>
+
     <div id="formulir">
       <section class="langkah">
         <div class="kepala">

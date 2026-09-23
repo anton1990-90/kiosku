@@ -1,7 +1,7 @@
 # ============================================================================
 # TokoKu — konfigurasi Cloudflare Worker
 #
-# Ganti dua nilai bertanda GANTI_... di bawah, lalu jalankan:
+# Deploy:
 #   npx wrangler deploy
 #
 # Rincian langkah ada di cloudflare/README.md
@@ -19,12 +19,16 @@ workers_dev = true
 [[d1_databases]]
 binding = "DB"
 database_name = "tokoku-lisensi"
-# GANTI_DENGAN_ID_DATABASE — dapat dari:
-#   npx wrangler d1 create tokoku-lisensi
-database_id = "GANTI_DENGAN_ID_DATABASE"
+database_id = "7b228966-1656-4c35-9ed8-f8e3e3f88377"
 
 [vars]
 # Nama aplikasi yang muncul di halaman portal.
 APP_NAME = "TokoKu"
 # Nomor WhatsApp dukungan (format 628..., boleh dikosongkan).
 SUPPORT_WHATSAPP = ""
+
+# Repo tempat rilis APK disimpan. Nilai ini HANYA ada di sisi server —
+# pelanggan tidak pernah melihatnya. Aplikasi meminta versi & file APK
+# lewat Worker ini (GET /api/versi dan GET /unduh/apk), jadi akun GitHub
+# penjual tidak pernah muncul di HP pelanggan.
+GITHUB_REPO = "anton1990-90/kiosku"

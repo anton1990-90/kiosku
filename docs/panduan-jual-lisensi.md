@@ -9,41 +9,43 @@ aktivasi satu per satu — cukup jual kodenya, sisanya dikerjakan server.
 
 ---
 
-## Status saat ini (per 22 September 2026)
+## Status saat ini (per 23 September 2026)
 
-Kode sudah selesai dan build sudah **hijau** di GitHub Actions. Yang masih
-kurang hanya dua hal di bawah ini — keduanya belum bisa dikerjakan tanpa data
-dari Anda.
+Kode sudah selesai, kunci tanda tangan sudah terpasang, dan server aktivasi
+sudah **berjalan**. Tidak ada lagi langkah persiapan yang tertinggal.
 
 | Bagian | Status |
 |---|---|
-| Kode lisensi + aktivasi + cek pembaruan | Selesai, sudah di-commit & build sukses |
-| Fitur hutang, catatan, laporan harian/mingguan/bulanan, scan barcode, profil toko | Selesai — versi **1.2.1** |
-| Portal aktivasi pelanggan + halaman admin penjual | Selesai — ada di folder `cloudflare/` |
-| APK bisa diunduh | Selesai — [tautan rilis terbaru](https://github.com/anton1990-90/kiosku/releases/latest/download/app-release.apk) |
-| **Kunci tanda tangan (BAGIAN A)** | **Belum** — 4 GitHub Secrets masih kosong, jadi APK saat ini masih ditandatangani debug key |
-| **Server aktivasi (BAGIAN B)** | **Belum** — `activationServerUrl` masih berisi `ISI_...`, dan servernya belum diterbitkan ke Cloudflare |
+| Kode lisensi + aktivasi + cek pembaruan | Selesai |
+| Fitur hutang, catatan, laporan, scan barcode, profil toko | Selesai — versi **1.5.0** |
+| Portal aktivasi pelanggan + halaman admin penjual | Selesai — [buka portal](https://tokoku-lisensi.dompetkuai.workers.dev) |
+| Halaman unduh APK untuk pelanggan | Selesai — [buka halaman unduh](https://tokoku-lisensi.dompetkuai.workers.dev/unduh) |
+| **Kunci tanda tangan (BAGIAN A)** | **Selesai** — 4 GitHub Secrets sudah terisi, APK ditandatangani kunci rilis |
+| **Server aktivasi (BAGIAN B)** | **Selesai** — berjalan di `https://tokoku-lisensi.dompetkuai.workers.dev` |
 
-> **Jangan jual APK yang sekarang.** APK itu ditandatangani debug key, sehingga
-> tidak bisa di-update dan Android ID-nya akan berubah saat kuncinya diganti —
-> artinya lisensi pelanggan akan mati. Kerjakan BAGIAN A dulu, jalankan build
-> ulang, baru mulai jualan.
+### Akun GitHub Anda tidak lagi terlihat pelanggan
 
-### Selama BAGIAN B belum dikerjakan, aplikasi terbuka tanpa aktivasi
+Dulu tautan unduhan menunjuk langsung ke halaman rilis GitHub, sehingga
+pelanggan bisa menemukan akun GitHub Anda. Sekarang tidak lagi — semua lewat
+server aktivasi:
 
-Supaya Anda tetap bisa mencoba semua fitur sebelum server aktivasi siap,
-gerbang lisensi sengaja dimatikan selama `activationServerUrl` masih berisi
-`ISI_...`. Saat itu beranda menampilkan spanduk merah:
+| Keperluan | Alamat yang dipakai aplikasi |
+|---|---|
+| Unduh APK | `https://tokoku-lisensi.dompetkuai.workers.dev/unduh` |
+| Berkas APK-nya | `https://tokoku-lisensi.dompetkuai.workers.dev/unduh/apk` |
+| Cek versi terbaru | `https://tokoku-lisensi.dompetkuai.workers.dev/api/versi` |
 
-> Mode uji: lisensi belum aktif karena server aktivasi belum diisi di
-> app_config.dart. Jangan jual APK ini.
+Server yang mengambilkan berkasnya dari rilis GitHub, jadi yang terlihat
+pelanggan hanya alamat server aktivasi. Nama akun GitHub Anda hanya tersimpan di
+sisi server, di `GITHUB_REPO` pada `cloudflare/wrangler.toml`.
 
-Begitu alamat server diisi dan build dijalankan ulang, gerbang lisensi
-**aktif kembali otomatis** dan setiap pelanggan wajib aktivasi. Jadi APK yang
-benar-benar dijual selalu terkunci — tidak perlu mengubah kode lagi.
+### Gerbang lisensi sudah aktif
 
-**Artinya:** selama spanduk merah itu masih muncul, APK tersebut adalah versi
-uji, bukan versi jual.
+Karena `activationServerUrl` sudah diisi, setiap pelanggan **wajib aktivasi**.
+Spanduk merah "Mode uji" tidak akan muncul lagi. Kalau suatu saat spanduk itu
+muncul, berarti APK yang terpasang adalah build lama atau build uji — jangan
+dijual.
+
 
 ---
 
@@ -79,7 +81,12 @@ pelanggan tidak salah ketik.
 
 ---
 
-## BAGIAN A — Pasang kunci tanda tangan (sekali saja)
+## BAGIAN A — Pasang kunci tanda tangan (sekali saja) — SUDAH DIKERJAKAN
+
+> **Status: selesai.** Keempat GitHub Secrets sudah terisi dan APK sudah
+> ditandatangani kunci rilis. Langkah di bawah disimpan untuk keadaan darurat —
+> misalnya kalau Anda mengganti kunci, memindahkan repo, atau menyiapkan mesin
+> baru.
 
 Ini **wajib dikerjakan sebelum menjual satu lisensi pun.** Kalau dilewati,
 aplikasi pembeli tidak akan pernah bisa di-update, dan semua lisensi akan mati
@@ -109,7 +116,12 @@ kalau kuncinya berubah nanti.
 
 ---
 
-## BAGIAN B — Pasang server aktivasi (sekali saja)
+## BAGIAN B — Pasang server aktivasi (sekali saja) — SUDAH DIKERJAKAN
+
+> **Status: selesai.** Server sudah berjalan di
+> **`https://tokoku-lisensi.dompetkuai.workers.dev`** dan `activationServerUrl`
+> di `lib/core/config/app_config.dart` sudah menunjuk ke sana. Langkah di bawah
+> disimpan kalau suatu saat server perlu dibuat ulang.
 
 Server aktivasi sekarang berjalan di **Cloudflare Workers**. Gratis, dan yang
 paling penting: **tidak pernah dibekukan** walaupun berhari-hari tidak dipakai.
@@ -167,25 +179,41 @@ Setelah ini, `<alamat-worker>` adalah portal pelanggan, dan
 
 ### 1. Kirim APK ke pelanggan
 
-Link unduhan yang selalu menunjuk versi terbaru:
+Cukup kirim **satu tautan** ini — pelanggan akan melihat halaman unduh yang
+ramah, lengkap dengan nomor versi terbaru:
 
 ```
-https://github.com/anton1990-90/kiosku/releases/latest/download/app-release.apk
+https://tokoku-lisensi.dompetkuai.workers.dev/unduh
 ```
+
+Halaman itu punya tombol **Unduh APK** yang otomatis mengambil versi terbaru.
+Tautan ini **tidak menampilkan akun GitHub Anda** — berkasnya dialirkan lewat
+server aktivasi.
 
 Minta pelanggan:
-- Unduh lewat browser HP
+- Buka tautannya lewat browser HP
+- Tekan **Unduh APK**
 - Aktifkan **"Instal dari sumber tidak dikenal"** kalau diminta
 - Buka file APK untuk memasang
+
+Halaman yang sama juga menautkan ke portal aktivasi, jadi pelanggan baru bisa
+mengunduh **dan** mengaktifkan dari satu tempat.
 
 ### 2. Siapkan stok voucher
 
 Buat sekaligus banyak, supaya tidak perlu repot setiap ada pembeli:
 
 ```bash
-export TOKOKU_URL="https://tokoku-lisensi.nama-anda.workers.dev"
+export TOKOKU_URL="https://tokoku-lisensi.dompetkuai.workers.dev"
 export TOKOKU_ADMIN_KEY="kunci-admin-Anda"
+```
 
+`TOKOKU_ADMIN_KEY` tersimpan di
+`C:\Users\Hariyanto\Documents\tokoku_app_source\release-signing\admin-key-tokoku.txt`
+(di luar repo, jadi tidak ikut ter-commit). Isinya juga tersimpan di Cloudflare
+sebagai secret `ADMIN_KEY`.
+
+```bash
 python tools/buat-voucher.py --jumlah 10 --kelompok "Grosir-2026-09"
 ```
 
@@ -205,7 +233,7 @@ lalu isi kolom **Buat Voucher Baru**.
 Satu pembelian = satu Kode Voucher. Kirim lewat WhatsApp, atau cetak di kartu.
 Sertakan juga alamat portal:
 
-> Buka `https://tokoku-lisensi.nama-anda.workers.dev`, masukkan Kode Perangkat
+> Buka `https://tokoku-lisensi.dompetkuai.workers.dev`, masukkan Kode Perangkat
 > dari aplikasi dan Kode Voucher di bawah ini.
 
 ### 4. Pelanggan menyelesaikan sendiri
@@ -234,19 +262,26 @@ Atau buka `<alamat-worker>/admin`.
 
 Setiap kali kode diubah:
 
-1. Naikkan versi di `pubspec.yaml`, contoh `version: 1.2.0+4` → `version: 1.2.1+5`
+1. Naikkan versi di `pubspec.yaml`, contoh `version: 1.5.0+10` → `version: 1.5.1+11`
+   Angka setelah `+` **wajib naik** — itulah `versionCode` Android. Kalau tidak
+   naik, Android menolak memasang APK di atas aplikasi yang sudah terpasang.
 2. Push ke branch `main`
 3. GitHub Actions otomatis:
    - membangun APK dengan kunci rilis Anda
-   - menerbitkan Release dengan tag `v1.2.1`
-4. Pelanggan yang membuka aplikasi akan melihat dialog **"Pembaruan tersedia"**
-   → tekan **Unduh** → browser terbuka → pasang APK baru
+   - menerbitkan Release dengan tag `v1.5.1`
+4. Pelanggan diberi tahu lewat **dua cara**:
+   - **Titik merah di lonceng pojok kanan atas** beranda — muncul begitu ada
+     versi baru. Ketuk untuk membuka rinciannya.
+   - **Dialog "Pembaruan tersedia"** yang tampil sekali saat aplikasi dibuka.
+
+   Keduanya menampilkan nomor versi, ukuran berkas, dan catatan rilis. Menekan
+   **Unduh** membuka halaman unduh di server aktivasi Anda — bukan GitHub.
 
 **Penting:** karena APK ditandatangani dengan kunci yang sama, memasang versi
-baru **tidak menghapus data toko** pelanggan. Ini hanya berlaku kalau Bagian A
-sudah dikerjakan.
+baru **tidak menghapus data toko** pelanggan.
 
-Pelanggan juga bisa cek manual: **Profil → Cek pembaruan**.
+Pelanggan juga bisa cek manual: **Profil → Cek pembaruan**. Tombol itu memakai
+sumber data yang sama dengan lencana di beranda, jadi hasilnya selalu konsisten.
 
 ---
 
@@ -308,12 +343,15 @@ nonaktifkan vouchernya (`"jenis":"voucher"`) — kodenya jadi tidak berguna.
 
 ## Daftar periksa sebelum jualan pertama
 
-- [ ] 4 GitHub Secrets sudah diisi (Bagian A)
-- [ ] Folder `release-signing` sudah dicadangkan ke 2 tempat
-- [ ] Server Cloudflare sudah diterbitkan dan `schema.sql` sudah dijalankan (Bagian B)
-- [ ] `ADMIN_KEY` sudah disimpan di pengelola kata sandi
-- [ ] `app_config.dart` sudah diisi `activationServerUrl`
+- [x] 4 GitHub Secrets sudah diisi (Bagian A) — **selesai**
+- [ ] Folder `release-signing` sudah dicadangkan ke 2 tempat ← **BELUM, kerjakan ini**
+- [x] Server Cloudflare sudah diterbitkan dan `schema.sql` sudah dijalankan (Bagian B) — **selesai**
+- [x] `ADMIN_KEY` sudah disimpan (ada di `release-signing/admin-key-tokoku.txt`)
+- [x] `app_config.dart` sudah diisi `activationServerUrl` — **selesai**
 - [ ] Sudah push, dan build GitHub Actions **hijau**
+- [ ] Halaman unduh `https://tokoku-lisensi.dompetkuai.workers.dev/unduh` bisa
+      dibuka dan tombol **Unduh APK** benar-benar mengunduh berkasnya
+- [ ] Di halaman unduh dan portal, **tidak ada** kata "github" yang terlihat
 
 **Dua pemeriksaan di bawah ini yang paling sering terlewat.** Kalau salah satu
 gagal, APK-nya tetap "hijau" di GitHub tapi tidak layak dijual:

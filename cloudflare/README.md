@@ -1,8 +1,14 @@
 # Server Aktivasi TokoKu — Cloudflare Worker + D1
 
+> **Status: sudah diterbitkan.**
+> Alamat: `https://tokoku-lisensi.dompetkuai.workers.dev`
+> Database D1 `tokoku-lisensi` sudah dibuat dan `schema.sql` sudah dijalankan.
+> Secret `ADMIN_KEY` sudah terpasang. Langkah di bawah disimpan untuk keadaan
+> darurat — misalnya kalau server perlu dibuat ulang dari nol.
+
 Folder ini berisi seluruh server aktivasi lisensi TokoKu: satu Worker yang
-sekaligus menjadi **API aktivasi**, **portal pelanggan**, dan **halaman admin
-penjual**.
+sekaligus menjadi **API aktivasi**, **portal pelanggan**, **halaman unduh APK**,
+dan **halaman admin penjual**.
 
 ## Kenapa Cloudflare, bukan Supabase
 
@@ -156,6 +162,9 @@ python tools/buat-voucher.py --ringkasan          # lihat lisensi aktif
 | Metode | Jalur | Untuk | Butuh kunci |
 |---|---|---|---|
 | `GET` | `/` | Portal pelanggan | — |
+| `GET` | `/unduh` | Halaman unduh APK untuk pelanggan | — |
+| `GET` | `/unduh/apk` | Berkas APK terbaru, dialirkan dari rilis GitHub | — |
+| `GET` | `/api/versi` | Versi terbaru + alamat unduhnya | — |
 | `GET` | `/admin` | Halaman admin penjual | — |
 | `GET` | `/health` | Cek server hidup | — |
 | `POST` | `/api/aktivasi` | Tukar voucher / aktifkan lisensi | — |

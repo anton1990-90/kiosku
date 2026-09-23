@@ -78,6 +78,54 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     await showUpdateDialog(context, info);
   }
 
+  /// Dialog "Tentang aplikasi".
+  ///
+  /// Sengaja hanya menampilkan identitas aplikasi. Rincian aktivasi (kode,
+  /// pemilik, tanggal) sudah punya menunya sendiri di "Info Lisensi", dan
+  /// tombol "Periksa pembaruan" juga sudah ada di daftar menu — menaruh
+  /// keduanya lagi di sini hanya membuat dua tombol yang melakukan hal sama.
+  void _tentangAplikasi() {
+    final licenseState = ref.read(licenseProvider);
+
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Tentang aplikasi'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _licenseRow('Aplikasi', 'TokoKu'),
+            _licenseRow('Untuk', 'Warung & toko sembako'),
+            _licenseRow('Versi terpasang', _appVersion),
+            _licenseRow(
+              'Status lisensi',
+              licenseState.isLicensed ? 'Aktif' : 'Belum aktif',
+            ),
+            const SizedBox(height: 4),
+            const Text(
+              'Lisensi ini berlaku untuk 1 HP. Kalau Anda ganti HP, hubungi '
+              'penjual untuk memindahkan lisensinya.\n\n'
+              'Panduan pemakaian ada di Profil → Pusat bantuan.',
+              style: TextStyle(
+                fontSize: 11.5,
+                height: 1.5,
+                color: AppColors.textSecondary,
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Tutup'),
+          ),
+        ],
+      ),
+    );
+  }
+
   void _showLicenseDialog() {
     final license = ref.read(licenseProvider).license;
     showDialog<void>(
@@ -1075,9 +1123,9 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                           icon: Icons.help_outline,
                           color: AppColors.infoMid,
                           title: 'Pusat bantuan',
-                          subtitle: 'FAQ, tutorial, kontak',
+                          subtitle: 'Panduan pemakaian & tanya-jawab',
                           trailing: Icons.chevron_right,
-                          onTap: () {},
+                          onTap: () => context.push('/profile/bantuan'),
                         ),
                         _MenuItem(
                           icon: Icons.info_outline,
@@ -1085,7 +1133,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                           title: 'Tentang aplikasi',
                           subtitle: 'Versi $_appVersion',
                           trailing: Icons.chevron_right,
-                          onTap: () {},
+                          onTap: _tentangAplikasi,
                         ),
                       ],
                     ),

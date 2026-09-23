@@ -1,6 +1,6 @@
 name: tokoku
 description: Aplikasi UMKM toko sembako & penjualan - offline-first dengan autentikasi email.
-version: 1.7.0+12
+version: 1.8.0+13
 publish_to: 'none'
 
 environment:

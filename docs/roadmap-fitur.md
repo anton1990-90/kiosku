@@ -5,7 +5,7 @@ Disusun 23 September 2026, berdasarkan pembacaan langsung kode di `lib/`
 
 > **Catatan pemutakhiran.** Nomor skema di tiap usulan di bawah ditulis saat
 > dokumen ini disusun, ketika versi skema masih 4 — jadi semuanya berbunyi
-> "versi 5". Versi skema sekarang **8** (v1.15.0), dan usulan yang belum
+> "versi 5". Versi skema sekarang **9** (v1.16.0), dan usulan yang belum
 > dikerjakan akan memakai versi berikutnya, bukan 5. Bagian yang sudah
 > dikerjakan ditandai di judulnya.
 
@@ -25,10 +25,14 @@ Dokumen ini **hanya memuat yang belum ada**. Semua fitur di bagian
 | 5 | Data pelanggan tetap | Sedang | Piutang sekarang pakai teks bebas |
 | 6 | Tutup kasir / hitung uang | Sedang | Kontrol harian kalau ada karyawan |
 | 7 | Pembelian ke supplier | Besar | Menyambung stok masuk ↔ hutang |
-| 8 | Akun kasir + hak akses | Besar | Sekarang hanya satu akun pemilik |
+| 8 | Akun kasir + hak akses — **selesai v1.16.0** | Besar | Dua peran: pemilik & kasir |
 | — | Cetak label barcode | Besar | Hanya perlu kalau repack barang |
 | — | Poin loyalitas | Sedang | Nilai kecil untuk toko sembako |
 | — | Sinkronisasi multi-HP | Besar | **Bertentangan** dengan model 1 lisensi = 1 HP |
+
+> Tabel di atas adalah potret saat dokumen ini disusun. Keadaan sekarang
+> dibaca dari penanda **SELESAI** di judul tiap bagian di bawah — beberapa
+> baris di tabel ini sudah selesai dan belum ditandai di sini.
 
 ---
 
@@ -156,7 +160,7 @@ kemudian dan tidak bisa ditelusuri ke siapa.
 fisik yang dihitung, selisih, waktu, catatan) dan satu layar tutup kasir.
 Setiap transaksi diberi `session_id` supaya bisa direkap per sesi.
 
-**Usaha:** sedang. **Skema:** versi 9.
+**Usaha:** sedang. **Skema:** versi 10 (versi 9 sudah dipakai akun kasir).
 
 ---
 
@@ -173,20 +177,31 @@ dicatat terpisah, jadi rawan tidak sinkron.
 
 ---
 
-## 8. Akun kasir + hak akses
+## 8. Akun kasir + hak akses — **SELESAI di v1.16.0**
 
-**Kondisi sekarang.** Tabel `users` hanya menyimpan satu akun (email
-`UNIQUE`). Seluruh aplikasi memakai akun pemilik.
+**Kondisi sekarang.** Tabel `users` menyimpan banyak akun, masing-masing
+dengan peran **Pemilik** atau **Kasir** dan penanda aktif. Pemilik mengelola
+akun karyawannya dari **Profil → Pengguna**.
 
-**Masalah nyata.** Pemilik mungkin ingin karyawan bisa menjual tetapi
-**tidak** bisa melihat laba, neraca, atau prive. Sekarang tidak ada pilihan
+**Masalah yang dulu ada.** Pemilik mungkin ingin karyawan bisa menjual tetapi
+**tidak** bisa melihat laba, neraca, atau prive. Dulu tidak ada pilihan
 selain memberikan akses penuh.
 
-**Rancangan.** Kolom `role` pada `users`, izin per pengguna, dan pembatas
-pada rute laporan keuangan. Perlu ditinjau bersama alur PIN yang ada
-(PIN saat ini milik perangkat, bukan per pengguna).
+**Yang dikerjakan.** Kolom `role` dan `is_active` pada `users` (skema v9),
+layar Pengguna, dan pembatas rute di `app_router.dart` — kasir yang membuka
+rute laporan atau pengaturan dikembalikan ke Beranda. Akun **tidak pernah
+dihapus** (nota lama harus tetap punya pemiliknya), hanya dinonaktifkan, dan
+toko selalu dipaksa menyisakan satu pemilik aktif.
 
-**Usaha:** besar. **Risiko:** tinggi — menyentuh autentikasi.
+**Yang sengaja belum.** Izin per pengguna yang lebih rinci daripada
+pemilik/kasir, dan PIN per akun — PIN masih milik perangkat, jadi PIN yang
+sama membuka aplikasi untuk siapa pun yang memegang HP itu. Selama itu
+belum berubah, pemisahan kasir berguna untuk mencegah **salah lihat dan
+salah ubah** oleh orang yang memegang HP, bukan untuk menahan orang yang
+sengaja ingin membuka.
+
+**Usaha:** besar. **Risiko:** tinggi — menyentuh autentikasi. **Skema:**
+versi 9 (selesai).
 
 ---
 

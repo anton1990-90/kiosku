@@ -27,6 +27,7 @@ import '../features/profile/help_screen.dart';
 import '../features/profile/payment_methods_screen.dart';
 import '../features/profile/store_info_screen.dart';
 import '../features/profile/supplier_screen.dart';
+import '../features/profile/user_screen.dart';
 import '../features/stok/stok_menipis_screen.dart';
 import '../features/stok/stok_screen.dart';
 import '../features/transaksi/transaksi_screen.dart';
@@ -35,6 +36,50 @@ import '../features/laporan/laporan_screen.dart';
 import '../features/laporan/rincian_penjualan_screen.dart';
 import '../features/profile/profile_screen.dart';
 import '../shared/widgets/bottom_nav_shell.dart';
+
+/// Rute yang hanya boleh dibuka pemilik toko.
+///
+/// Daftar ini **menutup**, bukan membuka: yang tidak disebut di sini boleh
+/// dibuka kasir. Konsekuensinya setiap rute baru harus dipikirkan perannya,
+/// dan rute yang terlewat akan terbuka untuk kasir — bukan tertutup. Untuk
+/// aplikasi kasir, arah itu yang dipilih: rute baru umumnya justru layar
+/// pengaturan atau laporan, dan keduanya harus ditambahkan ke sini.
+const _rutePemilik = <String>[
+  '/laporan',
+  '/produk',
+  '/stok',
+  '/license',
+  '/profile/toko',
+  '/profile/pembayaran',
+  '/profile/supplier',
+  '/profile/pelanggan',
+  '/profile/pengguna',
+];
+
+/// Pengecualian di dalam [_rutePemilik].
+///
+/// Layar ini hanya menampilkan daftar barang yang perlu direstok — tidak ada
+/// yang bisa diubah di sana, dan kasir memang perlu tahu barang apa yang habis
+/// supaya bisa memberi tahu pemilik toko.
+const _rutePemilikKecuali = <String>[
+  '/stok/menipis',
+];
+
+/// Apakah [location] termasuk rute milik pemilik toko?
+///
+/// Pencocokan dilakukan pada **batas segmen**: `/laporan` cocok dengan
+/// `/laporan` dan `/laporan/keuangan`, tetapi tidak dengan `/laporanku`.
+/// Tanpa batas itu, satu rute baru yang kebetulan berawalan sama akan ikut
+/// tertutup — atau ikut terbuka — tanpa disadari.
+bool _khususPemilik(String location) {
+  for (final rute in _rutePemilikKecuali) {
+    if (location == rute) return false;
+  }
+  for (final rute in _rutePemilik) {
+    if (location == rute || location.startsWith('$rute/')) return true;
+  }
+  return false;
+}
 
 /// App router with auth guards and ShellRoute for bottom navigation.
 /// Redirects unauthenticated users to login.
@@ -99,8 +144,26 @@ final routerProvider = Provider<GoRouter>((ref) {
         return authState.isFirstRun ? '/auth/register' : '/auth/login';
       }
 
+      // Layar daftar hanya untuk pemasangan baru. Begitu sudah ada akun,
+      // membukanya berarti siapa pun yang belum masuk bisa membuat akun untuk
+      // dirinya sendiri — dan akun baru itu ikut menentukan hak akses. Akun
+      // berikutnya hanya boleh dibuat pemilik toko, dari layar Pengguna.
+      if (!isLoggedIn &&
+          location == '/auth/register' &&
+          !authState.isFirstRun) {
+        return '/auth/login';
+      }
+
       // Sudah login dan sudah lolos PIN, tapi masih di layar auth/splash.
       if (isLoggedIn && !isPinRoute && (isAuthRoute || location == '/')) {
+        return '/dashboard';
+      }
+
+      // Hak akses menurut peran. Ini penjaganya yang sebenarnya: menyembunyikan
+      // tombol dan menu hanya merapikan tampilan, sedangkan tautan langsung ke
+      // rute tetap harus ditolak. Kasir yang membuka rute milik pemilik toko
+      // dikembalikan ke Beranda.
+      if (isLoggedIn && !authState.isOwner && _khususPemilik(location)) {
         return '/dashboard';
       }
 
@@ -196,6 +259,14 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/profile/pelanggan',
         name: 'pelanggan',
         builder: (context, state) => const CustomerScreen(),
+      ),
+      // Pengelolaan akun — hanya pemilik toko. Menunya juga tidak ditampilkan
+      // untuk kasir, tetapi rutenya tetap ditolak di sini: menyembunyikan menu
+      // tidak menahan apa pun kalau alamatnya bisa dibuka langsung.
+      GoRoute(
+        path: '/profile/pengguna',
+        name: 'pengguna',
+        builder: (context, state) => const UserScreen(),
       ),
       // Panduan pemakaian & tanya-jawab. Isinya ditulis di dalam aplikasi,
       // jadi tetap terbaca tanpa internet.

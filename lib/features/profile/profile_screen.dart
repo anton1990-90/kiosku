@@ -23,6 +23,7 @@ import '../../shared/services/export_service.dart';
 import '../../shared/services/pin_service.dart';
 import '../../shared/services/restore_service.dart';
 import '../../providers/update_provider.dart';
+import '../../providers/user_provider.dart';
 import '../../shared/widgets/shared_widgets.dart';
 import '../../shared/widgets/update_dialog.dart';
 
@@ -855,6 +856,12 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     final paymentState = ref.watch(paymentMethodProvider);
     final cashState = ref.watch(cashProvider);
     final user = authState.user;
+    final userState = ref.watch(userProvider);
+
+    // Hak akses pemilik toko. Dipakai untuk menyembunyikan kelompok menu
+    // yang bukan haknya. Yang benar-benar menjaga tetap router: menu yang
+    // disembunyikan tidak menahan apa pun kalau alamatnya dibuka langsung.
+    final pemilik = authState.isOwner;
 
     final totalTransactions =
         salesAsync.maybeWhen(data: (s) => s.length, orElse: () => 0);
@@ -994,8 +1001,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const _MenuGroupTitle('Toko & bisnis'),
-                    _MenuCard(
+                    if (pemilik) const _MenuGroupTitle('Toko & bisnis'),
+                    if (pemilik) _MenuCard(
                       children: [
                         _MenuItem(
                           icon: Icons.store_outlined,
@@ -1039,9 +1046,20 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                           trailing: Icons.chevron_right,
                           onTap: () => context.push('/profile/pelanggan'),
                         ),
+                        _MenuItem(
+                          icon: Icons.manage_accounts_outlined,
+                          color: AppColors.warningMid,
+                          title: 'Pengguna',
+                          subtitle: userState.users.isEmpty
+                              ? 'Kelola akun pemilik & kasir'
+                              : '${userState.users.length} akun · '
+                                  '${userState.pemilikAktif} pemilik aktif',
+                          trailing: Icons.chevron_right,
+                          onTap: () => context.push('/profile/pengguna'),
+                        ),
                       ],
                     ),
-                    const SizedBox(height: 20),
+                    if (pemilik) const SizedBox(height: 20),
                     const _MenuGroupTitle('Hutang & catatan'),
                     _MenuCard(
                       children: [
@@ -1084,29 +1102,31 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                           trailing: Icons.chevron_right,
                           onTap: () => context.push('/kas'),
                         ),
-                        _MenuItem(
-                          icon: Icons.account_balance_outlined,
-                          color: AppColors.accentMid,
-                          title: 'Laporan keuangan',
-                          subtitle:
-                              'Laba rugi, ekuitas, neraca, arus kas & prive',
-                          trailing: Icons.chevron_right,
-                          onTap: () => context.push('/laporan/keuangan'),
-                        ),
-                        _MenuItem(
-                          icon: Icons.receipt_long_outlined,
-                          color: AppColors.infoMid,
-                          title: 'Rincian produk terjual',
-                          subtitle:
-                              'Filter harian, total pendapatan & laba, ekspor',
-                          trailing: Icons.chevron_right,
-                          onTap: () => context.push('/laporan/rincian'),
-                        ),
+                        if (pemilik)
+                          _MenuItem(
+                            icon: Icons.account_balance_outlined,
+                            color: AppColors.accentMid,
+                            title: 'Laporan keuangan',
+                            subtitle:
+                                'Laba rugi, ekuitas, neraca, arus kas & prive',
+                            trailing: Icons.chevron_right,
+                            onTap: () => context.push('/laporan/keuangan'),
+                          ),
+                        if (pemilik)
+                          _MenuItem(
+                            icon: Icons.receipt_long_outlined,
+                            color: AppColors.infoMid,
+                            title: 'Rincian produk terjual',
+                            subtitle:
+                                'Filter harian, total pendapatan & laba, ekspor',
+                            trailing: Icons.chevron_right,
+                            onTap: () => context.push('/laporan/rincian'),
+                          ),
                       ],
                     ),
                     const SizedBox(height: 20),
-                    const _MenuGroupTitle('Preferensi'),
-                    _MenuCard(
+                    if (pemilik) const _MenuGroupTitle('Preferensi'),
+                    if (pemilik) _MenuCard(
                       children: [
                         _MenuItem(
                           icon: Icons.notifications_active_outlined,
@@ -1140,9 +1160,9 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                         ),
                       ],
                     ),
-                    const SizedBox(height: 20),
-                    const _MenuGroupTitle('Data & keamanan'),
-                    _MenuCard(
+                    if (pemilik) const SizedBox(height: 20),
+                    if (pemilik) const _MenuGroupTitle('Data & keamanan'),
+                    if (pemilik) _MenuCard(
                       children: [
                         _MenuItem(
                           icon: Icons.backup_outlined,
@@ -1212,9 +1232,9 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                         ),
                       ],
                     ),
-                    const SizedBox(height: 20),
-                    const _MenuGroupTitle('Lisensi & aplikasi'),
-                    _MenuCard(
+                    if (pemilik) const SizedBox(height: 20),
+                    if (pemilik) const _MenuGroupTitle('Lisensi & aplikasi'),
+                    if (pemilik) _MenuCard(
                       children: [
                         _MenuItem(
                           icon: Icons.verified_user_outlined,
@@ -1236,7 +1256,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                         ),
                       ],
                     ),
-                    const SizedBox(height: 20),
+                    if (pemilik) const SizedBox(height: 20),
                     const _MenuGroupTitle('Kunci layar'),
                     _MenuCard(
                       children: [

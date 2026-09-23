@@ -1,4 +1,4 @@
-# TokoKu — Aplikasi UMKM Toko Sembako & Penjualan (v1.15.0)
+# TokoKu — Aplikasi UMKM Toko Sembako & Penjualan (v1.16.0)
 
 Aplikasi mobile cross-platform (Android & iOS) untuk toko sembako UMKM. Dibuat dengan Flutter, bekerja **offline-first** dengan autentikasi email.
 
@@ -153,7 +153,7 @@ cloudflare/                          # Server aktivasi lisensi (Worker + D1)
 
 ## Skema Database (SQLite)
 
-Versi skema: **8**. Migrasi berjalan otomatis dan tidak menghapus data yang sudah ada — kolom baru selalu ditambahkan lewat `ALTER TABLE`, sedangkan tabel lama tidak pernah ditulis ulang.
+Versi skema: **9**. Migrasi berjalan otomatis dan tidak menghapus data yang sudah ada — kolom baru selalu ditambahkan lewat `ALTER TABLE`, sedangkan tabel lama tidak pernah ditulis ulang.
 
 | Table | Purpose |
 |-------|---------|
@@ -261,6 +261,63 @@ di `debts` dan `sales`, lalu barisnya dihapus — riwayat penjualan dan piutang
 adalah catatan uang, bukan data pelanggan. Buku pelanggan juga ikut
 dicadangkan (`BackupService.tabelCadangan`) dan ikut dikosongkan saat
 memulihkan, dengan urutan yang sama persis dengan "Reset semua data".
+
+### Akun kasir dan hak akses
+
+Sampai v1.15.0 aplikasi ini hanya mengenal satu akun, dan akun itu adalah
+pemilik toko. Begitu toko punya karyawan, pilihan yang ada cuma satu:
+memberikan akses penuh. Sejak v1.16.0 ada dua peran — **Pemilik** dan
+**Kasir** — dan pemilik bisa menambah, menonaktifkan, dan mengganti password
+akun karyawannya dari **Profil → Pengguna**.
+
+**Kolomnya, dan kenapa nilainya penting.** Skema v9 menambahkan
+`users.role` (`'owner'` / `'kasir'`) dan `users.is_active`. Nilai awalnya
+`'owner'` dan `1`, dan itu **load-bearing**: setiap pemasangan yang sudah ada
+memperbarui aplikasi lewat `ALTER TABLE`, sehingga seluruh baris lama
+mendapat nilai awal itu. Kalau nilai awalnya `'kasir'`, seluruh toko yang
+memperbarui aplikasi kehilangan akses ke pengaturan, laporan, dan layar
+Pengguna sekaligus — tanpa galat, tanpa peringatan, dan **tanpa cara
+memperbaikinya dari dalam aplikasi**, karena yang boleh mengangkat pemilik
+adalah pemilik. Pemeriksa statis mengunci arah nilai awalnya.
+
+**Akun tidak pernah dihapus.** `sales.user_id` punya kunci asing ke
+`users.id`, jadi menghapus akun akan membuang pemilik nota-nota lama — nota
+yang justru bukti uang masuk. Yang tersedia adalah **menonaktifkan**: akun
+nonaktif tidak bisa masuk (pesannya jelas, bukan "password salah"), namanya
+tetap menempel di riwayat, dan bisa diaktifkan lagi kapan saja. Karena itu
+tidak ada satu pun `DELETE FROM users` di seluruh `lib/`.
+
+**Toko tidak boleh kehilangan pemilik aktif terakhir.** Menurunkan peran
+pemilik terakhir menjadi kasir, atau menonaktifkannya, akan mengunci
+pengelolaan akun selamanya — aplikasinya tetap berjalan normal, yang hilang
+adalah kemampuan mengelolanya. Kedua tindakan itu ditolak di lapisan data
+(`AuthRepository`), bukan hanya disembunyikan di layar, karena aturannya
+menyangkut keadaan data.
+
+**Router adalah penjaganya, bukan tampilan.** Kasir yang mengetik alamat
+`/laporan` atau `/profile/toko` dikembalikan ke Beranda. Daftar rute pemilik
+ada di `app_router.dart` dan **menutup** rute yang disebut di dalamnya;
+`/stok/menipis` sengaja dikecualikan karena kasir memang perlu tahu barang
+apa yang habis. Menyembunyikan tombol di dasbor dan menu Profil hanya
+polesan — yang menentukan adalah pengalihan rutenya.
+
+**Akun pertama adalah pemilik.** Pendaftaran mandiri hanya terbuka pada
+pemasangan baru; begitu ada akun, rute `/auth/register` ditutup dan akun
+berikutnya hanya bisa dibuat pemilik dari layar Pengguna, bawaannya **kasir**.
+Arah itu dipilih dengan sengaja: salah menebak ke arah kasir hanya membuat
+satu akun kurang berkuasa dan pemilik bisa memperbaikinya, sedangkan salah
+menebak ke arah pemilik memberi akses penuh kepada orang yang tidak berhak.
+
+**Profil toko milik toko, bukan milik akun.** Menyimpan nama toko, logo,
+QRIS, atau rekening bank menulis ke **seluruh** baris `users` — kalau tidak,
+kasir akan mencetak struk dengan nama dan logo toko yang basi. Penyimpanan
+itu sekaligus mempertahankan `role` dan `is_active` akun yang sedang dipakai,
+sehingga menyimpan profil toko tidak pernah bisa diam-diam mengangkat kasir
+menjadi pemilik atau mengaktifkan kembali akun yang dinonaktifkan.
+
+**Hash password tidak ikut dicadangkan.** Tabel `users` sengaja **tidak**
+masuk `BackupService.tabelCadangan`: berkas cadangan dibuka dan dibagikan
+pengguna sebagai Excel/JSON, dan hash password tidak ada urusannya di sana.
 
 ## Palet Warna
 

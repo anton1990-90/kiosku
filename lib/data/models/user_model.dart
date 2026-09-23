@@ -1,3 +1,18 @@
+/// Peran akun.
+///   owner — pemilik toko: melihat semuanya, termasuk laba, laporan keuangan,
+///           pengaturan, cadangan data, dan pengelolaan pengguna.
+///   kasir — melayani penjualan dan mencatat uang, tanpa melihat laba,
+///           laporan keuangan, maupun pengaturan toko.
+///
+/// Nilainya disimpan sebagai teks di `users.role`, dan nilai awalnya `'owner'`
+/// (lihat `DatabaseHelper._upgradeV9`). Akun yang sudah ada sebelum fitur ini
+/// adalah pemilik toko; menebaknya sebagai kasir akan mengunci pemiliknya
+/// sendiri dari pengaturan, tanpa pemilik tersisa yang bisa memperbaikinya.
+class UserRole {
+  static const owner = 'owner';
+  static const kasir = 'kasir';
+}
+
 /// User model for email-based authentication.
 /// Stored locally in SQLite — enables offline login after initial registration.
 /// Juga menyimpan info toko yang bisa diedit pengguna (nama, alamat, telepon,
@@ -6,6 +21,15 @@ class UserModel {
   final int? id;
   final String email;
   final String passwordHash;
+
+  /// Peran akun — [UserRole.owner] atau [UserRole.kasir].
+  final String role;
+
+  /// Akun yang dinonaktifkan tidak bisa login lagi, tetapi seluruh riwayatnya
+  /// tetap ada. Akun **tidak pernah dihapus**: `sales.user_id` menunjuk ke
+  /// sini, dan nota lama harus tetap punya pemiliknya.
+  final bool isActive;
+
   final String storeName;
   final String? storeAddress;
   final String? storePhone;
@@ -25,6 +49,8 @@ class UserModel {
     this.id,
     required this.email,
     required this.passwordHash,
+    this.role = UserRole.owner,
+    this.isActive = true,
     required this.storeName,
     this.storeAddress,
     this.storePhone,
@@ -49,6 +75,12 @@ class UserModel {
     return (parts[0].substring(0, 1) + parts[1].substring(0, 1)).toUpperCase();
   }
 
+  /// Pemilik toko melihat dan mengubah segalanya.
+  bool get isOwner => role == UserRole.owner;
+
+  /// Peran ini untuk ditampilkan di layar.
+  String get roleLabel => isOwner ? 'Pemilik' : 'Kasir';
+
   bool get hasLogo => logoPath != null && logoPath!.isNotEmpty;
 
   bool get hasQris => qrisPath != null && qrisPath!.isNotEmpty;
@@ -63,6 +95,9 @@ class UserModel {
       if (id != null) 'id': id,
       'email': email,
       'password_hash': passwordHash,
+      'role': role,
+      // SQLite tidak punya tipe boolean — disimpan sebagai 1 / 0.
+      'is_active': isActive ? 1 : 0,
       'store_name': storeName,
       'store_address': storeAddress,
       'store_phone': storePhone,
@@ -80,6 +115,11 @@ class UserModel {
       id: map['id'] as int?,
       email: map['email'] as String,
       passwordHash: map['password_hash'] as String,
+      // Baris lama dan berkas cadangan lama belum punya kolom ini. Nilai
+      // bawaannya sama dengan nilai awal kolomnya, dan alasannya sama:
+      // akun yang sudah ada sebelum fitur ini adalah pemilik toko.
+      role: (map['role'] as String?) ?? UserRole.owner,
+      isActive: ((map['is_active'] as int?) ?? 1) == 1,
       storeName: map['store_name'] as String,
       storeAddress: map['store_address'] as String?,
       storePhone: map['store_phone'] as String?,
@@ -96,6 +136,8 @@ class UserModel {
     int? id,
     String? email,
     String? passwordHash,
+    String? role,
+    bool? isActive,
     String? storeName,
     String? storeAddress,
     String? storePhone,
@@ -115,6 +157,8 @@ class UserModel {
       id: id ?? this.id,
       email: email ?? this.email,
       passwordHash: passwordHash ?? this.passwordHash,
+      role: role ?? this.role,
+      isActive: isActive ?? this.isActive,
       storeName: storeName ?? this.storeName,
       storeAddress: clearAddress ? null : (storeAddress ?? this.storeAddress),
       storePhone: clearPhone ? null : (storePhone ?? this.storePhone),

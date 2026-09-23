@@ -31,12 +31,20 @@ import 'package:sqflite/sqflite.dart';
 ///       `sales.customer_name` sebagai rekaman saat transaksi terjadi — sama
 ///       seperti `sale_items.unit`. Jadi mengganti nama pelanggan tidak
 ///       mengubah struk dan laporan yang sudah ada.
+///   9 — + akun kasir: kolom `users.role` ('owner' / 'kasir') dan
+///       `users.is_active` (1 / 0). Nilai awalnya `'owner'` dan `1`, dan
+///       keduanya load-bearing: setiap pemasangan yang sudah ada berisi
+///       TEPAT SATU akun — pemilik toko. Kalau nilai awalnya `'kasir'`,
+///       pemilik itu kehilangan akses ke laporan, pengaturan, dan pengelolaan
+///       pengguna sekaligus, tanpa pemilik tersisa yang bisa memperbaikinya.
+///       Akun TIDAK PERNAH dihapus — `sales.user_id` punya kunci asing, dan
+///       riwayat harus tetap punya pemiliknya; akun kasir dinonaktifkan.
 class DatabaseHelper {
   DatabaseHelper._();
   static final DatabaseHelper instance = DatabaseHelper._();
 
   static const _dbName = 'tokoku.db';
-  static const _dbVersion = 8;
+  static const _dbVersion = 9;
 
   Database? _database;
 
@@ -69,6 +77,7 @@ class DatabaseHelper {
     await _upgradeV6(db);
     await _upgradeV7(db);
     await _upgradeV8(db);
+    await _upgradeV9(db);
     await _seedProducts(db);
     await _seedPaymentMethods(db);
   }
@@ -512,6 +521,31 @@ class DatabaseHelper {
     }
   }
 
+  /// Kolom versi 9 — akun kasir (pemilik & kasir).
+  ///
+  /// `users.role` menentukan apa yang boleh dibuka: `'owner'` melihat
+  /// semuanya, `'kasir'` hanya kasir, riwayat transaksi, stok, hutang &
+  /// piutang, buku kas, dan catatan. `users.is_active` mematikan akun tanpa
+  /// menghapusnya.
+  ///
+  /// **Akun tidak pernah dihapus.** `sales.user_id` punya kunci asing ke
+  /// `users.id`, dan riwayat penjualan harus tetap punya pemiliknya — kalau
+  /// akunnya dihapus, nota lama kehilangan siapa yang menjualnya. Karena itu
+  /// kasir yang berhenti cukup dinonaktifkan.
+  ///
+  /// Kedua nilai awal (`'owner'` dan `1`) load-bearing, dan keduanya untuk
+  /// alasan yang sama: setiap pemasangan yang sudah ada berisi TEPAT SATU
+  /// akun, yaitu pemilik toko. Nilai awal yang salah membuat akun itu
+  /// kehilangan aksesnya sendiri, dan tidak ada pemilik tersisa yang bisa
+  /// mengembalikannya. Karena itu `AuthRepository` juga menolak menurunkan
+  /// atau menonaktifkan **pemilik aktif terakhir**.
+  Future<void> _upgradeV9(Database db) async {
+    await _addColumnIfMissing(
+        db, 'users', 'role', "TEXT NOT NULL DEFAULT 'owner'");
+    await _addColumnIfMissing(
+        db, 'users', 'is_active', 'INTEGER NOT NULL DEFAULT 1');
+  }
+
   /// Migrasi dari versi lama. Data yang sudah ada tidak boleh hilang.
   Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
     if (oldVersion < 2) {
@@ -537,6 +571,9 @@ class DatabaseHelper {
     }
     if (oldVersion < 8) {
       await _upgradeV8(db);
+    }
+    if (oldVersion < 9) {
+      await _upgradeV9(db);
     }
   }
 

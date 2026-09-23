@@ -422,27 +422,32 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                       label: 'Transaksi',
                       onTap: () => context.go('/kasir'),
                     ),
-                    QuickAction(
-                      icon: Icons.inventory_2_outlined,
-                      iconColor: AppColors.accentMid,
-                      iconBgColor: AppColors.accentLight,
-                      label: 'Tambah Stok',
-                      onTap: () => context.go('/stok'),
-                    ),
-                    QuickAction(
-                      icon: Icons.bar_chart_outlined,
-                      iconColor: AppColors.successMid,
-                      iconBgColor: AppColors.successLight,
-                      label: 'Laporan',
-                      onTap: () => context.go('/laporan'),
-                    ),
-                    QuickAction(
-                      icon: Icons.account_balance_outlined,
-                      iconColor: AppColors.infoMid,
-                      iconBgColor: AppColors.infoLight,
-                      label: 'Laporan Keuangan',
-                      onTap: () => context.push('/laporan/keuangan'),
-                    ),
+                    // Menambah stok dan membuka laporan adalah pekerjaan
+                    // pemilik toko, bukan kasir. Rutenya juga ditolak router.
+                    if (authState.isOwner)
+                      QuickAction(
+                        icon: Icons.inventory_2_outlined,
+                        iconColor: AppColors.accentMid,
+                        iconBgColor: AppColors.accentLight,
+                        label: 'Tambah Stok',
+                        onTap: () => context.go('/stok'),
+                      ),
+                    if (authState.isOwner)
+                      QuickAction(
+                        icon: Icons.bar_chart_outlined,
+                        iconColor: AppColors.successMid,
+                        iconBgColor: AppColors.successLight,
+                        label: 'Laporan',
+                        onTap: () => context.go('/laporan'),
+                      ),
+                    if (authState.isOwner)
+                      QuickAction(
+                        icon: Icons.account_balance_outlined,
+                        iconColor: AppColors.infoMid,
+                        iconBgColor: AppColors.infoLight,
+                        label: 'Laporan Keuangan',
+                        onTap: () => context.push('/laporan/keuangan'),
+                      ),
                     QuickAction(
                       icon: Icons.handshake_outlined,
                       iconColor: AppColors.warningMid,
@@ -495,15 +500,21 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                     mainAxisExtent: 128,
                   ),
                   children: [
-                    StatCard(
-                      icon: Icons.trending_up,
-                      iconColor: AppColors.successMid,
-                      iconBgColor: AppColors.successLight,
-                      value: Formatters.rupiahCompact(dashState.weeklyProfit),
-                      label: 'Laba minggu ini',
-                      trend: '+12%',
-                      isUp: true,
-                    ),
+                    // Laba adalah isi pembukuan pemilik toko, bukan angka
+                    // yang perlu dilihat kasir. Kartunya disembunyikan, bukan
+                    // ditampilkan bernilai nol — nol terbaca sebagai "minggu
+                    // ini tidak untung".
+                    if (authState.isOwner)
+                      StatCard(
+                        icon: Icons.trending_up,
+                        iconColor: AppColors.successMid,
+                        iconBgColor: AppColors.successLight,
+                        value:
+                            Formatters.rupiahCompact(dashState.weeklyProfit),
+                        label: 'Laba minggu ini',
+                        trend: '+12%',
+                        isUp: true,
+                      ),
                     StatCard(
                       icon: Icons.inventory_outlined,
                       iconColor: AppColors.warningMid,

@@ -34,6 +34,13 @@ class AuthState {
 
   bool get isAuthenticated => user != null;
 
+  /// Akun yang sedang login adalah pemilik toko.
+  ///
+  /// Dipakai router untuk menolak rute yang bukan haknya, dan layar untuk
+  /// menyembunyikan menu. Bawaannya `false`: selama identitasnya belum jelas,
+  /// anggap bukan pemilik — arah yang aman untuk pemeriksaan hak akses.
+  bool get isOwner => user?.isOwner ?? false;
+
   AuthState copyWith({
     UserModel? user,
     bool? isLoading,
@@ -64,7 +71,17 @@ class AuthNotifier extends StateNotifier<AuthState> {
   /// On startup: check if a user session exists and restore it.
   /// Also detect first-run (no registered users).
   Future<void> _init() async {
-    final user = await _repo.getCurrentUser();
+    var user = await _repo.getCurrentUser();
+
+    // Sesi yang menunjuk akun nonaktif diputus di sini. Menonaktifkan kasir
+    // harus benar-benar menghentikannya: tanpa pemeriksaan ini akun itu masih
+    // bisa masuk lewat sesi lamanya sampai dia logout sendiri — yang tidak
+    // akan pernah terjadi, karena tombol keluar pun ada di dalam aplikasi.
+    if (user != null && !user.isActive) {
+      await _repo.logout();
+      user = null;
+    }
+
     final hasUsers = await _repo.hasRegisteredUsers();
     state = AuthState(
       user: user,
@@ -198,14 +215,29 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
   /// Hapus seluruh data usaha setelah password dikonfirmasi.
   /// Akun dan profil toko tidak ikut terhapus.
+  ///
+  /// Mengembalikan `false` juga kalau yang meminta bukan pemilik toko —
+  /// penjagaannya ada di repositori, karena tindakan ini tidak punya rute
+  /// sendiri yang bisa ditutup.
   Future<bool> resetAllData(String password) {
     return _repo.resetBusinessData(password);
   }
 
   /// Perbarui state setelah logo diganti, tanpa menulis ulang info toko.
+  ///
+  /// Kalau akun yang sedang login ternyata sudah dinonaktifkan (mungkin oleh
+  /// dirinya sendiri, ketika masih ada pemilik lain), sesinya diputus di sini
+  /// juga — bukan hanya saat aplikasi dibuka.
   Future<void> refreshUser() async {
     final user = await _repo.getCurrentUser();
     if (user == null) return;
+
+    if (!user.isActive) {
+      await _repo.logout();
+      state = const AuthState(isLoading: false);
+      return;
+    }
+
     state = AuthState(user: user, isLoading: false, isFirstRun: false);
   }
 

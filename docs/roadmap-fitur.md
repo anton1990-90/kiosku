@@ -18,11 +18,11 @@ Dokumen ini **hanya memuat yang belum ada**. Semua fitur di bagian
 
 | Prioritas | Fitur | Usaha | Alasan singkat |
 |---|---|---|---|
-| 1 | Cetak ulang struk | Kecil | Datanya sudah ada, tinggal tombolnya |
-| 2 | Batal / retur transaksi | Sedang | Sekarang salah input = permanen |
-| 3 | Diskon per item / per nota | Sedang | Kebiasaan jualan sembako, belum bisa dicatat |
-| 4 | Satuan produk (kg, liter, ikat) | Kecil | Struk "2" tidak jelas; salah tafsir |
-| 5 | Data pelanggan tetap | Sedang | Piutang sekarang pakai teks bebas |
+| 1 | Cetak ulang struk — **selesai v1.12.0** | Kecil | Datanya sudah ada, tinggal tombolnya |
+| 2 | Batal / retur transaksi — **selesai v1.14.0** | Sedang | Sekarang salah input = permanen |
+| 3 | Diskon per item / per nota — **selesai v1.13.0** | Sedang | Kebiasaan jualan sembako, belum bisa dicatat |
+| 4 | Satuan produk (kg, liter, ikat) — **tahap A selesai v1.12.0** | Kecil | Struk "2" tidak jelas; salah tafsir |
+| 5 | Data pelanggan tetap — **selesai v1.15.0** | Sedang | Piutang sekarang pakai teks bebas |
 | 6 | Tutup kasir / hitung uang | Sedang | Kontrol harian kalau ada karyawan |
 | 7 | Pembelian ke supplier | Besar | Menyambung stok masuk ↔ hutang |
 | 8 | Akun kasir + hak akses — **selesai v1.16.0** | Besar | Dua peran: pemilik & kasir |
@@ -30,13 +30,13 @@ Dokumen ini **hanya memuat yang belum ada**. Semua fitur di bagian
 | — | Poin loyalitas | Sedang | Nilai kecil untuk toko sembako |
 | — | Sinkronisasi multi-HP | Besar | **Bertentangan** dengan model 1 lisensi = 1 HP |
 
-> Tabel di atas adalah potret saat dokumen ini disusun. Keadaan sekarang
-> dibaca dari penanda **SELESAI** di judul tiap bagian di bawah — beberapa
-> baris di tabel ini sudah selesai dan belum ditandai di sini.
+> Tabel di atas dan penanda **SELESAI** di judul tiap bagian sudah
+> disamakan. Yang masih terbuka: bagian 4 tahap B, bagian 6, bagian 7,
+> dan bagian 8 sengaja disisakan untuk izin per pengguna yang lebih rinci.
 
 ---
 
-## 1. Cetak ulang struk
+## 1. Cetak ulang struk — **SELESAI di v1.12.0**
 
 **Kondisi sekarang.** `ReceiptService` hanya dipanggil di satu tempat:
 `lib/features/kasir/kasir_screen.dart:135`. Begitu layar kasir ditutup,
@@ -54,7 +54,7 @@ rincian transaksi di `transaksi_screen.dart`, lalu panggil
 
 ---
 
-## 2. Batal / retur transaksi
+## 2. Batal / retur transaksi — **SELESAI di v1.14.0**
 
 **Kondisi sekarang.** `transaksi_screen.dart` bersifat baca saja — tidak ada
 `onTap` pada baris, dan tidak ada `deleteSale` di seluruh `lib/`.
@@ -77,11 +77,11 @@ bisa dihapus tanpa jejak, kasir bisa memakai itu untuk menyembunyikan
 pengambilan uang.
 
 **Usaha:** sedang. **Risiko:** sedang-tinggi — menyentuh laporan keuangan.
-**Skema:** versi 5 (satu kolom + satu migrasi).
+**Skema:** versi 7 (selesai).
 
 ---
 
-## 3. Diskon per item / per nota
+## 3. Diskon per item / per nota — **SELESAI di v1.13.0**
 
 **Kondisi sekarang.** Tidak ada satu pun kemunculan kata "diskon" atau
 "discount" di `lib/`. `sales` tidak punya kolom potongan.
@@ -95,11 +95,11 @@ total cocok, dan laporan laba jadi salah.
 setelah potongan. Tampilkan potongan di struk dan di laporan.
 
 **Usaha:** sedang. **Risiko:** sedang — mengubah arti `total_profit`.
-**Skema:** versi 5 (dua kolom).
+**Skema:** versi 6 (selesai).
 
 ---
 
-## 4. Satuan produk (kg, liter, ikat, pcs)
+## 4. Satuan produk (kg, liter, ikat, pcs) — **Tahap A SELESAI di v1.12.0; Tahap B belum**
 
 **Kondisi sekarang.** Tabel `products` tidak punya kolom satuan, dan
 `produk_form_screen.dart` tidak punya isian satuan. Jumlah hanya angka.
@@ -119,7 +119,10 @@ mengubah `quantity INTEGER` menjadi `REAL` di `sales`, `sale_items`, dan
 sebagai rilis tersendiri**, jangan digabung dengan fitur lain, karena
 kesalahan pembulatan di sini langsung merusak laporan.
 
-**Usaha:** A kecil, B besar. **Skema:** versi 5.
+**Usaha:** A kecil, B besar. **Skema:** Tahap A versi 5 (selesai).
+Tahap B menunggu versi 10 dan mengubah `quantity INTEGER` menjadi `REAL`
+di `sales`, `sale_items`, dan `stock_movements` — kerjakan sebagai rilis
+tersendiri, seperti catatan di atas.
 
 ---
 

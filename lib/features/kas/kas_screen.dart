@@ -8,6 +8,7 @@ import '../../data/models/cash_model.dart';
 import '../../data/models/debt_model.dart';
 import '../../data/repositories/debt_repository.dart';
 import '../../providers/cash_provider.dart';
+import '../../shared/widgets/debt_detail_dialog.dart';
 
 /// Layar Kas — saldo, mutasi uang masuk/keluar, dan riwayat lengkapnya.
 ///
@@ -551,7 +552,13 @@ class _KasScreenState extends ConsumerState<KasScreen> {
     await showDialog<void>(
       context: context,
       builder: (_) => hasil != null
-          ? _DialogDetailHutang(trx: trx, detail: hasil)
+          ? DebtDetailDialog(
+              detail: hasil,
+              paidNow: trx.amount,
+              paidAt: trx.date,
+              paymentNote: trx.note,
+              title: hasil.isPiutang ? 'Terima piutang' : 'Bayar hutang',
+            )
           : _DialogDetailKas(trx: trx),
     );
   }
@@ -963,142 +970,6 @@ Widget _barisRincian(String label, String value, {bool tebal = false}) {
       ],
     ),
   );
-}
-
-/// Satu baris barang di dalam dialog rincian hutang.
-Widget _barisBarang(DebtGoods barang) {
-  return Padding(
-    padding: const EdgeInsets.only(bottom: 6),
-    child: Row(
-      children: [
-        Expanded(
-          child: Text(
-            barang.name,
-            style: const TextStyle(fontSize: 12.5, color: AppColors.textMain),
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-          ),
-        ),
-        const SizedBox(width: 8),
-        Text(
-          '${barang.quantity}x',
-          style: const TextStyle(
-            fontSize: 12,
-            fontWeight: FontWeight.w600,
-            color: AppColors.textSecondary,
-          ),
-        ),
-        const SizedBox(width: 10),
-        Text(
-          Formatters.rupiah(barang.price),
-          style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
-        ),
-      ],
-    ),
-  );
-}
-
-/// Dialog rincian untuk mutasi kas yang berasal dari hutang/piutang.
-///
-/// Menjawab "ini piutang siapa dan barang apa" — nama pelanggan/supplier,
-/// daftar barang dari nota penjualan, dan sisa tanggungannya.
-class _DialogDetailHutang extends StatelessWidget {
-  final CashTransaction trx;
-  final DebtDetail detail;
-
-  const _DialogDetailHutang({required this.trx, required this.detail});
-
-  @override
-  Widget build(BuildContext context) {
-    final piutang = detail.isPiutang;
-    final telepon = (detail.partyPhone ?? '').trim();
-    final catatan = (trx.note ?? '').trim();
-
-    return AlertDialog(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      title: Row(
-        children: [
-          Icon(
-            piutang ? Icons.call_received : Icons.call_made,
-            color: piutang ? AppColors.successMid : AppColors.dangerMid,
-            size: 24,
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              piutang ? 'Terima piutang' : 'Bayar hutang',
-              style: const TextStyle(
-                fontSize: 17,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-          ),
-        ],
-      ),
-      content: SingleChildScrollView(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _barisRincian(
-              piutang ? 'Pelanggan' : 'Supplier',
-              detail.partyName,
-              tebal: true,
-            ),
-            _barisRincian(
-              'Jenis',
-              piutang ? 'Piutang pelanggan' : 'Hutang ke supplier',
-            ),
-            if (telepon.isNotEmpty) _barisRincian('Telepon', telepon),
-            if (detail.invoiceNumber.isNotEmpty)
-              _barisRincian('No. nota', detail.invoiceNumber),
-            const Divider(height: 20),
-            _barisRincian(
-              'Dibayar sekarang',
-              Formatters.rupiah(trx.amount),
-              tebal: true,
-            ),
-            _barisRincian('Tanggal bayar', Formatters.dateTime(trx.date)),
-            if (catatan.isNotEmpty) _barisRincian('Catatan', catatan),
-            const Divider(height: 20),
-            _barisRincian('Nilai awal', Formatters.rupiah(detail.amount)),
-            _barisRincian('Sudah dibayar', Formatters.rupiah(detail.paidAmount)),
-            _barisRincian(
-              piutang ? 'Sisa piutang' : 'Sisa hutang',
-              Formatters.rupiah(detail.remaining),
-              tebal: true,
-            ),
-            _barisRincian('Status', detail.isLunas ? 'Lunas' : 'Belum lunas'),
-            if (detail.dueDate != null)
-              _barisRincian('Jatuh tempo', Formatters.date(detail.dueDate!)),
-            const SizedBox(height: 14),
-            Text(
-              piutang ? 'Barang yang dibeli' : 'Barang terkait',
-              style: const TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w700,
-                color: AppColors.textMain,
-              ),
-            ),
-            const SizedBox(height: 8),
-            if (detail.goods.isEmpty)
-              const Text(
-                'Tidak ada rincian barang untuk catatan ini.',
-                style: TextStyle(fontSize: 12, color: AppColors.textTertiary),
-              )
-            else
-              ...detail.goods.map(_barisBarang),
-          ],
-        ),
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: const Text('Tutup'),
-        ),
-      ],
-    );
-  }
 }
 
 /// Dialog rincian untuk mutasi kas lain — penjualan, beban, prive, belanja

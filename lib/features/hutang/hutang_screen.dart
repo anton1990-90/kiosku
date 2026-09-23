@@ -6,6 +6,7 @@ import '../../core/utils/formatters.dart';
 import '../../core/utils/responsive.dart';
 import '../../data/models/debt_model.dart';
 import '../../providers/debt_provider.dart';
+import '../../shared/widgets/debt_detail_dialog.dart';
 import '../../shared/widgets/shared_widgets.dart';
 
 /// Halaman Hutang & Piutang.
@@ -100,7 +101,7 @@ class _HutangScreenState extends ConsumerState<HutangScreen> {
                       'tidak ada yang terlewat.',
                 )
               else
-                ...state.debts.map((d) => _debtCard(d)),
+                ...state.debts.map(_kartuHutang),
             ],
           ),
         ),
@@ -209,16 +210,16 @@ class _HutangScreenState extends ConsumerState<HutangScreen> {
     );
   }
 
+  /// Isi kartu hutang. Sengaja tanpa warna latar — warna dipasang oleh
+  /// `_kartuHutang` di lapisan [Material] supaya efek ketuknya terlihat.
   Widget _debtCard(DebtModel debt) {
     final isPiutang = debt.isPiutang;
     final accent = isPiutang ? AppColors.successMid : AppColors.dangerMid;
     final accentLight = isPiutang ? AppColors.successLight : AppColors.dangerLight;
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: AppColors.bgCard,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: AppColors.border, width: 0.5),
       ),
@@ -367,6 +368,31 @@ class _HutangScreenState extends ConsumerState<HutangScreen> {
           const SizedBox(height: 10),
           Row(
             children: [
+              const Icon(
+                Icons.receipt_long_outlined,
+                size: 14,
+                color: AppColors.primaryDark,
+              ),
+              const SizedBox(width: 6),
+              const Text(
+                'Lihat rincian barang',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.primaryDark,
+                ),
+              ),
+              const Spacer(),
+              const Icon(
+                Icons.chevron_right,
+                size: 16,
+                color: AppColors.textTertiary,
+              ),
+            ],
+          ),
+          const SizedBox(height: 2),
+          Row(
+            children: [
               if (!debt.isLunas)
                 Expanded(
                   child: ElevatedButton.icon(
@@ -408,6 +434,37 @@ class _HutangScreenState extends ConsumerState<HutangScreen> {
           ),
         ],
       ),
+    );
+  }
+
+  /// Kartu hutang yang bisa diketuk di mana saja — termasuk pada nama
+  /// pelanggan/supplier — untuk membuka dialog rincian barangnya.
+  ///
+  /// Warna kartu dipasang di [Material], bukan di dalam [Container] milik
+  /// `_debtCard`. Kalau warnanya ada di dalam, latar itu menutupi lapisan tinta
+  /// Material sehingga efek ketuknya tidak kelihatan. Jarak antar kartu juga
+  /// dipasang di luar [InkWell] supaya efeknya tidak menjulur ke celah.
+  Widget _kartuHutang(DebtModel debt) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      child: Material(
+        color: AppColors.bgCard,
+        borderRadius: BorderRadius.circular(12),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: () => _showDetail(debt),
+          child: _debtCard(debt),
+        ),
+      ),
+    );
+  }
+
+  /// Buka dialog rincian: siapa pihaknya, barang apa saja, dan berapa sisanya.
+  Future<void> _showDetail(DebtModel debt) {
+    return DebtDetailDialog.showById(
+      context,
+      debt.id!,
+      title: debt.isPiutang ? 'Rincian piutang' : 'Rincian hutang',
     );
   }
 

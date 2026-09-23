@@ -213,7 +213,7 @@ class AuthRepository {
 
     final terpengaruh = await db.update(
       'users',
-      {'password_hash': newPassword},
+      {'password_hash': _hashPassword(newPassword)},
       where: 'id = ?',
       whereArgs: [rows.first['id']],
     );

@@ -391,3 +391,39 @@ class EmptyState extends StatelessWidget {
     );
   }
 }
+
+/// Satu baris "label — nilai" untuk dialog rincian.
+///
+/// Sengaja dipakai bersama oleh dialog rincian hutang/piutang di dua layar —
+/// riwayat Kas dan halaman Hutang & Piutang. Kalau tiap layar punya salinannya
+/// sendiri, lebar labelnya bisa menyimpang tanpa ada yang sadar.
+Widget barisRincian(String label, String value, {bool tebal = false}) {
+  return Padding(
+    padding: const EdgeInsets.only(bottom: 7),
+    child: Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SizedBox(
+          width: 126,
+          child: Text(
+            label,
+            style: const TextStyle(
+              fontSize: 12,
+              color: AppColors.textSecondary,
+            ),
+          ),
+        ),
+        Expanded(
+          child: Text(
+            value,
+            style: TextStyle(
+              fontSize: 12.5,
+              fontWeight: tebal ? FontWeight.w700 : FontWeight.w500,
+              color: AppColors.textMain,
+            ),
+          ),
+        ),
+      ],
+    ),
+  );
+}

@@ -9,6 +9,7 @@ import '../../data/models/debt_model.dart';
 import '../../data/repositories/debt_repository.dart';
 import '../../providers/cash_provider.dart';
 import '../../shared/widgets/debt_detail_dialog.dart';
+import '../../shared/widgets/shared_widgets.dart';
 
 /// Layar Kas — saldo, mutasi uang masuk/keluar, dan riwayat lengkapnya.
 ///
@@ -940,38 +941,6 @@ class _CatatKasSheetState extends State<_CatatKasSheet> {
 
 // --------------------------------------------------------- dialog rincian kas
 
-/// Satu baris "label — nilai" di dalam dialog rincian.
-Widget _barisRincian(String label, String value, {bool tebal = false}) {
-  return Padding(
-    padding: const EdgeInsets.only(bottom: 7),
-    child: Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        SizedBox(
-          width: 126,
-          child: Text(
-            label,
-            style: const TextStyle(
-              fontSize: 12,
-              color: AppColors.textSecondary,
-            ),
-          ),
-        ),
-        Expanded(
-          child: Text(
-            value,
-            style: TextStyle(
-              fontSize: 12.5,
-              fontWeight: tebal ? FontWeight.w700 : FontWeight.w500,
-              color: AppColors.textMain,
-            ),
-          ),
-        ),
-      ],
-    ),
-  );
-}
-
 /// Dialog rincian untuk mutasi kas lain — penjualan, beban, prive, belanja
 /// stok, atau catatan manual.
 class _DialogDetailKas extends StatelessWidget {
@@ -1010,16 +979,16 @@ class _DialogDetailKas extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _barisRincian('Jenis', masuk ? 'Uang masuk' : 'Uang keluar'),
-            _barisRincian(
+            barisRincian('Jenis', masuk ? 'Uang masuk' : 'Uang keluar'),
+            barisRincian(
               'Jumlah',
               '${masuk ? '+' : '-'}${Formatters.rupiah(trx.amount)}',
               tebal: true,
             ),
-            _barisRincian('Tanggal', Formatters.dateTime(trx.date)),
-            _barisRincian('Kategori', trx.categoryLabel),
-            _barisRincian('Sumber', _labelSumber(trx.refType)),
-            if (catatan.isNotEmpty) _barisRincian('Keterangan', catatan),
+            barisRincian('Tanggal', Formatters.dateTime(trx.date)),
+            barisRincian('Kategori', trx.categoryLabel),
+            barisRincian('Sumber', _labelSumber(trx.refType)),
+            if (catatan.isNotEmpty) barisRincian('Keterangan', catatan),
           ],
         ),
       ),

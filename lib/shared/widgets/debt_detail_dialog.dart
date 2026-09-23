@@ -3,6 +3,7 @@ import '../../core/constants/app_colors.dart';
 import '../../core/utils/formatters.dart';
 import '../../data/models/debt_model.dart';
 import '../../data/repositories/debt_repository.dart';
+import 'shared_widgets.dart';
 
 /// Dialog rincian satu catatan hutang/piutang.
 ///
@@ -148,42 +149,42 @@ class DebtDetailDialog extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _barisRincian(_labelPihak, detail.partyName, tebal: true),
-            _barisRincian(
+            barisRincian(_labelPihak, detail.partyName, tebal: true),
+            barisRincian(
               'Jenis',
               _piutang ? 'Piutang pelanggan' : 'Hutang ke supplier',
             ),
-            if (telepon.isNotEmpty) _barisRincian('Telepon', telepon),
+            if (telepon.isNotEmpty) barisRincian('Telepon', telepon),
             if (detail.invoiceNumber.isNotEmpty)
-              _barisRincian('No. nota', detail.invoiceNumber),
+              barisRincian('No. nota', detail.invoiceNumber),
             const Divider(height: 20),
 
             if (_adaKonteksBayar) ...[
-              _barisRincian(
+              barisRincian(
                 'Dibayar sekarang',
                 Formatters.rupiah(paidNow!),
                 tebal: true,
               ),
               if (paidAt != null)
-                _barisRincian('Tanggal bayar', Formatters.dateTime(paidAt!)),
+                barisRincian('Tanggal bayar', Formatters.dateTime(paidAt!)),
               if (catatanBayar.isNotEmpty)
-                _barisRincian('Catatan', catatanBayar),
+                barisRincian('Catatan', catatanBayar),
               const Divider(height: 20),
             ],
 
-            _barisRincian('Nilai awal', Formatters.rupiah(detail.amount)),
-            _barisRincian(
+            barisRincian('Nilai awal', Formatters.rupiah(detail.amount)),
+            barisRincian(
               'Sudah dibayar',
               Formatters.rupiah(detail.paidAmount),
             ),
-            _barisRincian(
+            barisRincian(
               _piutang ? 'Sisa piutang' : 'Sisa hutang',
               Formatters.rupiah(detail.remaining),
               tebal: true,
             ),
-            _barisRincian('Status', detail.isLunas ? 'Lunas' : 'Belum lunas'),
+            barisRincian('Status', detail.isLunas ? 'Lunas' : 'Belum lunas'),
             if (detail.dueDate != null)
-              _barisRincian('Jatuh tempo', Formatters.date(detail.dueDate!)),
+              barisRincian('Jatuh tempo', Formatters.date(detail.dueDate!)),
 
             const Divider(height: 20),
             Row(
@@ -214,7 +215,7 @@ class DebtDetailDialog extends StatelessWidget {
             else ...[
               ...detail.goods.map(_barisBarang),
               const Divider(height: 14),
-              _barisRincian(
+              barisRincian(
                 'Total barang (${detail.goods.length} item)',
                 Formatters.rupiah(_totalBarang),
                 tebal: true,
@@ -223,7 +224,7 @@ class DebtDetailDialog extends StatelessWidget {
 
             if (detail.note != null && detail.note!.trim().isNotEmpty) ...[
               const Divider(height: 20),
-              _barisRincian('Catatan', detail.note!.trim()),
+              barisRincian('Catatan', detail.note!.trim()),
             ],
           ],
         ),
@@ -236,38 +237,6 @@ class DebtDetailDialog extends StatelessWidget {
       ],
     );
   }
-}
-
-/// Satu baris "label — nilai" di dalam dialog rincian.
-Widget _barisRincian(String label, String value, {bool tebal = false}) {
-  return Padding(
-    padding: const EdgeInsets.only(bottom: 7),
-    child: Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        SizedBox(
-          width: 126,
-          child: Text(
-            label,
-            style: const TextStyle(
-              fontSize: 12,
-              color: AppColors.textSecondary,
-            ),
-          ),
-        ),
-        Expanded(
-          child: Text(
-            value,
-            style: TextStyle(
-              fontSize: 12.5,
-              fontWeight: tebal ? FontWeight.w700 : FontWeight.w500,
-              color: AppColors.textMain,
-            ),
-          ),
-        ),
-      ],
-    ),
-  );
 }
 
 /// Satu barang di dalam daftar rincian: nama, jumlah × harga, lalu subtotal.

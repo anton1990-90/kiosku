@@ -6,6 +6,7 @@ import '../../core/constants/app_colors.dart';
 import '../../core/utils/formatters.dart';
 import '../../core/utils/responsive.dart';
 import '../../providers/auth_provider.dart';
+import '../../providers/backup_provider.dart';
 import '../../providers/dashboard_provider.dart';
 import '../../providers/product_provider.dart';
 import '../../providers/update_provider.dart';
@@ -33,7 +34,21 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
       ref.read(dashboardProvider.notifier).loadStats();
       ref.read(productProvider.notifier).loadProducts();
       await _periksaPembaruan();
+      await _cadangkanKalauWaktunya();
     });
+  }
+
+  /// Cadangan otomatis: dijalankan setiap kali beranda terbuka, tapi
+  /// `jalankanOtomatis` sendiri yang memutuskan — dia langsung keluar kalau
+  /// cadangan terakhir belum lewat 24 jam, atau kalau fiturnya dimatikan.
+  ///
+  /// Beranda dipilih sebagai pemicu karena inilah layar pertama yang muncul
+  /// setelah kunci PIN dibuka, jadi tidak perlu penjadwal latar belakang yang
+  /// belum tentu dijalankan Android.
+  Future<void> _cadangkanKalauWaktunya() async {
+    final user = ref.read(authProvider).user;
+    if (user == null) return;
+    await ref.read(backupProvider.notifier).jalankanOtomatis(user: user);
   }
 
   /// Periksa pembaruan lewat server aktivasi sendiri. Gagal dengan tenang

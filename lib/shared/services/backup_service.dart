@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 
 import '../../data/database/database_helper.dart';
@@ -19,6 +20,107 @@ import 'xlsx_builder.dart';
 class BackupService {
   BackupService._();
   static final BackupService instance = BackupService._();
+
+  /// Versi format berkas cadangan. Naikkan kalau isinya berubah bentuk,
+  /// supaya berkas lama masih bisa dikenali dan ditolak dengan jelas
+  /// daripada dipulihkan setengah jalan.
+  static const int formatCadangan = 1;
+
+  /// Urutan tabel untuk **pemulihan**: induk lebih dulu, anak belakangan.
+  ///
+  /// Kebalikan dari urutan penghapusan di `DatabaseHelper.resetBusinessData()`,
+  /// karena `PRAGMA foreign_keys = ON` aktif. Salah urutan = gagal kunci asing.
+  static const List<String> tabelCadangan = [
+    'products',
+    'suppliers',
+    'sales',
+    'debts',
+    'notes',
+    'cash_transactions',
+    'expenses',
+    'prive',
+    'stock_movements',
+    'debt_payments',
+    'sale_items',
+    'payment_methods',
+  ];
+
+  /// Urutan **penghapusan**: anak lebih dulu, baru induk.
+  ///
+  /// Sama persis dengan `resetBusinessData()`. `payment_methods` sengaja tidak
+  /// ikut dihapus — daftarnya sudah ada di setiap perangkat dan dipulihkan
+  /// dengan cara mencocokkan `code`, bukan dengan menghapus lalu menanam ulang.
+  static const List<String> urutanHapus = [
+    'sale_items',
+    'debt_payments',
+    'stock_movements',
+    'cash_transactions',
+    'expenses',
+    'prive',
+    'sales',
+    'debts',
+    'notes',
+    'suppliers',
+    'products',
+  ];
+
+  /// Susun seluruh data usaha sebagai peta yang siap diubah jadi JSON.
+  ///
+  /// Semua nilai diambil apa adanya dari database, jadi angka tetap angka dan
+  /// tanggal tetap teks ISO-8601. Tidak ada pembulatan atau pemformatan yang
+  /// bisa mengubah nilai aslinya.
+  Future<Map<String, dynamic>> susunData({required UserModel user}) async {
+    final db = await DatabaseHelper.instance.database;
+
+    final tabel = <String, List<Map<String, Object?>>>{};
+    for (final nama in tabelCadangan) {
+      tabel[nama] = await db.query(nama);
+    }
+
+    return {
+      'aplikasi': 'TokoKu',
+      'format': formatCadangan,
+      'dibuat': DateTime.now().toIso8601String(),
+      'toko': {
+        'nama': user.storeName,
+        'alamat': user.storeAddress,
+        'telepon': user.storePhone,
+        'logo': user.logoPath,
+        'qris': user.qrisPath,
+        'bankNama': user.bankName,
+        'bankNomor': user.bankAccountNumber,
+        'bankAtasNama': user.bankAccountName,
+      },
+      'jumlah': {
+        for (final entry in tabel.entries) entry.key: entry.value.length,
+      },
+      'tabel': tabel,
+    };
+  }
+
+  /// Tulis berkas cadangan JSON yang bisa dibaca kembali aplikasi.
+  ///
+  /// Ini yang dipakai fitur "Pulihkan data". Berkas `.xlsx` dari
+  /// [createBackup] tetap ada untuk dibuka di Excel, tapi tidak dipakai
+  /// memulihkan karena membacanya kembali butuh penafsir ZIP/XML sendiri.
+  ///
+  /// Kalau [otomatis] benar, namanya sengaja TETAP (`cadangan-otomatis.json`)
+  /// supaya cadangan harian saling menimpa dan tidak menumpuk ratusan berkas
+  /// di penyimpanan HP. Cadangan manual tetap memakai stempel waktu, jadi
+  /// beberapa salinan lama bisa disimpan berdampingan.
+  Future<File> createBackupJson({
+    required UserModel user,
+    bool otomatis = false,
+  }) async {
+    final data = await susunData(user: user);
+    final isi = const JsonEncoder.withIndent('  ').convert(data);
+    final nama = otomatis
+        ? 'cadangan-otomatis'
+        : ExportService.safeName(
+            'cadangan-${user.storeName}-${_stempelWaktu(DateTime.now())}',
+          );
+    return ExportService.instance.writeJson(filename: nama, isi: isi);
+  }
 
   /// Susun berkas backup dan simpan ke folder ekspor.
   Future<File> createBackup({required UserModel user}) async {

@@ -85,6 +85,24 @@ class ExportService {
     return file;
   }
 
+  /// Tulis berkas cadangan JSON.
+  ///
+  /// Berbeda dari `.xlsx` yang ditujukan untuk dibaca manusia lewat Excel,
+  /// berkas ini ditujukan untuk **dibaca kembali oleh aplikasi** saat memulihkan
+  /// data di perangkat baru. Formatnya sengaja JSON karena bisa ditulis dan
+  /// dibaca dengan `dart:convert` bawaan — tanpa pustaka tambahan, sehingga
+  /// tidak ada penafsir ZIP/XML buatan sendiri yang kalau salah bisa merusak
+  /// data pelanggan tanpa suara.
+  Future<File> writeJson({
+    required String filename,
+    required String isi,
+  }) async {
+    final dir = await _folder();
+    final file = File('${dir.path}/$filename.json');
+    await file.writeAsString(isi, encoding: utf8, flush: true);
+    return file;
+  }
+
   /// Buka menu bagikan untuk satu berkas.
   Future<void> share(
     File file, {

@@ -1,3 +1,4 @@
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -6,6 +7,7 @@ import '../../core/constants/app_colors.dart';
 import '../../core/utils/formatters.dart';
 import '../../core/utils/responsive.dart';
 import '../../providers/auth_provider.dart';
+import '../../providers/backup_provider.dart';
 import '../../providers/cash_provider.dart';
 import '../../providers/debt_provider.dart';
 import '../../providers/license_provider.dart';
@@ -18,6 +20,7 @@ import '../../providers/supplier_provider.dart';
 import '../../shared/services/backup_service.dart';
 import '../../shared/services/export_service.dart';
 import '../../shared/services/pin_service.dart';
+import '../../shared/services/restore_service.dart';
 import '../../providers/update_provider.dart';
 import '../../shared/widgets/shared_widgets.dart';
 import '../../shared/widgets/update_dialog.dart';
@@ -195,6 +198,246 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
         backgroundColor: AppColors.successMid,
       ),
     );
+  }
+
+  /// Waktu singkat untuk subjudul menu, mis. "hari ini 08.30".
+  static String _waktuSingkat(DateTime waktu) {
+    String dua(int v) => v.toString().padLeft(2, '0');
+    final sekarang = DateTime.now();
+    final hariSama = waktu.year == sekarang.year &&
+        waktu.month == sekarang.month &&
+        waktu.day == sekarang.day;
+    final jam = '${dua(waktu.hour)}.${dua(waktu.minute)}';
+    if (hariSama) return 'hari ini $jam';
+    return '${dua(waktu.day)}/${dua(waktu.month)} $jam';
+  }
+
+  /// Tanggal & jam dari teks ISO-8601 milik berkas cadangan.
+  static String _waktuLengkap(String iso) {
+    final waktu = DateTime.tryParse(iso);
+    if (waktu == null) return iso.isEmpty ? '-' : iso;
+    String dua(int v) => v.toString().padLeft(2, '0');
+    return '${dua(waktu.day)}/${dua(waktu.month)}/${waktu.year} '
+        '${dua(waktu.hour)}.${dua(waktu.minute)}';
+  }
+
+  /// Satu baris "label : nilai" di dalam dialog ringkasan.
+  Widget _barisRingkas(String label, String nilai) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 4),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 108,
+            child: Text(
+              label,
+              style: const TextStyle(
+                fontSize: 12.5,
+                color: AppColors.textSecondary,
+              ),
+            ),
+          ),
+          Expanded(
+            child: Text(
+              nilai,
+              style: const TextStyle(
+                fontSize: 12.5,
+                fontWeight: FontWeight.w600,
+                color: AppColors.textMain,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Buat berkas cadangan, lalu buka menu "Bagikan" supaya pemilik toko bisa
+  /// menyimpannya ke email, WhatsApp, atau Google Drive.
+  ///
+  /// Ini langkah yang membuat cadangan berguna: berkas yang hanya tersimpan di
+  /// dalam HP tidak menolong siapa pun kalau HP-nya hilang.
+  Future<void> _cadangkanData() async {
+    final user = ref.read(authProvider).user;
+    if (user == null) return;
+
+    final berkas = await ref
+        .read(backupProvider.notifier)
+        .cadangkanSekarang(user: user);
+    if (!mounted) return;
+
+    if (berkas == null) {
+      _pesan('Cadangan gagal dibuat.', gagal: true);
+      return;
+    }
+
+    await ExportService.instance.share(
+      berkas,
+      subject: 'Cadangan data ${user.storeName}',
+      text: 'Simpan berkas ini. Dipakai untuk memulihkan data di HP baru.',
+    );
+    if (!mounted) return;
+    _pesan('Cadangan dibuat. Simpan berkasnya ke email atau Google Drive.');
+  }
+
+  /// Minta password akun. Mengembalikan password yang SUDAH terbukti benar,
+  /// atau `null` kalau dibatalkan maupun salah.
+  Future<String?> _mintaPassword() async {
+    final controller = TextEditingController();
+
+    final diketik = await showDialog<String>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Konfirmasi password'),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          obscureText: true,
+          decoration: const InputDecoration(labelText: 'Password akun'),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Batal'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(dialogContext, controller.text),
+            child: const Text('Pulihkan'),
+          ),
+        ],
+      ),
+    );
+
+    controller.dispose();
+
+    if (diketik == null || diketik.isEmpty) return null;
+
+    final benar = await ref.read(authProvider.notifier).verifyPassword(diketik);
+    if (!mounted) return null;
+    if (!benar) {
+      _pesan('Password salah. Tidak ada data yang diubah.', gagal: true);
+      return null;
+    }
+    return diketik;
+  }
+
+  /// Ambil kembali data usaha dari berkas cadangan.
+  ///
+  /// Meminta password lebih dulu karena tindakan ini **mengganti** seluruh
+  /// data usaha yang ada di perangkat ini.
+  Future<void> _pulihkanData() async {
+    final pilihan = await FilePicker.platform.pickFiles(
+      type: FileType.any,
+      withData: false,
+    );
+    final path = pilihan?.files.single.path;
+    if (path == null || !mounted) return;
+
+    // Diperiksa lebih dulu TANPA mengubah apa pun, supaya berkas yang salah
+    // ketahuan sebelum ada data yang tersentuh.
+    final RingkasanCadangan ringkas;
+    try {
+      ringkas = await RestoreService.instance.periksa(path);
+    } on FormatException catch (e) {
+      if (!mounted) return;
+      _pesan(e.message, gagal: true);
+      return;
+    }
+    if (!mounted) return;
+
+    final lanjut = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Pulihkan data?'),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Seluruh data usaha di HP ini akan DIGANTI oleh isi berkas '
+                'cadangan.',
+                style: TextStyle(
+                  fontSize: 13,
+                  height: 1.5,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.danger,
+                ),
+              ),
+              const SizedBox(height: 14),
+              _barisRingkas('Dibuat', _waktuLengkap(ringkas.dibuat)),
+              if (ringkas.namaToko.isNotEmpty)
+                _barisRingkas('Nama toko', ringkas.namaToko),
+              _barisRingkas('Produk', '${ringkas.jumlah['products'] ?? 0}'),
+              _barisRingkas('Penjualan', '${ringkas.jumlah['sales'] ?? 0}'),
+              _barisRingkas(
+                'Item penjualan',
+                '${ringkas.jumlah['sale_items'] ?? 0}',
+              ),
+              _barisRingkas(
+                'Hutang & piutang',
+                '${ringkas.jumlah['debts'] ?? 0}',
+              ),
+              _barisRingkas('Kas', '${ringkas.jumlah['cash_transactions'] ?? 0}'),
+              _barisRingkas('Total baris', '${ringkas.totalBaris}'),
+              const SizedBox(height: 12),
+              const Text(
+                'Akun Anda (email & password) tidak ikut berubah.',
+                style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Batal'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.danger),
+            child: const Text('Lanjut'),
+          ),
+        ],
+      ),
+    );
+
+    if (lanjut != true || !mounted) return;
+
+    final password = await _mintaPassword();
+    if (password == null || !mounted) return;
+
+    final user = ref.read(authProvider).user;
+    if (user == null) return;
+
+    try {
+      final hasil = await RestoreService.instance.pulihkan(
+        path: path,
+        user: user,
+      );
+      if (!mounted) return;
+
+      // Muat ulang seluruh daftar supaya layar langsung menampilkan data
+      // hasil pemulihan, tanpa perlu menutup aplikasi.
+      ref.read(productProvider.notifier).loadProducts();
+      ref.read(cashProvider.notifier).load();
+      ref.read(saleProvider.notifier).loadSales();
+      ref.read(debtProvider.notifier).loadDebts();
+      ref.read(noteProvider.notifier).loadNotes();
+      ref.read(supplierProvider.notifier).loadSuppliers();
+      await ref.read(authProvider.notifier).refreshUser();
+
+      if (!mounted) return;
+      _pesan('${hasil.totalBaris} baris data berhasil dipulihkan.');
+    } catch (_) {
+      // RestoreService memakai satu transaksi, jadi kegagalan di tengah jalan
+      // sudah membatalkan seluruhnya — data lama tetap utuh.
+      if (!mounted) return;
+      _pesan('Pemulihan gagal. Data lama Anda tidak berubah.', gagal: true);
+    }
   }
 
   Future<void> _logout() async {
@@ -433,6 +676,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   @override
   Widget build(BuildContext context) {
     final authState = ref.watch(authProvider);
+    final backupState = ref.watch(backupProvider);
     final productState = ref.watch(productProvider);
     final salesAsync = ref.watch(saleProvider);
     final licenseState = ref.watch(licenseProvider);
@@ -724,11 +968,42 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                         _MenuItem(
                           icon: Icons.backup_outlined,
                           color: AppColors.successMid,
-                          title: 'Backup semua data',
-                          subtitle: 'Simpan ke Excel, dipisah per lembar '
+                          title: 'Backup ke Excel',
+                          subtitle: 'Untuk dibuka di Excel, dipisah per lembar '
                               '(produk, penjualan, kas, hutang, dll.)',
                           trailing: Icons.chevron_right,
                           onTap: _backupData,
+                        ),
+                        _MenuItem(
+                          icon: Icons.save_alt,
+                          color: AppColors.primary,
+                          title: 'Cadangkan data',
+                          subtitle: 'Berkas untuk memulihkan di HP baru',
+                          trailing: Icons.chevron_right,
+                          onTap: backupState.sedangJalan ? null : _cadangkanData,
+                        ),
+                        _MenuItem(
+                          icon: Icons.settings_backup_restore,
+                          color: AppColors.infoMid,
+                          title: 'Pulihkan data',
+                          subtitle: 'Ambil kembali data dari berkas cadangan',
+                          trailing: Icons.chevron_right,
+                          onTap: _pulihkanData,
+                        ),
+                        _MenuItem(
+                          icon: Icons.schedule,
+                          color: AppColors.warning,
+                          title: 'Cadangan otomatis',
+                          subtitle: backupState.otomatis
+                              ? (backupState.terakhir == null
+                                  ? 'Menyala — belum pernah dibuat'
+                                  : 'Menyala — terakhir '
+                                      '${_waktuSingkat(backupState.terakhir!)}')
+                              : 'Mati — cadangan tidak dibuat otomatis',
+                          toggle: backupState.otomatis,
+                          onToggle: (nilai) => ref
+                              .read(backupProvider.notifier)
+                              .setOtomatis(nilai),
                         ),
                         _MenuItem(
                           icon: Icons.delete_forever_outlined,
@@ -765,7 +1040,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                       ],
                     ),
                     const SizedBox(height: 20),
-                    const _MenuGroupTitle('Keamanan'),
+                    const _MenuGroupTitle('Kunci layar'),
                     _MenuCard(
                       children: [
                         _MenuItem(

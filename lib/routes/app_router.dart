@@ -22,6 +22,7 @@ import '../features/dashboard/dashboard_screen.dart';
 import '../features/kas/kas_screen.dart';
 import '../features/kasir/kasir_screen.dart';
 import '../features/produk/produk_screen.dart';
+import '../features/profile/customer_screen.dart';
 import '../features/profile/help_screen.dart';
 import '../features/profile/payment_methods_screen.dart';
 import '../features/profile/store_info_screen.dart';
@@ -190,6 +191,11 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/profile/supplier',
         name: 'supplier',
         builder: (context, state) => const SupplierScreen(),
+      ),
+      GoRoute(
+        path: '/profile/pelanggan',
+        name: 'pelanggan',
+        builder: (context, state) => const CustomerScreen(),
       ),
       // Panduan pemakaian & tanya-jawab. Isinya ditulis di dalam aplikasi,
       // jadi tetap terbaca tanpa internet.

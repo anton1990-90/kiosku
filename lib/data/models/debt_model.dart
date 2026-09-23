@@ -29,6 +29,14 @@ class DebtModel {
   final int? supplierId; // terisi kalau terkait supplier
   final int? saleId; // terisi kalau berasal dari transaksi penjualan
   final int? productId; // terisi kalau hutang ini untuk satu produk
+
+  /// Terisi kalau pelanggannya ada di buku pelanggan.
+  ///
+  /// Hanya **penghubung**: nama yang ditampilkan tetap dibaca dari
+  /// [partyName], yang merupakan rekaman saat catatan ini dibuat. Dengan
+  /// begitu mengganti nama pelanggan tidak mengubah catatan lama.
+  final int? customerId;
+
   final DateTime createdAt;
   final DateTime updatedAt;
 
@@ -45,6 +53,7 @@ class DebtModel {
     this.supplierId,
     this.saleId,
     this.productId,
+    this.customerId,
     required this.createdAt,
     required this.updatedAt,
   });
@@ -89,6 +98,7 @@ class DebtModel {
       'supplier_id': supplierId,
       'sale_id': saleId,
       'product_id': productId,
+      'customer_id': customerId,
       'created_at': createdAt.toIso8601String(),
       'updated_at': updatedAt.toIso8601String(),
     };
@@ -109,6 +119,7 @@ class DebtModel {
       supplierId: map['supplier_id'] as int?,
       saleId: map['sale_id'] as int?,
       productId: map['product_id'] as int?,
+      customerId: map['customer_id'] as int?,
       createdAt: DateTime.parse(map['created_at'] as String),
       updatedAt: DateTime.parse(map['updated_at'] as String),
     );
@@ -127,6 +138,7 @@ class DebtModel {
     int? supplierId,
     int? saleId,
     int? productId,
+    int? customerId,
     DateTime? createdAt,
     DateTime? updatedAt,
   }) {
@@ -143,6 +155,7 @@ class DebtModel {
       supplierId: supplierId ?? this.supplierId,
       saleId: saleId ?? this.saleId,
       productId: productId ?? this.productId,
+      customerId: customerId ?? this.customerId,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
     );

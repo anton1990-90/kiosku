@@ -1,4 +1,4 @@
-# TokoKu — Aplikasi UMKM Toko Sembako & Penjualan (v1.14.0)
+# TokoKu — Aplikasi UMKM Toko Sembako & Penjualan (v1.15.0)
 
 Aplikasi mobile cross-platform (Android & iOS) untuk toko sembako UMKM. Dibuat dengan Flutter, bekerja **offline-first** dengan autentikasi email.
 
@@ -20,8 +20,9 @@ Aplikasi mobile cross-platform (Android & iOS) untuk toko sembako UMKM. Dibuat d
 - **Kas**: Satu buku kas untuk semua uang masuk & keluar. Beranda menampilkan saldo kas di tengah, uang keluar di kiri bawah, uang masuk di kanan bawah. Setiap penjualan, pembayaran hutang/piutang, restok, beban, dan prive tercatat otomatis — plus riwayat lengkap dan pencatatan manual.
 - **Laporan keuangan standar akuntansi**: **Laba rugi**, **perubahan ekuitas**, **neraca**, dan **arus kas**, semuanya bisa diekspor ke PDF & CSV. Ada juga pencatatan **beban usaha** dan **prive** (pengambilan pemilik).
 - **Hutang & piutang**: Catat piutang pelanggan dan hutang ke supplier, cicilan pembayaran, riwayat bayar, serta peringatan jatuh tempo. Terhubung ke stok produk: restok yang belum dibayar penuh otomatis jadi hutang supplier, dan transaksi yang belum dibayar penuh jadi piutang pelanggan (dengan ceklist "Transaksi ini hutang?" di layar kasir).
+- **Data pelanggan**: Buku pelanggan yang bisa ditambah, diedit, dan dihapus — nama, nomor HP, alamat, dan catatan. Tiap pelanggan menampilkan **sisa piutang** dan **total belanjanya**, dan nomor HP-nya bisa langsung dibuka di WhatsApp. Piutang dari nota kasir maupun yang dicatat manual otomatis terhubung ke pelanggannya, dan nama yang belum ada di buku akan ditambahkan sendiri. Nama pelanggan tetap terekam apa adanya di setiap nota, jadi mengganti namanya **tidak mengubah struk dan laporan yang sudah terbit** — dan menghapus pelanggan **tidak menghapus riwayat transaksinya**.
 - **Catatan**: Catatan bebas berwarna untuk pemilik toko, bisa disematkan (pin).
-- **Profile**: Logo usaha bisa diganti dari galeri, info toko, metode pembayaran yang bisa diaktifkan/dinonaktifkan, daftar supplier yang bisa diedit, serta pintasan ke **Kas** dan **Laporan Keuangan**.
+- **Profile**: Logo usaha bisa diganti dari galeri, info toko, metode pembayaran yang bisa diaktifkan/dinonaktifkan, daftar supplier dan **daftar pelanggan** yang bisa diedit, serta pintasan ke **Kas** dan **Laporan Keuangan**.
 - **Lisensi & pembaruan**: Aktivasi satu perangkat, plus notifikasi otomatis saat ada versi baru.
 
 ## Prasyarat
@@ -152,17 +153,18 @@ cloudflare/                          # Server aktivasi lisensi (Worker + D1)
 
 ## Skema Database (SQLite)
 
-Versi skema: **7**. Migrasi berjalan otomatis dan tidak menghapus data yang sudah ada — kolom baru selalu ditambahkan lewat `ALTER TABLE`, sedangkan tabel lama tidak pernah ditulis ulang.
+Versi skema: **8**. Migrasi berjalan otomatis dan tidak menghapus data yang sudah ada — kolom baru selalu ditambahkan lewat `ALTER TABLE`, sedangkan tabel lama tidak pernah ditulis ulang.
 
 | Table | Purpose |
 |-------|---------|
 | `users` | Akun dengan email, password hash, nama toko, telepon toko, path logo |
 | `products` | Produk dengan nama, kategori, harga modal/jual, stok, satuan, dan path foto |
-| `sales` | Transaksi dengan invoice number, total, laba, metode bayar, penanda hutang, potongan nota, **status** (`selesai`/`batal`), dan **alasan pembatalan** |
+| `sales` | Transaksi dengan invoice number, total, laba, metode bayar, penanda hutang, potongan nota, **status** (`selesai`/`batal`), **alasan pembatalan**, dan penghubung `customer_id` |
 | `sale_items` | Line items per transaksi (product, qty, satuan saat terjual, subtotal setelah potongan, potongan baris) |
 | `suppliers` | Data pemasok yang bisa diedit |
+| `customers` | **Buku pelanggan** — nama, nomor HP, alamat, catatan yang bisa diedit |
 | `payment_methods` | Metode pembayaran yang bisa diaktifkan/dinonaktifkan |
-| `debts` | Piutang pelanggan & hutang ke supplier (terhubung ke `sale_id` / `product_id`) |
+| `debts` | Piutang pelanggan & hutang ke supplier (terhubung ke `sale_id` / `product_id` / `customer_id`) |
 | `debt_payments` | Riwayat pembayaran cicilan hutang |
 | `notes` | Catatan bebas pemilik toko |
 | `cash_transactions` | **Buku kas** — satu-satunya sumber saldo, uang masuk/keluar, dan arus kas |
@@ -225,6 +227,40 @@ itu. Nilai awal itulah yang menentukan nasib seluruh riwayat penjualan yang
 sudah ada — kalau salah, semua transaksi lama langsung hilang dari setiap
 laporan tanpa galat apa pun. Karena itu nilainya dikunci oleh pemeriksa statis
 dan diuji-negatif.
+
+### Catatan buku pelanggan
+
+`customers` menyimpan identitas pelanggan: nama, nomor HP, alamat, dan catatan.
+Ia menjawab dua pertanyaan yang sebelumnya tidak bisa dijawab aplikasi ini:
+**siapa saja yang masih berhutang**, dan **bagaimana cara menghubunginya**.
+Sebelum v1.15.0 nama pelanggan hanya tersimpan sebagai teks bebas di tiap
+catatan piutang, sehingga "Bu Siti" dan "bu siti" tampak seperti dua orang yang
+berbeda dan nomor HP-nya tidak tersimpan di mana pun.
+
+`debts.customer_id` dan `sales.customer_id` hanyalah **penghubung**. Nama
+pelanggan tetap disimpan apa adanya di `debts.party_name` dan
+`sales.customer_name` — perlakuan yang sama dengan `sale_items.unit` yang
+menyimpan satuan saat barang terjual. Jadi **mengganti nama pelanggan tidak
+mengubah struk, riwayat, dan laporan yang sudah terbit**, dan tidak ada berkas
+di luar `customer_repository.dart` yang boleh membaca nama pelanggan lewat
+`FROM customers`. Aturan itu dikunci oleh pemeriksa statis dan diuji-negatif.
+
+Nama cadangan `'Pelanggan'` untuk pembeli tanpa nama **tidak** ikut dipindahkan
+ke buku pelanggan: kalau ikut, semua pembeli tanpa nama akan menumpuk jadi satu
+pelanggan palsu. Nilainya ditulis di satu tempat saja
+(`DatabaseHelper.namaPelangganUmum`).
+
+Pengaitannya dilakukan berdasarkan **nama yang diketik**, di dalam transaksi
+penyimpanan yang sama dengan nota atau catatan piutangnya — bukan dari pilihan
+dropdown, yang bisa tertinggal kalau namanya diubah setelah memilih. Nama yang
+belum ada di buku pelanggan akan ditambahkan otomatis, sehingga bukunya terisi
+dari pemakaian sehari-hari.
+
+**Menghapus pelanggan tidak menghapus riwayatnya.** Penghubungnya dikosongkan
+di `debts` dan `sales`, lalu barisnya dihapus — riwayat penjualan dan piutang
+adalah catatan uang, bukan data pelanggan. Buku pelanggan juga ikut
+dicadangkan (`BackupService.tabelCadangan`) dan ikut dikosongkan saat
+memulihkan, dengan urutan yang sama persis dengan "Reset semua data".
 
 ## Palet Warna
 

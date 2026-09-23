@@ -1,7 +1,13 @@
 # Roadmap Fitur TokoKu
 
 Disusun 23 September 2026, berdasarkan pembacaan langsung kode di `lib/`
-(pubspec saat ini: `1.11.0+17`, skema database versi 4, 14 tabel).
+(pubspec saat itu: `1.11.0+17`, skema database versi 4, 14 tabel).
+
+> **Catatan pemutakhiran.** Nomor skema di tiap usulan di bawah ditulis saat
+> dokumen ini disusun, ketika versi skema masih 4 — jadi semuanya berbunyi
+> "versi 5". Versi skema sekarang **8** (v1.15.0), dan usulan yang belum
+> dikerjakan akan memakai versi berikutnya, bukan 5. Bagian yang sudah
+> dikerjakan ditandai di judulnya.
 
 Dokumen ini **hanya memuat yang belum ada**. Semua fitur di bagian
 "Sudah ada — jangan diusulkan lagi" sudah terverifikasi ada di kode.
@@ -113,24 +119,26 @@ kesalahan pembulatan di sini langsung merusak laporan.
 
 ---
 
-## 5. Data pelanggan tetap
+## 5. Data pelanggan tetap — **SELESAI di v1.15.0**
 
-**Kondisi sekarang.** Tidak ada tabel pelanggan. `sales.customer_name` dan
-`debts.party_name` keduanya teks bebas.
+**Kondisi sekarang.** Sudah ada tabel `customers` (nama, telepon, alamat,
+catatan) beserta layar "Pelanggan" di menu Profil. `debts.customer_id` dan
+`sales.customer_id` mengaitkan catatan dan nota ke buku pelanggan, sementara
+`sales.customer_name` dan `debts.party_name` tetap menyimpan nama apa adanya
+sebagai rekaman saat transaksi terjadi.
 
-**Masalah nyata.** "Bu Ani", "bu ani", dan "Ani" tercatat sebagai tiga orang
-berbeda. Pertanyaan "berapa total hutang Bu Ani?" tidak bisa dijawab dengan
-yakin — padahal piutang adalah fitur yang sudah ada dan dipakai.
+**Masalah yang dulu ada.** "Bu Ani", "bu ani", dan "Ani" tercatat sebagai tiga
+orang berbeda. Pertanyaan "berapa total hutang Bu Ani?" tidak bisa dijawab
+dengan yakin — padahal piutang adalah fitur yang sudah ada dan dipakai.
 
-**Rancangan.** Tabel `customers` (nama, telepon, catatan), kolom
-`customer_id` pada `sales` dan `debts`. Teks bebas tetap dipertahankan
-sebagai cadangan supaya data lama tidak hilang. Tambahkan pemilih pelanggan
-di kasir dan di form hutang.
+**Yang dikerjakan.** Nama pelanggan dari catatan piutang lama dipindahkan
+sekali saat migrasi (nama cadangan `'Pelanggan'` sengaja dilewati), pengaitannya
+dilakukan berdasarkan nama di dalam transaksi penyimpanan, dan daftar
+pelanggannya menampilkan sisa piutang serta total belanja per orang.
 
-Nilai tambah setelah ini ada: harga khusus pelanggan tetap, dan rekap
-belanja per pelanggan.
+Nilai tambah setelah ini tinggal: harga khusus pelanggan tetap.
 
-**Usaha:** sedang. **Skema:** versi 5.
+**Usaha:** sedang. **Skema:** versi 8 (selesai).
 
 ---
 
@@ -148,7 +156,7 @@ kemudian dan tidak bisa ditelusuri ke siapa.
 fisik yang dihitung, selisih, waktu, catatan) dan satu layar tutup kasir.
 Setiap transaksi diberi `session_id` supaya bisa direkap per sesi.
 
-**Usaha:** sedang. **Skema:** versi 5.
+**Usaha:** sedang. **Skema:** versi 9.
 
 ---
 

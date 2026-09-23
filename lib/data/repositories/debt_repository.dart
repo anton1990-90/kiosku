@@ -3,6 +3,7 @@ import '../database/database_helper.dart';
 import '../models/cash_model.dart';
 import '../models/debt_model.dart';
 import 'cash_repository.dart';
+import 'customer_repository.dart';
 
 /// Repositori hutang / piutang. Semua data lokal (offline).
 ///
@@ -12,6 +13,7 @@ import 'cash_repository.dart';
 class DebtRepository {
   final DatabaseHelper _db = DatabaseHelper.instance;
   final CashRepository _cash = CashRepository();
+  final CustomerRepository _customer = CustomerRepository();
 
   Future<List<DebtModel>> getAll({
     String? type,
@@ -57,19 +59,49 @@ class DebtRepository {
     return DebtModel.fromMap(results.first);
   }
 
+  /// Peta kolom untuk disimpan, dengan penghubung pelanggan yang sudah
+  /// dipastikan.
+  ///
+  /// Piutang dikaitkan ke buku pelanggan **berdasarkan nama yang diketik**,
+  /// bukan berdasarkan pilihan dropdown yang bisa tertinggal: kalau pengguna
+  /// memilih "Bu Siti" lalu mengetik ulang namanya, yang tersimpan harus tetap
+  /// konsisten dengan nama yang tampil di layar. Pelanggan baru dibuat di
+  /// dalam transaksi yang sama supaya tidak ada piutang yang menunjuk
+  /// pelanggan yang gagal tersimpan.
+  ///
+  /// Hutang (sisi supplier) tidak pernah dikaitkan ke pelanggan, jadi
+  /// penghubungnya dipastikan kosong — termasuk saat jenis catatan diubah dari
+  /// piutang menjadi hutang.
+  Future<Map<String, dynamic>> _petaDenganPelanggan(
+    DatabaseExecutor txn,
+    DebtModel debt,
+  ) async {
+    final peta = debt.toMap();
+    if (debt.type == DebtType.piutang) {
+      peta['customer_id'] =
+          await _customer.pastikanPelanggan(txn, debt.partyName);
+    } else {
+      peta['customer_id'] = null;
+    }
+    return peta;
+  }
+
   Future<int> insert(DebtModel debt) async {
     final db = await _db.database;
-    return await db.insert('debts', debt.toMap());
+    return await db.transaction((txn) async {
+      return txn.insert('debts', await _petaDenganPelanggan(txn, debt));
+    });
   }
 
   Future<int> update(DebtModel debt) async {
     final db = await _db.database;
-    return await db.update(
-      'debts',
-      debt.copyWith(updatedAt: DateTime.now()).toMap(),
-      where: 'id = ?',
-      whereArgs: [debt.id],
-    );
+    return await db.transaction((txn) async {
+      final peta = await _petaDenganPelanggan(
+        txn,
+        debt.copyWith(updatedAt: DateTime.now()),
+      );
+      return txn.update('debts', peta, where: 'id = ?', whereArgs: [debt.id]);
+    });
   }
 
   Future<int> delete(int id) async {

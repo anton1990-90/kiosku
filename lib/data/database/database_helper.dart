@@ -25,12 +25,18 @@ import 'package:sqflite/sqflite.dart';
 ///       sales.cancel_reason. Dua view ditambahkan: `sales_aktif` (hanya yang
 ///       tidak dibatalkan) dan `sales_semua` (semua, untuk struk & cadangan).
 ///       Seluruh laporan membaca `sales_aktif`.
+///   8 — + data pelanggan: tabel `customers` (nama, HP, alamat, catatan) dan
+///       kolom penghubung `debts.customer_id` + `sales.customer_id`. Nama
+///       pelanggan TETAP disimpan apa adanya di `debts.party_name` dan
+///       `sales.customer_name` sebagai rekaman saat transaksi terjadi — sama
+///       seperti `sale_items.unit`. Jadi mengganti nama pelanggan tidak
+///       mengubah struk dan laporan yang sudah ada.
 class DatabaseHelper {
   DatabaseHelper._();
   static final DatabaseHelper instance = DatabaseHelper._();
 
   static const _dbName = 'tokoku.db';
-  static const _dbVersion = 7;
+  static const _dbVersion = 8;
 
   Database? _database;
 
@@ -62,6 +68,7 @@ class DatabaseHelper {
     await _upgradeV5(db);
     await _upgradeV6(db);
     await _upgradeV7(db);
+    await _upgradeV8(db);
     await _seedProducts(db);
     await _seedPaymentMethods(db);
   }
@@ -408,6 +415,103 @@ class DatabaseHelper {
     ''');
   }
 
+  /// Nama yang dipakai transaksi hutang tanpa nama pelanggan.
+  ///
+  /// Disimpan sebagai konstanta supaya aturan "jangan jadikan ini pelanggan"
+  /// hanya ditulis di satu tempat. Nilainya **harus sama** dengan yang ditulis
+  /// `SaleRepository.createSale` saat pelanggan tidak diisi.
+  static const namaPelangganUmum = 'Pelanggan';
+
+  /// Kolom versi 8 — data pelanggan.
+  ///
+  /// `customers` adalah buku pelanggan: nama, nomor HP, alamat, catatan.
+  /// Sebelumnya aplikasi ini tidak bisa menjawab dua pertanyaan yang wajar
+  /// ditanyakan pemilik toko: "siapa saja yang masih berhutang?" dan "berapa
+  /// nomor HP orang yang berhutang itu?". Nama pelanggan memang sudah
+  /// tersimpan, tetapi sebagai teks bebas di tiap catatan, sehingga "Bu Siti"
+  /// dan "bu siti" tampak seperti dua orang yang berbeda.
+  ///
+  /// `debts.customer_id` dan `sales.customer_id` hanya **penghubung**. Nama
+  /// pelanggan tetap disimpan apa adanya di `debts.party_name` dan
+  /// `sales.customer_name` — perlakuan yang sama dengan `sale_items.unit`
+  /// yang menyimpan satuan saat barang terjual. Jadi mengganti nama pelanggan
+  /// tidak mengubah struk, riwayat, dan laporan yang sudah ada.
+  ///
+  /// Keduanya sengaja **tanpa foreign key**: kolom hasil `ALTER TABLE` tidak
+  /// bisa membawa constraint di SQLite, dan menghapus pelanggan memang tidak
+  /// boleh menghapus riwayat transaksinya. Karena itu
+  /// `CustomerRepository.delete` hanya mengosongkan penghubungnya.
+  Future<void> _upgradeV8(Database db) async {
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS customers (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        phone TEXT,
+        address TEXT,
+        note TEXT,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      )
+    ''');
+    await _addColumnIfMissing(db, 'debts', 'customer_id', 'INTEGER');
+    await _addColumnIfMissing(db, 'sales', 'customer_id', 'INTEGER');
+    await _pindahkanPelangganLama(db);
+  }
+
+  /// Pindahkan nama pelanggan dari catatan piutang lama ke tabel `customers`.
+  ///
+  /// Dijalankan sekali di dalam migrasi v8, supaya pemilik toko yang sudah
+  /// punya banyak catatan piutang langsung melihat buku pelanggannya terisi
+  /// dan tidak perlu mengetik ulang satu per satu. Pada database baru tabel
+  /// `debts` masih kosong, jadi ini tidak melakukan apa-apa.
+  ///
+  /// `'Pelanggan'` (nama cadangan untuk hutang tanpa nama) sengaja dilewati:
+  /// kalau tidak, semua pembeli tanpa nama akan menumpuk jadi satu pelanggan
+  /// palsu yang justru mengaburkan data.
+  Future<void> _pindahkanPelangganLama(Database db) async {
+    final baris = await db.rawQuery('''
+      SELECT TRIM(party_name) AS nama, MAX(party_phone) AS telepon
+      FROM debts
+      WHERE type = 'piutang'
+        AND party_name IS NOT NULL
+        AND TRIM(party_name) <> ''
+        AND TRIM(party_name) <> ?
+      GROUP BY TRIM(party_name)
+    ''', [namaPelangganUmum]);
+
+    final now = DateTime.now().toIso8601String();
+    for (final r in baris) {
+      final nama = (r['nama'] as String?)?.trim() ?? '';
+      if (nama.isEmpty) continue;
+
+      // Sudah pernah dipindahkan? Jangan digandakan.
+      final ada = await db.query(
+        'customers',
+        columns: ['id'],
+        where: 'name = ?',
+        whereArgs: [nama],
+        limit: 1,
+      );
+
+      final telepon = (r['telepon'] as String?)?.trim();
+      final id = ada.isNotEmpty
+          ? ada.first['id'] as int
+          : await db.insert('customers', {
+              'name': nama,
+              'phone': (telepon == null || telepon.isEmpty) ? null : telepon,
+              'created_at': now,
+              'updated_at': now,
+            });
+
+      await db.update(
+        'debts',
+        {'customer_id': id},
+        where: "type = 'piutang' AND TRIM(party_name) = ?",
+        whereArgs: [nama],
+      );
+    }
+  }
+
   /// Migrasi dari versi lama. Data yang sudah ada tidak boleh hilang.
   Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
     if (oldVersion < 2) {
@@ -430,6 +534,9 @@ class DatabaseHelper {
     }
     if (oldVersion < 7) {
       await _upgradeV7(db);
+    }
+    if (oldVersion < 8) {
+      await _upgradeV8(db);
     }
   }
 
@@ -454,6 +561,7 @@ class DatabaseHelper {
       'prive',
       'sales',
       'debts',
+      'customers',
       'notes',
       'suppliers',
       'products',

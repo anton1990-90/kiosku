@@ -4,6 +4,7 @@ import '../models/cash_model.dart';
 import '../models/debt_model.dart';
 import '../models/sale_item_model.dart';
 import '../models/sale_model.dart';
+import 'customer_repository.dart';
 
 /// Sale repository — handles transaction creation and history queries.
 /// All offline: transactions are stored locally in SQLite.
@@ -15,8 +16,11 @@ import '../models/sale_model.dart';
 ///   * `stock_movements`      — jejak stok keluar
 ///   * `cash_transactions`    — uang yang benar-benar diterima
 ///   * `debts`                — piutang, kalau pelanggan belum bayar penuh
+///   * `customers`            — dikaitkan lewat `customer_id`, dibuat kalau
+///                              namanya belum ada di buku pelanggan
 class SaleRepository {
   final DatabaseHelper _db = DatabaseHelper.instance;
+  final CustomerRepository _customerRepo = CustomerRepository();
 
   /// Create a new sale transaction with all line items.
   /// Also reduces product stock for each item.
@@ -88,7 +92,14 @@ class SaleRepository {
     int? debtId;
 
     await db.transaction((txn) async {
-      saleId = await txn.insert('sales', sale.toMap());
+      // Pelanggan dikaitkan di dalam transaksi yang sama: kalau penjualannya
+      // gagal di tengah jalan, pelanggan yang baru dibuat pun ikut batal
+      // tersimpan — buku pelanggan tidak terisi nama dari nota yang tidak ada.
+      final customerId =
+          await _customerRepo.pastikanPelanggan(txn, customerName);
+      final petaSale = sale.toMap();
+      if (customerId != null) petaSale['customer_id'] = customerId;
+      saleId = await txn.insert('sales', petaSale);
 
       for (final item in items) {
         await txn.insert('sale_items', {
@@ -117,7 +128,7 @@ class SaleRepository {
       if (catatPiutang) {
         debtId = await txn.insert('debts', {
           'party_name': (customerName == null || customerName.trim().isEmpty)
-              ? 'Pelanggan'
+              ? DatabaseHelper.namaPelangganUmum
               : customerName.trim(),
           'type': DebtType.piutang,
           'amount': totalAmount,
@@ -126,6 +137,7 @@ class SaleRepository {
           'due_date': dueDate?.toIso8601String(),
           'status': DebtStatus.belumLunas,
           'sale_id': saleId,
+          'customer_id': customerId,
           'product_id': items.length == 1 ? items.first.productId : null,
           'created_at': now.toIso8601String(),
           'updated_at': now.toIso8601String(),

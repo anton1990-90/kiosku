@@ -16,6 +16,7 @@ import '../../providers/payment_method_provider.dart';
 import '../../providers/pin_provider.dart';
 import '../../providers/product_provider.dart';
 import '../../providers/sale_provider.dart';
+import '../../providers/customer_provider.dart';
 import '../../providers/supplier_provider.dart';
 import '../../shared/services/backup_service.dart';
 import '../../shared/services/export_service.dart';
@@ -849,6 +850,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     final licenseState = ref.watch(licenseProvider);
     final debtState = ref.watch(debtProvider);
     final noteState = ref.watch(noteProvider);
+    final customerState = ref.watch(customerProvider);
     final supplierState = ref.watch(supplierProvider);
     final paymentState = ref.watch(paymentMethodProvider);
     final cashState = ref.watch(cashProvider);
@@ -1026,6 +1028,16 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                               : '${supplierState.suppliers.length} supplier terdaftar',
                           trailing: Icons.chevron_right,
                           onTap: () => context.push('/profile/supplier'),
+                        ),
+                        _MenuItem(
+                          icon: Icons.person_outline,
+                          color: AppColors.primaryMid,
+                          title: 'Pelanggan',
+                          subtitle: customerState.pelanggan.isEmpty
+                              ? 'Kelola data pelanggan'
+                              : '${customerState.pelanggan.length} pelanggan terdaftar',
+                          trailing: Icons.chevron_right,
+                          onTap: () => context.push('/profile/pelanggan'),
                         ),
                       ],
                     ),

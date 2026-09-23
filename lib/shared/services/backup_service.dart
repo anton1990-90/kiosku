@@ -33,6 +33,7 @@ class BackupService {
   static const List<String> tabelCadangan = [
     'products',
     'suppliers',
+    'customers',
     'sales',
     'debts',
     'notes',
@@ -59,6 +60,7 @@ class BackupService {
     'prive',
     'sales',
     'debts',
+    'customers',
     'notes',
     'suppliers',
     'products',
@@ -162,6 +164,7 @@ class BackupService {
       orderBy: 'date ASC, id ASC',
     );
     final suppliers = await db.query('suppliers', orderBy: 'id ASC');
+    final customers = await db.query('customers', orderBy: 'id ASC');
     final notes = await db.query('notes', orderBy: 'id ASC');
 
     // Peta bantuan supaya lembar anak bisa menampilkan nomor nota / nama
@@ -190,6 +193,7 @@ class BackupService {
       _prive(prive),
       _riwayatStok(stockMoves),
       _supplier(suppliers),
+      _pelanggan(customers),
       _catatan(notes),
     ];
 
@@ -490,6 +494,24 @@ class BackupService {
             _teks(s['address']),
             _teks(s['note']),
             _teks(s['created_at']),
+          ],
+      ],
+    );
+  }
+
+  static XlsxSheet _pelanggan(List<Map<String, Object?>> rows) {
+    return XlsxSheet(
+      name: 'Pelanggan',
+      rows: [
+        ['ID', 'Nama', 'Telepon', 'Alamat', 'Catatan', 'Dibuat'],
+        for (final c in rows)
+          [
+            _int(c['id']),
+            _teks(c['name']),
+            _teks(c['phone']),
+            _teks(c['address']),
+            _teks(c['note']),
+            _teks(c['created_at']),
           ],
       ],
     );

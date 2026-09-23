@@ -4,6 +4,7 @@ import '../../core/constants/app_colors.dart';
 import '../../core/utils/formatters.dart';
 import '../../core/utils/responsive.dart';
 import '../../data/models/debt_model.dart';
+import '../../providers/customer_provider.dart';
 import '../../providers/debt_provider.dart';
 import '../../providers/supplier_provider.dart';
 
@@ -31,6 +32,7 @@ class _HutangFormScreenState extends ConsumerState<HutangFormScreen> {
   /// 0 berarti "tidak dikaitkan" — DropdownButton tidak menampilkan item
   /// yang bernilai null, jadi perlu penanda sendiri.
   int _supplierId = 0;
+  int _customerId = 0;
   bool _saving = false;
 
   bool get isEditing => widget.debt != null;
@@ -47,6 +49,7 @@ class _HutangFormScreenState extends ConsumerState<HutangFormScreen> {
       _type = d.type;
       _dueDate = d.dueDate;
       _supplierId = d.supplierId ?? 0;
+      _customerId = d.customerId ?? 0;
     }
   }
 
@@ -76,6 +79,35 @@ class _HutangFormScreenState extends ConsumerState<HutangFormScreen> {
     }
   }
 
+  /// Pilih pelanggan dari buku pelanggan: nama dan nomor HP-nya ikut terisi.
+  ///
+  /// Nama yang terisi inilah yang nanti dipakai untuk mengaitkan catatannya,
+  /// jadi pengguna tetap bebas mengubahnya setelah memilih. Nomor HP hanya
+  /// ditimpa kalau pelanggannya memang punya nomor.
+  void _pilihPelanggan(int? id) {
+    if (id == null || id == 0) {
+      setState(() => _customerId = 0);
+      return;
+    }
+    final cocok = ref
+        .read(customerProvider)
+        .pelanggan
+        .where((c) => c.customer.id == id);
+    if (cocok.isEmpty) {
+      setState(() => _customerId = 0);
+      return;
+    }
+    final pelanggan = cocok.first.customer;
+    setState(() {
+      _customerId = id;
+      _nameController.text = pelanggan.name;
+      final hp = pelanggan.phone;
+      if (hp != null && hp.trim().isNotEmpty) {
+        _phoneController.text = hp;
+      }
+    });
+  }
+
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
     setState(() => _saving = true);
@@ -103,6 +135,10 @@ class _HutangFormScreenState extends ConsumerState<HutangFormScreen> {
       supplierId: _type == DebtType.hutang && _supplierId != 0
           ? _supplierId
           : null,
+      // customerId sengaja tidak diisi di sini: repositori yang mengaitkan
+      // piutang ke buku pelanggan berdasarkan [partyName] di atas, di dalam
+      // transaksi penyimpanan. Kalau nilainya diambil dari pilihan dropdown,
+      // catatan bisa tertaut ke pelanggan yang namanya sudah diubah pengguna.
       createdAt: existing?.createdAt ?? DateTime.now(),
       updatedAt: DateTime.now(),
     );
@@ -120,6 +156,23 @@ class _HutangFormScreenState extends ConsumerState<HutangFormScreen> {
   @override
   Widget build(BuildContext context) {
     final supplierState = ref.watch(supplierProvider);
+    final customerState = ref.watch(customerProvider);
+
+    // Nilai dropdown wajib ada di dalam daftar itemnya. Kalau pelanggan atau
+    // supplier yang tertaut sudah dihapus — atau daftarnya belum selesai
+    // dimuat — nilai lama tidak ada di daftar dan Flutter melempar error saat
+    // membangun widget. Karena itu nilainya dikembalikan ke 0
+    // ("tidak dikaitkan") kalau tidak ditemukan.
+    final daftarPelanggan =
+        customerState.pelanggan.where((c) => c.customer.id != null).toList();
+    final nilaiPelanggan =
+        daftarPelanggan.any((c) => c.customer.id == _customerId)
+            ? _customerId
+            : 0;
+    final daftarSupplier =
+        supplierState.suppliers.where((s) => s.id != null).toList();
+    final nilaiSupplier =
+        daftarSupplier.any((s) => s.id == _supplierId) ? _supplierId : 0;
 
     return Scaffold(
       backgroundColor: AppColors.bgPage,
@@ -194,11 +247,41 @@ class _HutangFormScreenState extends ConsumerState<HutangFormScreen> {
                   return null;
                 },
               ),
+              // Kaitkan ke pelanggan terdaftar kalau jenisnya piutang.
+              //
+              // Pilihan ini hanya mengisi nama (dan nomor HP) supaya tidak
+              // salah ketik — yang benar-benar mengikat catatan ini ke buku
+              // pelanggan adalah **namanya**, sama seperti transaksi penjualan.
+              // Jadi mengetik nama yang belum ada di sini sekaligus
+              // menambahkannya ke buku pelanggan, sedangkan memilih nama yang
+              // sudah ada tidak menggandakannya.
+              if (_type == DebtType.piutang && daftarPelanggan.isNotEmpty) ...[
+                const SizedBox(height: 16),
+                DropdownButtonFormField<int>(
+                  value: nilaiPelanggan,
+                  decoration: const InputDecoration(
+                    labelText: 'Pelanggan terdaftar (opsional)',
+                  ),
+                  items: [
+                    const DropdownMenuItem<int>(
+                      value: 0,
+                      child: Text('Tidak dikaitkan'),
+                    ),
+                    ...daftarPelanggan.map(
+                      (c) => DropdownMenuItem<int>(
+                        value: c.customer.id!,
+                        child: Text(c.customer.name),
+                      ),
+                    ),
+                  ],
+                  onChanged: _pilihPelanggan,
+                ),
+              ],
               // Kaitkan ke supplier terdaftar kalau jenisnya hutang.
               if (_type == DebtType.hutang) ...[
                 const SizedBox(height: 16),
                 DropdownButtonFormField<int>(
-                  value: _supplierId,
+                  value: nilaiSupplier,
                   decoration: const InputDecoration(
                     labelText: 'Supplier terdaftar (opsional)',
                   ),
@@ -207,14 +290,12 @@ class _HutangFormScreenState extends ConsumerState<HutangFormScreen> {
                       value: 0,
                       child: Text('Tidak dikaitkan'),
                     ),
-                    ...supplierState.suppliers
-                        .where((s) => s.id != null)
-                        .map(
-                          (s) => DropdownMenuItem<int>(
-                            value: s.id!,
-                            child: Text(s.name),
-                          ),
-                        ),
+                    ...daftarSupplier.map(
+                      (s) => DropdownMenuItem<int>(
+                        value: s.id!,
+                        child: Text(s.name),
+                      ),
+                    ),
                   ],
                   onChanged: (v) => setState(() => _supplierId = v ?? 0),
                 ),

@@ -11,11 +11,13 @@ import '../../providers/debt_provider.dart';
 import '../../providers/license_provider.dart';
 import '../../providers/note_provider.dart';
 import '../../providers/payment_method_provider.dart';
+import '../../providers/pin_provider.dart';
 import '../../providers/product_provider.dart';
 import '../../providers/sale_provider.dart';
 import '../../providers/supplier_provider.dart';
 import '../../shared/services/backup_service.dart';
 import '../../shared/services/export_service.dart';
+import '../../shared/services/pin_service.dart';
 import '../../providers/update_provider.dart';
 import '../../shared/widgets/shared_widgets.dart';
 import '../../shared/widgets/update_dialog.dart';
@@ -218,6 +220,214 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
         ],
       ),
     );
+  }
+
+  /// Pesan singkat di bawah layar.
+  void _pesan(String teks, {bool gagal = false}) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(teks),
+        behavior: SnackBarBehavior.floating,
+        backgroundColor: gagal ? AppColors.danger : AppColors.successMid,
+      ),
+    );
+  }
+
+  /// Layar pengaturan "Kunci PIN".
+  ///
+  /// Kalau PIN belum dipasang → langsung tawarkan memasang.
+  /// Kalau sudah → tawarkan ganti atau matikan, keduanya setelah PIN lama
+  /// dimasukkan lebih dulu.
+  Future<void> _aturPin() async {
+    if (!ref.read(pinProvider).aktif) {
+      await _pasangPin();
+      return;
+    }
+
+    final pilihan = await showModalBottomSheet<String>(
+      context: context,
+      builder: (sheetContext) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.password, color: AppColors.primary),
+              title: const Text('Ganti PIN'),
+              onTap: () => Navigator.pop(sheetContext, 'ganti'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.lock_open, color: AppColors.warning),
+              title: const Text('Matikan PIN'),
+              subtitle: const Text('Aplikasi tidak terkunci lagi saat dibuka'),
+              onTap: () => Navigator.pop(sheetContext, 'matikan'),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (pilihan == 'ganti') {
+      if (await _mintaPinSekarang('Konfirmasi PIN lama') == null) return;
+      if (!mounted) return;
+      await _pasangPin();
+      return;
+    }
+
+    if (pilihan == 'matikan') {
+      if (await _mintaPinSekarang('Konfirmasi PIN lama') == null) return;
+      await ref.read(pinProvider.notifier).matikan();
+      if (!mounted) return;
+      _pesan('Kunci PIN dimatikan.');
+    }
+  }
+
+  /// Minta PIN yang sedang berlaku. Mengembalikan PIN-nya, atau `null` kalau
+  /// dibatalkan atau salah.
+  Future<String?> _mintaPinSekarang(String judul) async {
+    final controller = TextEditingController();
+
+    final diketik = await showDialog<String>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Text(judul),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          obscureText: true,
+          keyboardType: TextInputType.number,
+          maxLength: PinService.panjangMaks,
+          decoration: const InputDecoration(
+            labelText: 'PIN',
+            counterText: '',
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Batal'),
+          ),
+          ElevatedButton(
+            onPressed: () =>
+                Navigator.pop(dialogContext, controller.text.trim()),
+            child: const Text('Lanjut'),
+          ),
+        ],
+      ),
+    );
+
+    controller.dispose();
+
+    if (diketik == null || diketik.isEmpty) return null;
+    if (!await PinService.instance.cocok(diketik)) {
+      if (!mounted) return null;
+      _pesan('PIN salah.', gagal: true);
+      return null;
+    }
+    return diketik;
+  }
+
+  /// Dialog memasang PIN baru (diketik dua kali).
+  Future<void> _pasangPin() async {
+    final controller = TextEditingController();
+    final ulangi = TextEditingController();
+    String? masalah;
+    String? pinSiap;
+
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (dialogContext, setDialogState) => AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          title: const Text('Pasang PIN'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'PIN dipakai untuk membuka aplikasi, jadi Anda tidak perlu '
+                'mengetik email dan password setiap hari. Minimal 4 angka.',
+                style: TextStyle(
+                  fontSize: 12.5,
+                  height: 1.5,
+                  color: AppColors.textSecondary,
+                ),
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: controller,
+                autofocus: true,
+                obscureText: true,
+                keyboardType: TextInputType.number,
+                maxLength: PinService.panjangMaks,
+                decoration: const InputDecoration(
+                  labelText: 'PIN baru',
+                  counterText: '',
+                ),
+              ),
+              const SizedBox(height: 8),
+              TextField(
+                controller: ulangi,
+                obscureText: true,
+                keyboardType: TextInputType.number,
+                maxLength: PinService.panjangMaks,
+                decoration: const InputDecoration(
+                  labelText: 'Ulangi PIN',
+                  counterText: '',
+                ),
+              ),
+              if (masalah != null) ...[
+                const SizedBox(height: 10),
+                Text(
+                  masalah!,
+                  style: const TextStyle(
+                    fontSize: 12.5,
+                    color: AppColors.danger,
+                  ),
+                ),
+              ],
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('Batal'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                final pin = controller.text.trim();
+                final lagi = ulangi.text.trim();
+                final keluhan = PinService.periksa(pin) ??
+                    (pin != lagi ? 'Ulangi PIN tidak sama.' : null);
+                if (keluhan != null) {
+                  setDialogState(() => masalah = keluhan);
+                  return;
+                }
+                pinSiap = pin;
+                Navigator.pop(dialogContext);
+              },
+              child: const Text('Simpan'),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    controller.dispose();
+    ulangi.dispose();
+
+    if (pinSiap == null || !mounted) return;
+
+    final keluhan = await ref.read(pinProvider.notifier).pasang(pinSiap!);
+    if (!mounted) return;
+
+    if (keluhan != null) {
+      _pesan(keluhan, gagal: true);
+      return;
+    }
+    _pesan('PIN aktif. Aplikasi akan meminta PIN setiap kali dibuka.');
   }
 
   @override
@@ -552,6 +762,32 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                           trailing: Icons.chevron_right,
                           onTap: _checkingUpdate ? null : _checkUpdate,
                         ),
+                      ],
+                    ),
+                    const SizedBox(height: 20),
+                    const _MenuGroupTitle('Keamanan'),
+                    _MenuCard(
+                      children: [
+                        _MenuItem(
+                          icon: Icons.lock_outline,
+                          color: AppColors.primary,
+                          title: 'Kunci PIN',
+                          subtitle: ref.watch(pinProvider).aktif
+                              ? 'Aktif — diminta tiap aplikasi dibuka'
+                              : 'Belum dipasang',
+                          trailing: Icons.chevron_right,
+                          onTap: _aturPin,
+                        ),
+                        if (ref.watch(pinProvider).aktif)
+                          _MenuItem(
+                            icon: Icons.lock_clock,
+                            color: AppColors.infoMid,
+                            title: 'Kunci sekarang',
+                            subtitle: 'Kunci layar tanpa menutup aplikasi',
+                            trailing: Icons.chevron_right,
+                            onTap: () =>
+                                ref.read(pinProvider.notifier).kunciSekarang(),
+                          ),
                       ],
                     ),
                     const SizedBox(height: 20),

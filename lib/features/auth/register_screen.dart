@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/constants/app_colors.dart';
 import '../../providers/auth_provider.dart';
+import '../../providers/pin_provider.dart';
 
 /// Register screen — create a new account with email & store name.
 /// First registration sets up the store. After this, login works offline.
@@ -41,6 +42,12 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
               ? null
               : _addressController.text.trim(),
         );
+
+    // Akun baru dibuat dengan password, jadi kunci PIN (kalau ada dari
+    // pemasangan sebelumnya) ikut dibuka.
+    if (success) {
+      ref.read(pinProvider.notifier).bukaSetelahLogin();
+    }
 
     if (!success && mounted) {
       final error = ref.read(authProvider).error;

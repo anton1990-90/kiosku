@@ -3,12 +3,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../providers/auth_provider.dart';
 import '../providers/license_provider.dart';
+import '../providers/pin_provider.dart';
 import '../core/config/app_config.dart';
 import '../core/constants/app_colors.dart';
 import '../core/utils/report_period.dart';
 import '../data/models/debt_model.dart';
 import '../data/models/note_model.dart';
 import '../features/auth/login_screen.dart';
+import '../features/auth/pin_screen.dart';
 import '../features/auth/register_screen.dart';
 import '../features/catatan/catatan_form_screen.dart';
 import '../features/catatan/catatan_screen.dart';
@@ -36,6 +38,7 @@ import '../shared/widgets/bottom_nav_shell.dart';
 final routerProvider = Provider<GoRouter>((ref) {
   final authState = ref.watch(authProvider);
   final licenseState = ref.watch(licenseProvider);
+  final pinState = ref.watch(pinProvider);
 
   return GoRouter(
     initialLocation: '/',
@@ -43,12 +46,19 @@ final routerProvider = Provider<GoRouter>((ref) {
     redirect: (context, state) {
       final location = state.matchedLocation;
 
-      // Sambil memuat status auth & lisensi, tetap di splash.
-      if (authState.isLoading || licenseState.isLoading) {
+      // Sambil memuat status auth, lisensi, & PIN, tetap di splash.
+      //
+      // `pinState.isLoading` WAJIB ikut ditunggu. Tanpa itu, saat aplikasi
+      // dibuka status PIN masih bernilai awal (belum terkunci), sehingga
+      // pengguna bisa menyelinap ke beranda sebelum kuncinya sempat dibaca.
+      if (authState.isLoading ||
+          licenseState.isLoading ||
+          pinState.isLoading) {
         return location == '/' ? null : '/';
       }
 
       final isActivationRoute = location.startsWith('/auth/activation');
+      final isPinRoute = location == '/auth/pin';
 
       // Gerbang lisensi hanya aktif kalau server aktivasi sudah diisi.
       // Selama activationServerUrl masih 'ISI_...' aplikasi boleh dipakai
@@ -71,13 +81,23 @@ final routerProvider = Provider<GoRouter>((ref) {
       final isLoggedIn = authState.isAuthenticated;
       final isAuthRoute = location.startsWith('/auth');
 
+      // Gerbang PIN — hanya berlaku untuk pengguna yang sudah masuk.
+      // Kalau PIN dipasang, aplikasi mengunci diri saat dibuka, jadi layar
+      // PIN harus didahulukan daripada beranda.
+      if (isLoggedIn) {
+        if (pinState.perluDibuka && !isPinRoute) return '/auth/pin';
+        if (isPinRoute && !pinState.perluDibuka) return '/dashboard';
+      }
+
       // Belum login → ke register (pertama kali) atau login.
-      if (!isLoggedIn && !isAuthRoute) {
+      // Layar PIN ikut diarahkan keluar: sesinya sudah tidak ada (misalnya
+      // sesudah menekan "Lupa PIN?"), jadi tidak ada gunanya menahan di sana.
+      if (!isLoggedIn && (!isAuthRoute || isPinRoute)) {
         return authState.isFirstRun ? '/auth/register' : '/auth/login';
       }
 
-      // Sudah login tapi di layar auth/splash → ke dashboard.
-      if (isLoggedIn && (isAuthRoute || location == '/')) {
+      // Sudah login dan sudah lolos PIN, tapi masih di layar auth/splash.
+      if (isLoggedIn && !isPinRoute && (isAuthRoute || location == '/')) {
         return '/dashboard';
       }
 
@@ -105,6 +125,13 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/auth/register',
         name: 'register',
         builder: (context, state) => const RegisterScreen(),
+      ),
+      // Kunci PIN — dipasang pemilik toko supaya tidak perlu mengetik email
+      // & password setiap kali membuka aplikasi.
+      GoRoute(
+        path: '/auth/pin',
+        name: 'pin',
+        builder: (context, state) => const PinScreen(),
       ),
       // Halaman detail (tanpa bottom nav) — dibuka dengan tombol kembali.
       GoRoute(

@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/constants/app_colors.dart';
 import '../../providers/auth_provider.dart';
+import '../../providers/pin_provider.dart';
 
 /// Login screen — email & password authentication.
 /// Works offline: validates against local SQLite database.
@@ -33,6 +34,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           email: _emailController.text.trim(),
           password: _passwordController.text,
         );
+
+    // Berhasil masuk dengan password juga membuka kunci PIN. Password lebih
+    // kuat daripada PIN, jadi ini jalan keluar yang sah kalau PIN lupa —
+    // tanpa perlu menghapus data aplikasi.
+    if (success) {
+      ref.read(pinProvider.notifier).bukaSetelahLogin();
+    }
 
     if (!success && mounted) {
       final error = ref.read(authProvider).error;

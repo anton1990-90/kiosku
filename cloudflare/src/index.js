@@ -496,18 +496,23 @@ async function tanganiVersi(env, url) {
  * Badan respons dialirkan apa adanya (tidak ditahan di memori), jadi file
  * berukuran puluhan MB tidak membebani Worker.
  */
-async function tanganiUnduhApk(env) {
+async function tanganiUnduhApk(env, request) {
   const repo = repoGithub(env);
   if (!repo) return balasJson({ ok: false, reason: 'server_error' }, 500);
 
+  // Teruskan Range kalau ada. Tanpa ini, unduhan 34 MB yang terputus di
+  // jaringan seluler akan mengulang dari nol, bukan melanjutkan.
+  const mintaRange = request ? request.headers.get('range') : null;
+  const headerPermintaan = { 'User-Agent': 'tokoku-lisensi-worker' };
+  if (mintaRange) headerPermintaan['Range'] = mintaRange;
+
   const res = await fetch(
     `https://github.com/${repo}/releases/latest/download/app-release.apk`,
-    {
-      headers: { 'User-Agent': 'tokoku-lisensi-worker' },
-      redirect: 'follow',
-    }
+    { headers: headerPermintaan, redirect: 'follow' }
   );
 
+  // 206 = potongan isi (unduhan dilanjutkan). Selain 200/206 berarti gagal.
+  const potongan = res.status === 206;
   if (!res.ok || !res.body) {
     return balasHtml(halamanUnduhGagal(env), 502);
   }
@@ -520,6 +525,7 @@ async function tanganiUnduhApk(env) {
     'Content-Disposition': `attachment; filename="${namaBerkas}"`,
     'Cache-Control': 'public, max-age=3600',
     'X-Content-Type-Options': 'nosniff',
+    'Accept-Ranges': 'bytes',
   };
 
   // Panjang isi diteruskan kalau memang ada, supaya Android bisa menampilkan
@@ -527,7 +533,15 @@ async function tanganiUnduhApk(env) {
   const panjang = res.headers.get('content-length');
   if (panjang && /^\d+$/.test(panjang)) header['Content-Length'] = panjang;
 
-  return new Response(res.body, { status: 200, headers: header });
+  const rentang = res.headers.get('content-range');
+  if (potongan && rentang) header['Content-Range'] = rentang;
+
+  // HEAD: header saja, tanpa badan. Dipakai pemeriksa tautan dan pengelola
+  // unduhan Android untuk tahu ukuran sebelum benar-benar mengunduh.
+  const kepala = request && request.method.toUpperCase() === 'HEAD';
+  const status = potongan ? 206 : 200;
+
+  return new Response(kepala ? null : res.body, { status, headers: header });
 }
 
 // ---------------------------------------------------------------------------
@@ -560,8 +574,8 @@ export default {
         return await tanganiVersi(env, url);
       }
 
-      if (jalur === '/unduh/apk' && metode === 'GET') {
-        return await tanganiUnduhApk(env);
+      if (jalur === '/unduh/apk' && (metode === 'GET' || metode === 'HEAD')) {
+        return await tanganiUnduhApk(env, request);
       }
 
       if (jalur === '/unduh' && metode === 'GET') {

@@ -44,6 +44,11 @@ from datetime import datetime
 LEDGER_NAME = "ledger-voucher.csv"
 LEDGER_HEADER = ["kode", "kelompok", "nama", "dibuat_pada"]
 
+# Cloudflare menolak User-Agent bawaan Python ("Python-urllib/3.x") dengan
+# HTTP 403 di depan server aktivasi. Tanpa header ini, SEMUA permintaan dari
+# skrip ini ditolak 403 — termasuk yang kuncinya benar. Header ini wajib ada.
+USER_AGENT = "TokoKu-Voucher-Tool/1.0"
+
 URL_BAWAAN = os.environ.get("TOKOKU_URL", "").strip()
 KUNCI_BAWAAN = os.environ.get("TOKOKU_ADMIN_KEY", "").strip()
 
@@ -79,6 +84,7 @@ def panggil(url, kunci, jalur, muatan=None, metode=None):
         metode = "POST" if badan is not None else "GET"
 
     permintaan = urllib.request.Request(alamat, data=badan, method=metode)
+    permintaan.add_header("User-Agent", USER_AGENT)
     permintaan.add_header("Accept", "application/json")
     if kunci:
         permintaan.add_header("x-admin-key", kunci)
@@ -200,6 +206,11 @@ def jalankan_buat(args):
     status, data = panggil(args.url, args.kunci, "/admin/vouchers", muatan)
     if status == 401:
         print("Kunci admin ditolak (401). Periksa TOKOKU_ADMIN_KEY.")
+        return 1
+    if status == 403:
+        print("Ditolak Cloudflare (403) — ini BUKAN soal kunci admin.")
+        print("Artinya User-Agent yang dipakai skrip ini tidak diizinkan.")
+        print("Pastikan konstanta USER_AGENT di berkas ini terisi, lalu coba lagi.")
         return 1
     if not data.get("ok"):
         print("Server gagal membuat voucher (status %s)." % status)

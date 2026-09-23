@@ -103,6 +103,16 @@ class ExportService {
     return file;
   }
 
+  /// Alamat berkas di folder ekspor, tanpa membuat berkasnya.
+  ///
+  /// Dipakai untuk membaca kembali hasil ekspor sendiri — misalnya cadangan
+  /// otomatis. Pemilih berkas Android tidak bisa menampilkan folder privat
+  /// aplikasi, jadi berkas yang ditulis ke sini harus dibaca lewat jalur ini.
+  Future<File> berkasEkspor(String filename, {String ekstensi = 'json'}) async {
+    final dir = await _folder();
+    return File('${dir.path}/$filename.$ekstensi');
+  }
+
   /// Buka menu bagikan untuk satu berkas.
   Future<void> share(
     File file, {

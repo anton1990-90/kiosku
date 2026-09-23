@@ -98,6 +98,9 @@ class BackupService {
     };
   }
 
+  /// Nama berkas cadangan otomatis — sengaja tetap, lihat [createBackupJson].
+  static const String namaCadanganOtomatis = 'cadangan-otomatis';
+
   /// Tulis berkas cadangan JSON yang bisa dibaca kembali aplikasi.
   ///
   /// Ini yang dipakai fitur "Pulihkan data". Berkas `.xlsx` dari
@@ -115,11 +118,25 @@ class BackupService {
     final data = await susunData(user: user);
     final isi = const JsonEncoder.withIndent('  ').convert(data);
     final nama = otomatis
-        ? 'cadangan-otomatis'
+        ? namaCadanganOtomatis
         : ExportService.safeName(
             'cadangan-${user.storeName}-${_stempelWaktu(DateTime.now())}',
           );
     return ExportService.instance.writeJson(filename: nama, isi: isi);
+  }
+
+  /// Berkas cadangan otomatis yang ada di HP ini, atau `null` kalau belum ada.
+  ///
+  /// Cadangan otomatis ditulis ke folder privat aplikasi, dan pemilih berkas
+  /// Android tidak bisa menampilkan folder itu. Jadi berkas ini hanya bisa
+  /// dipulihkan lewat jalur ini, bukan lewat "pilih berkas".
+  ///
+  /// Berkasnya sengaja TIDAK dihapus setelah dipulihkan: kalau pemulihannya
+  /// ternyata salah pilih, cadangan aslinya masih ada untuk dicoba lagi.
+  Future<File?> cadanganOtomatis() async {
+    final berkas = await ExportService.instance
+        .berkasEkspor(namaCadanganOtomatis);
+    return await berkas.exists() ? berkas : null;
   }
 
   /// Susun berkas backup dan simpan ke folder ekspor.

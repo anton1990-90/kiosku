@@ -371,18 +371,112 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     return diketik;
   }
 
+  /// Ukuran berkas dalam satuan yang mudah dibaca pemilik toko.
+  static String _ukuran(int byte) {
+    if (byte < 1024) return '$byte byte';
+    if (byte < 1024 * 1024) return '${(byte / 1024).round()} KB';
+    return '${(byte / (1024 * 1024)).toStringAsFixed(1)} MB';
+  }
+
+  /// Tanya dari mana data dipulihkan, lalu kembalikan alamat berkasnya.
+  ///
+  /// Cadangan otomatis ditulis ke folder **privat** aplikasi, dan pemilih
+  /// berkas Android tidak bisa menampilkan folder itu. Jadi berkasnya dibaca
+  /// langsung lewat [BackupService.cadanganOtomatis], bukan lewat "pilih
+  /// berkas" — tanpa jalur ini, cadangan otomatis tidak akan pernah bisa
+  /// dipulihkan dan hanya memakan ruang penyimpanan.
+  Future<String?> _pilihSumberCadangan() async {
+    final otomatis = await BackupService.instance.cadanganOtomatis();
+
+    DateTime? waktu;
+    int ukuran = 0;
+    if (otomatis != null) {
+      try {
+        waktu = await otomatis.lastModified();
+        ukuran = await otomatis.length();
+      } catch (_) {
+        // Berkas ada tapi tidak terbaca (mis. izin). Perlakukan seperti tidak
+        // ada, jangan tawarkan sesuatu yang akan gagal.
+        waktu = null;
+      }
+    }
+    if (!mounted) return null;
+
+    return showModalBottomSheet<String>(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(18)),
+      ),
+      builder: (sheetContext) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Padding(
+              padding: EdgeInsets.fromLTRB(18, 18, 18, 4),
+              child: Text(
+                'Pulihkan dari mana?',
+                style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
+              ),
+            ),
+            if (otomatis != null && waktu != null)
+              ListTile(
+                leading: const Icon(Icons.schedule, color: AppColors.primary),
+                title: const Text('Cadangan otomatis di HP ini'),
+                subtitle: Text(
+                  '${_waktuLengkap(waktu.toIso8601String())}'
+                  ' • ${_ukuran(ukuran)}',
+                ),
+                onTap: () => Navigator.pop(sheetContext, otomatis.path),
+              )
+            else
+              const Padding(
+                padding: EdgeInsets.fromLTRB(18, 6, 18, 12),
+                child: Text(
+                  'Belum ada cadangan otomatis di HP ini. Cadangan otomatis '
+                  'dibuat saat aplikasi dibuka, paling banyak sekali sehari.',
+                  style: TextStyle(
+                    fontSize: 12,
+                    height: 1.5,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+              ),
+            ListTile(
+              leading: const Icon(Icons.folder_open_outlined),
+              title: const Text('Pilih berkas lain'),
+              subtitle: const Text(
+                'Berkas cadangan yang Anda simpan di email atau Google Drive',
+              ),
+              onTap: () async {
+                // file_picker 11.x: `pickFiles` adalah metode statis di kelas
+                // `FilePicker`. Getter `FilePicker.platform` sudah dihapus.
+                final pilihan = await FilePicker.pickFiles(
+                  type: FileType.any,
+                  withData: false,
+                );
+                if (!sheetContext.mounted) return;
+                final daftar = pilihan?.files;
+                if (daftar == null || daftar.isEmpty) {
+                  Navigator.pop(sheetContext);
+                  return;
+                }
+                Navigator.pop(sheetContext, daftar.first.path);
+              },
+            ),
+            const SizedBox(height: 10),
+          ],
+        ),
+      ),
+    );
+  }
+
   /// Ambil kembali data usaha dari berkas cadangan.
   ///
   /// Meminta password lebih dulu karena tindakan ini **mengganti** seluruh
   /// data usaha yang ada di perangkat ini.
   Future<void> _pulihkanData() async {
-    // file_picker 11.x: `pickFiles` adalah metode statis di kelas `FilePicker`.
-    // Getter `FilePicker.platform` sudah dihapus, jadi jangan dipakai.
-    final pilihan = await FilePicker.pickFiles(
-      type: FileType.any,
-      withData: false,
-    );
-    final path = pilihan?.files.single.path;
+    final path = await _pilihSumberCadangan();
     if (path == null || !mounted) return;
 
     // Diperiksa lebih dulu TANPA mengubah apa pun, supaya berkas yang salah
@@ -516,6 +610,29 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   }
 
   /// Pesan singkat di bawah layar.
+  /// Coba lagi setelah cadangan otomatis gagal.
+  ///
+  /// Tidak membuka menu Bagikan: berkasnya sekarang sudah bisa dipulihkan
+  /// langsung dari HP ini, jadi yang penting cadangannya benar-benar ada.
+  Future<void> _cobaCadanganLagi() async {
+    final user = ref.read(authProvider).user;
+    if (user == null) return;
+
+    final berkas = await ref
+        .read(backupProvider.notifier)
+        .cadangkanSekarang(user: user);
+    if (!mounted) return;
+
+    if (berkas == null) {
+      _pesan(
+        'Cadangan masih gagal. Periksa ruang penyimpanan HP, lalu coba lagi.',
+        gagal: true,
+      );
+      return;
+    }
+    _pesan('Cadangan berhasil dibuat.');
+  }
+
   void _pesan(String teks, {bool gagal = false}) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -1044,17 +1161,35 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                           icon: Icons.schedule,
                           color: AppColors.warning,
                           title: 'Cadangan otomatis',
-                          subtitle: backupState.otomatis
-                              ? (backupState.terakhir == null
-                                  ? 'Menyala — belum pernah dibuat'
-                                  : 'Menyala — terakhir '
-                                      '${_waktuSingkat(backupState.terakhir!)}')
-                              : 'Mati — cadangan tidak dibuat otomatis',
+                          subtitle: backupState.gagal
+                              ? 'Cadangan terakhir GAGAL dibuat'
+                              : (backupState.otomatis
+                                  ? (backupState.terakhir == null
+                                      ? 'Menyala — belum pernah dibuat'
+                                      : 'Menyala — terakhir '
+                                          '${_waktuSingkat(backupState.terakhir!)}')
+                                  : 'Mati — cadangan tidak dibuat otomatis'),
                           toggle: backupState.otomatis,
                           onToggle: (nilai) => ref
                               .read(backupProvider.notifier)
                               .setOtomatis(nilai),
                         ),
+                        // Kegagalan cadangan harus terlihat, bukan cuma
+                        // tersimpan di state. Pemilik toko yang mengira
+                        // dirinya terlindungi padahal cadangannya gagal
+                        // berada di posisi yang lebih berbahaya daripada
+                        // tidak punya cadangan sama sekali.
+                        if (backupState.gagal)
+                          _MenuItem(
+                            icon: Icons.error_outline,
+                            color: AppColors.danger,
+                            title: 'Cadangan gagal dibuat',
+                            subtitle: 'Ketuk untuk mencoba lagi',
+                            trailing: Icons.refresh,
+                            onTap: backupState.sedangJalan
+                                ? null
+                                : _cobaCadanganLagi,
+                          ),
                         _MenuItem(
                           icon: Icons.delete_forever_outlined,
                           color: AppColors.dangerMid,

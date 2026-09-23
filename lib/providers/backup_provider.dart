@@ -23,12 +23,21 @@ class BackupState {
   /// Sedang membuat cadangan saat ini.
   final bool sedangJalan;
 
+  /// Percobaan terakhir GAGAL.
+  ///
+  /// Dipisah dari [pesan] karena kegagalan harus terlihat oleh pemilik toko,
+  /// bukan sekadar tersimpan. Cadangan yang gagal tanpa kabar lebih berbahaya
+  /// daripada tidak ada cadangan sama sekali: pemilik toko mengira dirinya
+  /// terlindungi.
+  final bool gagal;
+
   const BackupState({
     this.isLoading = true,
     this.otomatis = true,
     this.terakhir,
     this.pesan,
     this.sedangJalan = false,
+    this.gagal = false,
   });
 
   /// Apakah sudah lewat 24 jam sejak cadangan terakhir.
@@ -47,6 +56,7 @@ class BackupState {
     DateTime? terakhir,
     String? pesan,
     bool? sedangJalan,
+    bool? gagal,
     bool hapusPesan = false,
   }) {
     return BackupState(
@@ -55,6 +65,7 @@ class BackupState {
       terakhir: terakhir ?? this.terakhir,
       pesan: hapusPesan ? null : (pesan ?? this.pesan),
       sedangJalan: sedangJalan ?? this.sedangJalan,
+      gagal: gagal ?? this.gagal,
     );
   }
 }
@@ -137,17 +148,21 @@ class BackupNotifier extends StateNotifier<BackupState> {
       state = state.salin(
         sedangJalan: false,
         terakhir: sekarang,
+        gagal: false,
         pesan: otomatis
             ? 'Cadangan harian dibuat otomatis.'
             : 'Cadangan dibuat. Simpan berkasnya ke email atau Google Drive.',
       );
       return berkas;
     } catch (_) {
-      // Gagal mencadangkan tidak boleh mengganggu pemakaian aplikasi, jadi
-      // hanya dicatat sebagai pesan.
+      // Gagal mencadangkan tidak boleh mengganggu pemakaian aplikasi, tapi
+      // TIDAK boleh juga disembunyikan: layar Profil menampilkan [gagal]
+      // supaya pemilik toko tahu cadangannya belum aman.
       state = state.salin(
         sedangJalan: false,
-        pesan: 'Cadangan gagal dibuat. Coba lagi nanti.',
+        gagal: true,
+        pesan: 'Cadangan gagal dibuat. Periksa ruang penyimpanan HP, '
+            'lalu coba lagi.',
       );
       return null;
     }

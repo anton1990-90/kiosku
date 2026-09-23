@@ -328,7 +328,9 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   /// Meminta password lebih dulu karena tindakan ini **mengganti** seluruh
   /// data usaha yang ada di perangkat ini.
   Future<void> _pulihkanData() async {
-    final pilihan = await FilePicker.platform.pickFiles(
+    // file_picker 11.x: `pickFiles` adalah metode statis di kelas `FilePicker`.
+    // Getter `FilePicker.platform` sudah dihapus, jadi jangan dipakai.
+    final pilihan = await FilePicker.pickFiles(
       type: FileType.any,
       withData: false,
     );

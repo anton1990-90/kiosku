@@ -1,8 +1,23 @@
 name: Build APK
 
+# Kapan build ini menyala.
+#
+# Tujuannya: build APK hanya jalan kalau ada yang benar-benar mengubah
+# APLIKASINYA. Perubahan di cloudflare/ atau docs/ tidak memengaruhi isi APK
+# sama sekali — server aktivasi diterbitkan terpisah lewat `wrangler deploy`.
+# Tanpa penyaring ini, memperbaiki satu salah ketik di dokumen pun membangun
+# ulang APK 34 MB dan menimpa berkas rilis yang sedang dipakai pelanggan.
+#
+# Aman: kalau satu push menyentuh `lib/` SEKALIGUS `docs/`, build tetap jalan
+# — `paths-ignore` hanya melewati push yang SELURUH berkasnya diabaikan.
 on:
   push:
     branches: [ main, master ]
+    paths-ignore:
+      - 'cloudflare/**'   # Worker diterbitkan lewat `wrangler deploy`
+      - 'docs/**'         # panduan untuk penjual, bukan bagian APK
+      - '**/*.md'         # README dan catatan lain
+      - '.gitignore'      # tidak ikut masuk ke APK
   workflow_dispatch:
 
 jobs:

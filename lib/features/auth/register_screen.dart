@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/constants/app_colors.dart';
 import '../../providers/auth_provider.dart';
-import '../../providers/pin_provider.dart';
 
 /// Register screen — create a new account with email & store name.
 /// First registration sets up the store. After this, login works offline.
@@ -43,11 +42,8 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
               : _addressController.text.trim(),
         );
 
-    // Akun baru dibuat dengan password, jadi kunci PIN (kalau ada dari
-    // pemasangan sebelumnya) ikut dibuka.
-    if (success) {
-      ref.read(pinProvider.notifier).bukaSetelahLogin();
-    }
+    // Kunci PIN dibuka di dalam AuthNotifier.register(), bukan di sini —
+    // supaya router tidak sempat melihat "sudah login tapi PIN masih terkunci".
 
     if (!success && mounted) {
       final error = ref.read(authProvider).error;
@@ -179,8 +175,8 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton(
-                    onPressed: authState.isLoading ? null : _handleRegister,
-                    child: authState.isLoading
+                    onPressed: authState.sedangMasuk ? null : _handleRegister,
+                    child: authState.sedangMasuk
                         ? const SizedBox(
                             width: 20,
                             height: 20,

@@ -9,6 +9,7 @@ import '../core/constants/app_colors.dart';
 import '../core/utils/report_period.dart';
 import '../data/models/debt_model.dart';
 import '../data/models/note_model.dart';
+import '../features/auth/forgot_password_screen.dart';
 import '../features/auth/login_screen.dart';
 import '../features/auth/pin_screen.dart';
 import '../features/auth/register_screen.dart';
@@ -133,6 +134,14 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/auth/pin',
         name: 'pin',
         builder: (context, state) => const PinScreen(),
+      ),
+      // Pemulihan akun untuk pemilik yang lupa passwordnya. Bukan halaman
+      // beranda, jadi sengaja di luar ShellRoute — sama seperti layar auth
+      // lain, punya tombol kembali sendiri.
+      GoRoute(
+        path: '/auth/lupa-password',
+        name: 'lupaPassword',
+        builder: (context, state) => const ForgotPasswordScreen(),
       ),
       // Halaman detail (tanpa bottom nav) — dibuka dengan tombol kembali.
       GoRoute(

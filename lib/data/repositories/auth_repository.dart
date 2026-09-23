@@ -190,6 +190,36 @@ class AuthRepository {
     return true;
   }
 
+  /// Ganti password seorang pengguna tanpa login.
+  ///
+  /// Dipakai alur "Lupa password", di mana pemilik sudah membuktikan
+  /// kepemilikannya lewat kode aktivasi. Metode ini sendiri tidak memeriksa
+  /// bukti apa pun — pemanggil yang wajib melakukannya lebih dulu.
+  ///
+  /// Mengembalikan false kalau emailnya tidak terdaftar.
+  Future<bool> resetPassword({
+    required String email,
+    required String newPassword,
+  }) async {
+    final db = await _db.database;
+    final rows = await db.query(
+      'users',
+      columns: ['id'],
+      where: 'email = ?',
+      whereArgs: [email.toLowerCase()],
+      limit: 1,
+    );
+    if (rows.isEmpty) return false;
+
+    final terpengaruh = await db.update(
+      'users',
+      {'password_hash': newPassword},
+      where: 'id = ?',
+      whereArgs: [rows.first['id']],
+    );
+    return terpengaruh > 0;
+  }
+
   /// Simpan hanya path logo (dipakai setelah memilih gambar dari galeri).
   Future<void> updateLogoPath(int userId, String? logoPath) async {
     final db = await _db.database;

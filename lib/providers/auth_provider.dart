@@ -1,17 +1,33 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../data/models/user_model.dart';
 import '../data/repositories/auth_repository.dart';
+import 'pin_provider.dart';
 
 /// Auth state — tracks the current logged-in user.
 class AuthState {
   final UserModel? user;
+
+  /// Pembacaan status sesi saat aplikasi dibuka. Router menahan pengguna di
+  /// splash selama ini bernilai true.
+  ///
+  /// Sengaja TIDAK dipakai untuk login/daftar yang sedang berjalan — lihat
+  /// [sedangMasuk]. Kalau satu bendera dipakai untuk keduanya, router melempar
+  /// pengguna keluar dari layar login ke splash di tengah proses; begitu
+  /// kembali, gerbang PIN sudah menunggu dan PIN ditanyakan lagi tepat setelah
+  /// pengguna mengetik password yang benar. `LicenseState` memakai pemisahan
+  /// yang sama, dan karena alasan yang sama.
   final bool isLoading;
+
+  /// Login atau pendaftaran sedang berjalan — tombolnya menampilkan spinner.
+  final bool sedangMasuk;
+
   final String? error;
   final bool isFirstRun;
 
   const AuthState({
     this.user,
     this.isLoading = false,
+    this.sedangMasuk = false,
     this.error,
     this.isFirstRun = false,
   });
@@ -21,12 +37,14 @@ class AuthState {
   AuthState copyWith({
     UserModel? user,
     bool? isLoading,
+    bool? sedangMasuk,
     String? error,
     bool? isFirstRun,
   }) {
     return AuthState(
       user: user ?? this.user,
       isLoading: isLoading ?? this.isLoading,
+      sedangMasuk: sedangMasuk ?? this.sedangMasuk,
       error: error,
       isFirstRun: isFirstRun ?? this.isFirstRun,
     );
@@ -35,11 +53,13 @@ class AuthState {
 
 /// Auth notifier — handles registration, login, logout, and session restoration.
 class AuthNotifier extends StateNotifier<AuthState> {
-  final AuthRepository _repo = AuthRepository();
-
-  AuthNotifier() : super(const AuthState(isLoading: true)) {
+  AuthNotifier(this._ref) : super(const AuthState(isLoading: true)) {
     _init();
   }
+
+  /// Dipakai untuk membuka kunci PIN dari dalam alur login. Lihat [login].
+  final Ref _ref;
+  final AuthRepository _repo = AuthRepository();
 
   /// On startup: check if a user session exists and restore it.
   /// Also detect first-run (no registered users).
@@ -60,7 +80,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
     required String storeName,
     String? storeAddress,
   }) async {
-    state = state.copyWith(isLoading: true, error: null);
+    state = state.copyWith(sedangMasuk: true, error: null);
     try {
       final user = await _repo.register(
         email: email,
@@ -68,10 +88,14 @@ class AuthNotifier extends StateNotifier<AuthState> {
         storeName: storeName,
         storeAddress: storeAddress,
       );
-      state = AuthState(user: user, isLoading: false, isFirstRun: false);
+      // Akun dibuat memakai password, jadi kunci PIN (kalau ada dari pemasangan
+      // sebelumnya) ikut dibuka — dan dibuka SEBELUM state auth berubah.
+      // Alasannya sama seperti di [login].
+      _ref.read(pinProvider.notifier).bukaSetelahLogin();
+      state = AuthState(user: user, isFirstRun: false);
       return true;
     } catch (e) {
-      state = state.copyWith(isLoading: false, error: e.toString());
+      state = state.copyWith(sedangMasuk: false, error: e.toString());
       return false;
     }
   }
@@ -81,15 +105,41 @@ class AuthNotifier extends StateNotifier<AuthState> {
     required String email,
     required String password,
   }) async {
-    state = state.copyWith(isLoading: true, error: null);
+    state = state.copyWith(sedangMasuk: true, error: null);
     try {
       final user = await _repo.login(email: email, password: password);
-      state = AuthState(user: user, isLoading: false, isFirstRun: false);
+
+      // Password lebih kuat daripada PIN, jadi masuk dengan email & password
+      // membuka kunci PIN — inilah jalan keluar kalau PIN lupa.
+      //
+      // WAJIB dipanggil SEBELUM state auth berubah. Kalau dipanggil sesudahnya
+      // (dulu begitu, dari layar login), ada jendela waktu di mana
+      // `isAuthenticated` sudah true tetapi `pinState.perluDibuka` masih true;
+      // router melihat keadaan itu dan melempar pengguna ke /auth/pin — jadi
+      // PIN ditanyakan lagi tepat setelah password yang benar diketik.
+      //
+      // Aman memanggil ini di sini: layar login tidak mungkin tampil selagi
+      // `pinState.isLoading` true (router menahan di splash), jadi status PIN
+      // sudah terbaca dan `aktif`-nya akurat.
+      _ref.read(pinProvider.notifier).bukaSetelahLogin();
+
+      state = AuthState(user: user, isFirstRun: false);
       return true;
     } catch (e) {
-      state = state.copyWith(isLoading: false, error: e.toString());
+      state = state.copyWith(sedangMasuk: false, error: e.toString());
       return false;
     }
+  }
+
+  /// Ganti password tanpa login — dipakai alur "Lupa password".
+  ///
+  /// Pemanggil WAJIB sudah memverifikasi bukti kepemilikan (kode aktivasi)
+  /// lebih dulu; metode ini sendiri tidak memeriksa apa pun.
+  Future<bool> resetPassword({
+    required String email,
+    required String newPassword,
+  }) {
+    return _repo.resetPassword(email: email, newPassword: newPassword);
   }
 
   /// Logout and clear session.
@@ -166,5 +216,5 @@ class AuthNotifier extends StateNotifier<AuthState> {
 }
 
 final authProvider = StateNotifierProvider<AuthNotifier, AuthState>((ref) {
-  return AuthNotifier();
+  return AuthNotifier(ref);
 });

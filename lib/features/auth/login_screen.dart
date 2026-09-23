@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/constants/app_colors.dart';
 import '../../providers/auth_provider.dart';
-import '../../providers/pin_provider.dart';
 
 /// Login screen — email & password authentication.
 /// Works offline: validates against local SQLite database.
@@ -35,12 +34,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           password: _passwordController.text,
         );
 
-    // Berhasil masuk dengan password juga membuka kunci PIN. Password lebih
-    // kuat daripada PIN, jadi ini jalan keluar yang sah kalau PIN lupa —
-    // tanpa perlu menghapus data aplikasi.
-    if (success) {
-      ref.read(pinProvider.notifier).bukaSetelahLogin();
-    }
+    // Kunci PIN dibuka di dalam AuthNotifier.login(), bukan di sini. Urutannya
+    // penting: kalau dibuka setelah `await` di atas, router sempat melihat
+    // "sudah login tapi PIN masih terkunci" dan melempar pengguna ke layar PIN.
 
     if (!success && mounted) {
       final error = ref.read(authProvider).error;
@@ -162,8 +158,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     SizedBox(
                       width: double.infinity,
                       child: ElevatedButton(
-                        onPressed: authState.isLoading ? null : _handleLogin,
-                        child: authState.isLoading
+                        onPressed: authState.sedangMasuk ? null : _handleLogin,
+                        child: authState.sedangMasuk
                             ? const SizedBox(
                                 width: 20,
                                 height: 20,
@@ -176,6 +172,20 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       ),
                     ),
                     const SizedBox(height: 16),
+                    TextButton(
+                      onPressed: authState.sedangMasuk
+                          ? null
+                          : () => context.push('/auth/lupa-password'),
+                      child: const Text(
+                        'Lupa password?',
+                        style: TextStyle(
+                          color: AppColors.textSecondary,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 4),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [

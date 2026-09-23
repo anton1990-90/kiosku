@@ -164,13 +164,19 @@ class _HelpScreenState extends ConsumerState<HelpScreen> {
     ),
     (
       tanya: 'Lupa password akun, bagaimana?',
-      jawab: 'Hubungi penjual. Password disimpan dalam bentuk acak (hash), '
-          'jadi tidak ada yang bisa membacanya kembali, termasuk aplikasi ini.',
+      jawab: 'Di layar masuk, tekan "Lupa password?". Isi email akun, kode '
+          'aktivasi (berawalan AK-), lalu password baru Anda. Kode aktivasi '
+          'dipakai untuk memastikan aplikasi ini memang milik Anda — kode itu '
+          'hanya berlaku di HP ini. Kodenya ada di struk pembelian atau chat '
+          'dari penjual; setelah Anda masuk, kodenya juga tampil di menu '
+          'Profil → Lisensi.',
     ),
     (
       tanya: 'Lupa PIN, bagaimana?',
-      jawab: 'Di layar PIN, tekan Lupa PIN?. Anda akan diminta email dan '
-          'password. Setelah berhasil masuk, atur ulang PIN lewat Profil.',
+      jawab: 'Di layar PIN, tekan "Lupa PIN?". Anda akan diminta email dan '
+          'password. Setelah berhasil masuk Anda langsung dibawa ke beranda — '
+          'PIN tidak ditanyakan lagi. PIN-nya sendiri tidak berubah; atur '
+          'ulang lewat menu Profil → Kunci PIN.',
     ),
     (
       tanya: 'Apakah data hilang kalau aplikasi dihapus?',

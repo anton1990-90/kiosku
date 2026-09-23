@@ -75,7 +75,10 @@ class _PinScreenState extends ConsumerState<PinScreen> {
         title: const Text('Lupa PIN?'),
         content: const Text(
           'Untuk membuka, Anda perlu masuk dengan email dan password akun toko.\n\n'
-          'Setelah berhasil masuk, ganti PIN di menu Profil → Kunci PIN.',
+          'Setelah berhasil masuk, Anda langsung dibawa ke beranda — PIN tidak '
+          'ditanyakan lagi. PIN-nya sendiri tidak berubah; ganti di menu '
+          'Profil → Kunci PIN.\n\n'
+          'Kalau passwordnya juga lupa, pilih "Lupa password?" di layar masuk.',
         ),
         actions: [
           TextButton(

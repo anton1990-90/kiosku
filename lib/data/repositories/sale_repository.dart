@@ -24,6 +24,11 @@ class SaleRepository {
   /// [isDebt] menandai transaksi yang dicatat sebagai hutang pelanggan.
   /// Kalau [paidAmount] kurang dari total, sisa otomatis dibuatkan catatan
   /// piutang — jadi tidak perlu dicatat dua kali secara manual.
+  ///
+  /// [discount] adalah potongan untuk seluruh nota, di luar potongan per baris
+  /// yang sudah dikurangi di dalam `items`. Nilainya memotong total yang harus
+  /// dibayar **dan** laba, karena uang yang benar-benar masuk memang lebih
+  /// sedikit.
   Future<SaleModel> createSale({
     required int userId,
     required List<SaleItemModel> items,
@@ -32,11 +37,25 @@ class SaleRepository {
     required int paidAmount,
     bool isDebt = false,
     DateTime? dueDate,
+    int discount = 0,
   }) async {
     final db = await _db.database;
 
-    final totalAmount = items.fold(0, (sum, i) => sum + i.subtotal);
-    final totalProfit = items.fold(0, (sum, i) => sum + i.profit);
+    // Harga semua barang setelah potongan per baris.
+    final hargaBarang = items.fold(0, (sum, i) => sum + i.subtotal);
+
+    // Potongan nota dibatasi harga barang, supaya total tidak pernah negatif
+    // walau kasir salah mengetik angka.
+    final potonganNota = discount < 0
+        ? 0
+        : (discount > hargaBarang ? hargaBarang : discount);
+
+    final totalAmount = hargaBarang - potonganNota;
+
+    // Laba barang dikurangi potongan nota — uang masuknya memang lebih sedikit.
+    final labaBarang = items.fold(0, (sum, i) => sum + i.profit);
+    final totalProfit = labaBarang - potonganNota;
+
     final totalItems = items.fold(0, (sum, i) => sum + i.quantity);
 
     // Pembayaran tidak boleh negatif atau melebihi total.
@@ -61,6 +80,7 @@ class SaleRepository {
       paidAmount: dibayar,
       changeAmount: changeAmount,
       isDebt: catatPiutang,
+      discount: potonganNota,
       createdAt: now,
     );
 

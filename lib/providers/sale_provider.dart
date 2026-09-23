@@ -25,6 +25,8 @@ class SaleNotifier extends StateNotifier<AsyncValue<List<SaleModel>>> {
   ///
   /// Kalau [isDebt] true dan pembayaran kurang dari total, repositori
   /// sekaligus membuat catatan piutang pelanggan.
+  ///
+  /// [discount] adalah potongan untuk seluruh nota, di luar potongan per baris.
   Future<SaleModel?> checkout({
     required int userId,
     required List<SaleItemModel> items,
@@ -33,6 +35,7 @@ class SaleNotifier extends StateNotifier<AsyncValue<List<SaleModel>>> {
     required int paidAmount,
     bool isDebt = false,
     DateTime? dueDate,
+    int discount = 0,
   }) async {
     try {
       final sale = await _repo.createSale(
@@ -43,6 +46,7 @@ class SaleNotifier extends StateNotifier<AsyncValue<List<SaleModel>>> {
         paidAmount: paidAmount,
         isDebt: isDebt,
         dueDate: dueDate,
+        discount: discount,
       );
 
       await loadSales();

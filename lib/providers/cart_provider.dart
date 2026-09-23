@@ -7,9 +7,29 @@ class CartItem {
   final ProductModel product;
   final int quantity;
 
-  CartItem({required this.product, required this.quantity});
+  /// Potongan harga untuk baris ini, dalam rupiah.
+  final int discount;
 
-  int get subtotal => product.sellPrice * quantity;
+  CartItem({
+    required this.product,
+    required this.quantity,
+    this.discount = 0,
+  });
+
+  /// Harga sebelum potongan.
+  int get grossSubtotal => product.sellPrice * quantity;
+
+  /// Potongan yang benar-benar berlaku.
+  ///
+  /// Dibatasi harga barangnya: potongan tidak boleh melebihi harga, supaya
+  /// baris ini tidak pernah bernilai negatif walau kasir salah mengetik.
+  int get potongan {
+    final kotor = grossSubtotal;
+    return discount > kotor ? kotor : discount;
+  }
+
+  /// Harga yang dibayar pelanggan untuk baris ini.
+  int get subtotal => grossSubtotal - potongan;
 }
 
 /// Cart state for the Kasir (POS) screen.
@@ -18,13 +38,32 @@ class CartState {
   final String? customerName;
   final String paymentMethod;
 
+  /// Potongan untuk seluruh nota, di luar potongan per baris.
+  final int discount;
+
   const CartState({
     this.items = const [],
     this.customerName,
     this.paymentMethod = 'tunai',
+    this.discount = 0,
   });
 
-  int get totalAmount => items.fold(0, (sum, i) => sum + i.subtotal);
+  /// Jumlah harga semua barang setelah potongan per baris.
+  int get subtotal => items.fold(0, (sum, i) => sum + i.subtotal);
+
+  /// Potongan nota yang benar-benar berlaku, dibatasi harga barang.
+  int get potonganNota {
+    final kotor = subtotal;
+    return discount > kotor ? kotor : discount;
+  }
+
+  /// Total yang harus dibayar pelanggan.
+  int get totalAmount => subtotal - potonganNota;
+
+  /// Semua potongan yang berlaku — per baris ditambah potongan nota.
+  int get totalDiscount =>
+      items.fold(0, (sum, i) => sum + i.potongan) + potonganNota;
+
   int get totalItems => items.fold(0, (sum, i) => sum + i.quantity);
   bool get isEmpty => items.isEmpty;
 
@@ -40,6 +79,7 @@ class CartState {
               sellPrice: i.product.sellPrice,
               quantity: i.quantity,
               subtotal: i.subtotal,
+              discount: i.potongan,
               unit: i.product.unit,
             ))
         .toList();
@@ -49,11 +89,13 @@ class CartState {
     List<CartItem>? items,
     String? customerName,
     String? paymentMethod,
+    int? discount,
   }) {
     return CartState(
       items: items ?? this.items,
       customerName: customerName ?? this.customerName,
       paymentMethod: paymentMethod ?? this.paymentMethod,
+      discount: discount ?? this.discount,
     );
   }
 }
@@ -68,8 +110,13 @@ class CartNotifier extends StateNotifier<CartState> {
     if (existing >= 0) {
       final item = items[existing];
       if (item.quantity < product.stock) {
-        items[existing] =
-            CartItem(product: product, quantity: item.quantity + 1);
+        // Potongan baris ikut dipertahankan — kalau tidak, menambah jumlah
+        // diam-diam menghapus potongan yang sudah diketik kasir.
+        items[existing] = CartItem(
+          product: product,
+          quantity: item.quantity + 1,
+          discount: item.discount,
+        );
       }
     } else {
       if (product.stock > 0) {
@@ -91,8 +138,11 @@ class CartNotifier extends StateNotifier<CartState> {
     if (index >= 0) {
       final item = items[index];
       if (item.quantity < item.product.stock) {
-        items[index] =
-            CartItem(product: item.product, quantity: item.quantity + 1);
+        items[index] = CartItem(
+          product: item.product,
+          quantity: item.quantity + 1,
+          discount: item.discount,
+        );
       }
     }
     state = state.copyWith(items: items);
@@ -104,8 +154,13 @@ class CartNotifier extends StateNotifier<CartState> {
     if (index >= 0) {
       final item = items[index];
       if (item.quantity > 1) {
-        items[index] =
-            CartItem(product: item.product, quantity: item.quantity - 1);
+        // Sama seperti menambah jumlah: potongan baris jangan ikut terhapus.
+        // Kalau potongan jadi melebihi harga, getter `potongan` yang membatasi.
+        items[index] = CartItem(
+          product: item.product,
+          quantity: item.quantity - 1,
+          discount: item.discount,
+        );
       } else {
         items.removeAt(index);
       }
@@ -115,6 +170,29 @@ class CartNotifier extends StateNotifier<CartState> {
 
   void setCustomerName(String? name) {
     state = state.copyWith(customerName: name);
+  }
+
+  /// Atur potongan untuk satu baris keranjang, dalam rupiah.
+  ///
+  /// Nilai yang melebihi harga baris tetap disimpan apa adanya; yang membatasi
+  /// adalah getter [CartItem.potongan], supaya angka yang diketik kasir tidak
+  /// hilang diam-diam saat jumlah barangnya berubah.
+  void setItemDiscount(int productId, int discount) {
+    final items = List<CartItem>.from(state.items);
+    final index = items.indexWhere((i) => i.product.id == productId);
+    if (index < 0) return;
+    final item = items[index];
+    items[index] = CartItem(
+      product: item.product,
+      quantity: item.quantity,
+      discount: discount < 0 ? 0 : discount,
+    );
+    state = state.copyWith(items: items);
+  }
+
+  /// Atur potongan untuk seluruh nota, dalam rupiah.
+  void setDiscount(int discount) {
+    state = state.copyWith(discount: discount < 0 ? 0 : discount);
   }
 
   void setPaymentMethod(String method) {

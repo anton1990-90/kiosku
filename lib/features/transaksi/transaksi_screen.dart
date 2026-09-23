@@ -400,6 +400,18 @@ class _TransaksiScreenState extends ConsumerState<TransaksiScreen> {
                       color: AppColors.successMid,
                     ),
                   ),
+                  // Hanya muncul kalau transaksinya memang ada potongan.
+                  if (trx.totalDiscount > 0) ...[
+                    const SizedBox(height: 2),
+                    Text(
+                      'hemat ${Formatters.rupiahCompact(trx.totalDiscount)}',
+                      style: const TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.accentMid,
+                      ),
+                    ),
+                  ],
                 ],
               ),
             ],
@@ -459,14 +471,33 @@ class _TransaksiScreenState extends ConsumerState<TransaksiScreen> {
                   const SizedBox(width: 10),
                   SizedBox(
                     width: 88,
-                    child: Text(
-                      Formatters.rupiah(l.subtotal),
-                      textAlign: TextAlign.right,
-                      style: const TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.textMain,
-                      ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        // Harga sebelum potongan baris — dicoret, supaya jelas
+                        // kenapa angka di bawahnya lebih kecil dari qty x harga.
+                        if (l.discount > 0)
+                          Text(
+                            Formatters.rupiahCompact(l.subtotal + l.discount),
+                            style: const TextStyle(
+                              fontSize: 10,
+                              color: AppColors.textTertiary,
+                              decoration: TextDecoration.lineThrough,
+                            ),
+                          ),
+                        Text(
+                          Formatters.rupiah(l.subtotal),
+                          textAlign: TextAlign.right,
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: l.discount > 0
+                                ? AppColors.successMid
+                                : AppColors.textMain,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ],

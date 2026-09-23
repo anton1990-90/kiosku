@@ -12,6 +12,8 @@ class SaleModel {
   final int changeAmount;
   final bool isDebt; // true kalau sebagian/seluruhnya belum dibayar
   final int? debtId; // id catatan piutang yang dibuat dari transaksi ini
+  /// Potongan untuk seluruh nota, di luar potongan per baris. Dalam rupiah.
+  final int discount;
   final DateTime createdAt;
 
   SaleModel({
@@ -27,8 +29,16 @@ class SaleModel {
     required this.changeAmount,
     this.isDebt = false,
     this.debtId,
+    this.discount = 0,
     required this.createdAt,
   });
+
+  /// Harga barang sebelum potongan nota dikurangi.
+  ///
+  /// Dipakai struk untuk menampilkan baris "Potongan" hanya kalau memang ada,
+  /// dan untuk menghitung ulang harga barang di nota lama yang potongannya
+  /// belum tersimpan.
+  int get grossAmount => totalAmount + discount;
 
   /// Sisa yang belum dibayar pelanggan.
   int get unpaidAmount {
@@ -50,6 +60,7 @@ class SaleModel {
       'change_amount': changeAmount,
       'is_debt': isDebt ? 1 : 0,
       'debt_id': debtId,
+      'discount': discount,
       'created_at': createdAt.toIso8601String(),
     };
   }
@@ -68,6 +79,8 @@ class SaleModel {
       changeAmount: map['change_amount'] as int,
       isDebt: ((map['is_debt'] as int?) ?? 0) == 1,
       debtId: map['debt_id'] as int?,
+      // Nota yang tercatat sebelum versi 6 belum punya kolom ini.
+      discount: (map['discount'] as int?) ?? 0,
       createdAt: DateTime.parse(map['created_at'] as String),
     );
   }

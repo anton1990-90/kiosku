@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/utils/formatters.dart';
@@ -74,6 +75,7 @@ class _KasirScreenState extends ConsumerState<KasirScreen> {
       paidAmount: result.paid,
       isDebt: result.isDebt,
       dueDate: result.dueDate,
+      discount: cart.discount,
     );
 
     if (sale != null) {
@@ -84,6 +86,34 @@ class _KasirScreenState extends ConsumerState<KasirScreen> {
         _showReceiptDialog(sale, saleItems, user);
       }
     }
+  }
+
+  /// Atur potongan untuk satu baris keranjang.
+  Future<void> _aturDiskonBaris(CartItem item) async {
+    final hasil = await _tanyaRupiah(
+      context: context,
+      judul: 'Potongan ${item.product.name}',
+      keterangan: '${item.quantity} x ${Formatters.rupiah(item.product.sellPrice)} '
+          '= ${Formatters.rupiah(item.grossSubtotal)}',
+      nilaiAwal: item.potongan,
+      maksimum: item.grossSubtotal,
+    );
+    if (hasil == null || !mounted) return;
+    ref.read(cartProvider.notifier).setItemDiscount(item.product.id!, hasil);
+  }
+
+  /// Atur potongan untuk seluruh nota.
+  Future<void> _aturDiskonNota(CartState cart) async {
+    final hasil = await _tanyaRupiah(
+      context: context,
+      judul: 'Potongan seluruh nota',
+      keterangan: 'Harga barang setelah potongan per baris: '
+          '${Formatters.rupiah(cart.subtotal)}',
+      nilaiAwal: cart.potonganNota,
+      maksimum: cart.subtotal,
+    );
+    if (hasil == null || !mounted) return;
+    ref.read(cartProvider.notifier).setDiscount(hasil);
   }
 
   /// Scan a product barcode and add it to the cart.
@@ -170,6 +200,19 @@ class _KasirScreenState extends ConsumerState<KasirScreen> {
             const SizedBox(height: 4),
             Text('${sale.totalItems} item · ${sale.paymentMethod.toUpperCase()}',
                 style: const TextStyle(fontSize: 13, color: AppColors.textSecondary)),
+            // Kasir perlu melihat potongan yang benar-benar tersimpan, bukan
+            // hanya mengandalkan yang diketik di keranjang tadi.
+            if (sale.discount > 0) ...[
+              const SizedBox(height: 4),
+              Text(
+                'Potongan nota: ${Formatters.rupiah(sale.discount)}',
+                style: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.accentMid,
+                ),
+              ),
+            ],
             if (sale.changeAmount > 0) ...[
               const SizedBox(height: 8),
               Container(
@@ -468,7 +511,9 @@ class _KasirScreenState extends ConsumerState<KasirScreen> {
                     ),
                     const SizedBox(height: 14),
                     ConstrainedBox(
-                      constraints: const BoxConstraints(maxHeight: 100),
+                      // Dinaikkan dari 100 sejak tiap baris bisa memuat dua
+                      // baris teks (harga asli dicoret + harga setelah potongan).
+                      constraints: const BoxConstraints(maxHeight: 128),
                       child: ListView.builder(
                         shrinkWrap: true,
                         itemCount: cart.items.length,
@@ -523,20 +568,121 @@ class _KasirScreenState extends ConsumerState<KasirScreen> {
                                 ),
                                 Expanded(
                                   flex: 2,
-                                  child: Text(
-                                    Formatters.rupiah(item.subtotal),
-                                    style: const TextStyle(
-                                      fontSize: 13,
-                                      fontWeight: FontWeight.w600,
-                                      color: AppColors.textMain,
+                                  child: GestureDetector(
+                                    behavior: HitTestBehavior.opaque,
+                                    onTap: () => _aturDiskonBaris(item),
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.end,
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        if (item.potongan > 0)
+                                          Text(
+                                            Formatters.rupiah(item.grossSubtotal),
+                                            style: const TextStyle(
+                                              fontSize: 11,
+                                              color: AppColors.textTertiary,
+                                              decoration:
+                                                  TextDecoration.lineThrough,
+                                            ),
+                                          ),
+                                        Text(
+                                          Formatters.rupiah(item.subtotal),
+                                          style: TextStyle(
+                                            fontSize: 13,
+                                            fontWeight: FontWeight.w600,
+                                            color: item.potongan > 0
+                                                ? AppColors.successMid
+                                                : AppColors.textMain,
+                                          ),
+                                          textAlign: TextAlign.right,
+                                        ),
+                                      ],
                                     ),
-                                    textAlign: TextAlign.right,
+                                  ),
+                                ),
+                                GestureDetector(
+                                  behavior: HitTestBehavior.opaque,
+                                  onTap: () => _aturDiskonBaris(item),
+                                  child: Padding(
+                                    padding: const EdgeInsets.only(left: 8),
+                                    child: Icon(
+                                      Icons.percent,
+                                      size: 16,
+                                      color: item.potongan > 0
+                                          ? AppColors.successMid
+                                          : AppColors.textTertiary,
+                                    ),
                                   ),
                                 ),
                               ],
                             ),
                           );
                         },
+                      ),
+                    ),
+                    const Divider(height: 16),
+                    // Baris potongan hanya muncul kalau memang ada potongan,
+                    // supaya tampilan normal tidak ikut ramai.
+                    if (cart.totalDiscount > 0) ...[
+                      barisRincian(
+                        'Harga barang',
+                        Formatters.rupiah(
+                          cart.subtotal + cart.items.fold(0, (s, i) => s + i.potongan),
+                        ),
+                      ),
+                      if (cart.items.any((i) => i.potongan > 0))
+                        barisRincian(
+                          'Potongan barang',
+                          '-${Formatters.rupiah(cart.items.fold(0, (s, i) => s + i.potongan))}',
+                        ),
+                      const SizedBox(height: 6),
+                    ],
+                    // Potongan nota selalu bisa diketuk, walau nilainya masih nol.
+                    GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onTap: () => _aturDiskonNota(cart),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 4),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Text(
+                              'Potongan nota',
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: AppColors.textSecondary,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  cart.potonganNota > 0
+                                      ? '-${Formatters.rupiah(cart.potonganNota)}'
+                                      : 'Tambah',
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w700,
+                                    color: cart.potonganNota > 0
+                                        ? AppColors.successMid
+                                        : AppColors.primary,
+                                  ),
+                                ),
+                                const SizedBox(width: 4),
+                                Icon(
+                                  cart.potonganNota > 0
+                                      ? Icons.edit_outlined
+                                      : Icons.add_circle_outline,
+                                  size: 15,
+                                  color: cart.potonganNota > 0
+                                      ? AppColors.successMid
+                                      : AppColors.primary,
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                     const Divider(height: 16),
@@ -593,6 +739,82 @@ class _KasirScreenState extends ConsumerState<KasirScreen> {
       ),
     );
   }
+}
+
+/// Tanya nominal potongan (rupiah) lewat dialog angka.
+///
+/// Mengembalikan `null` kalau dibatalkan, dan `0` kalau kasir memilih
+/// menghapus potongan. Nilai yang melebihi [maksimum] sengaja **tidak**
+/// dipotong di sini — pembatasan sesungguhnya ada di keranjang, supaya angka
+/// yang diketik kasir tidak berubah diam-diam saat jumlah barangnya diubah.
+Future<int?> _tanyaRupiah({
+  required BuildContext context,
+  required String judul,
+  required String keterangan,
+  required int nilaiAwal,
+  required int maksimum,
+}) async {
+  final controller = TextEditingController(text: nilaiAwal == 0 ? '' : '$nilaiAwal');
+  final hasil = await showDialog<int>(
+    context: context,
+    builder: (ctx) {
+      return AlertDialog(
+        title: Text(judul),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              keterangan,
+              style: const TextStyle(
+                fontSize: 13,
+                color: AppColors.textSecondary,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'Maksimal ${Formatters.rupiah(maksimum)}',
+              style: const TextStyle(
+                fontSize: 12,
+                color: AppColors.textTertiary,
+              ),
+            ),
+            const SizedBox(height: 14),
+            TextField(
+              controller: controller,
+              autofocus: true,
+              keyboardType: TextInputType.number,
+              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+              decoration: const InputDecoration(
+                prefixText: 'Rp ',
+                hintText: '0',
+                border: OutlineInputBorder(),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, 0),
+            child: const Text('Hapus potongan'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Batal'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              final angka = int.tryParse(controller.text.trim()) ?? 0;
+              Navigator.pop(ctx, angka < 0 ? 0 : angka);
+            },
+            child: const Text('Simpan'),
+          ),
+        ],
+      );
+    },
+  );
+  controller.dispose();
+  return hasil;
 }
 
 /// Hasil dialog pembayaran.

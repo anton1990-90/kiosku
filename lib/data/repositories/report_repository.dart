@@ -71,7 +71,10 @@ class ReportRepository {
       SELECT si.product_name,
              SUM(si.quantity) AS qty,
              SUM(si.subtotal) AS revenue,
-             SUM((si.sell_price - si.cost_price) * si.quantity) AS profit
+             -- Laba dihitung dari harga setelah potongan baris, bukan dari
+             -- harga label. Kalau memakai sell_price, potongan kasir tidak
+             -- ikut mengurangi laba dan laba yang dilaporkan jadi terlalu besar.
+             SUM(si.subtotal - si.cost_price * si.quantity) AS profit
       FROM sale_items si
       INNER JOIN sales s ON s.id = si.sale_id
       WHERE s.created_at >= ? AND s.created_at < ?

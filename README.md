@@ -1,4 +1,4 @@
-# TokoKu — Aplikasi UMKM Toko Sembako & Penjualan (v1.12.0)
+# TokoKu — Aplikasi UMKM Toko Sembako & Penjualan (v1.13.0)
 
 Aplikasi mobile cross-platform (Android & iOS) untuk toko sembako UMKM. Dibuat dengan Flutter, bekerja **offline-first** dengan autentikasi email.
 
@@ -7,6 +7,7 @@ Aplikasi mobile cross-platform (Android & iOS) untuk toko sembako UMKM. Dibuat d
 - **Offline-first**: Semua data tersimpan di perangkat (SQLite). Tidak butuh internet untuk jualan.
 - **Autentikasi email**: Login dengan email & password. Akses penjualan dikendalikan sesuai email terdaftar.
 - **Kasir (POS)**: Transaksi cepat dengan keranjang otomatis, pilihan metode pembayaran (tunai, QRIS, e-wallet), dan kalkulasi kembalian.
+- **Potongan harga**: Potongan bisa diberikan **per barang** ("beli 2 kurang 500") maupun **untuk seluruh nota** ("borongan kurang 2.000"). Nilainya rupiah, bukan persen, dan selalu dibatasi harga barangnya supaya total tidak pernah negatif. Potongan ikut tercetak di struk, terlihat di riwayat transaksi, dan **mengurangi laba** yang dilaporkan — bukan hanya mengurangi total bayar.
 - **Scan barcode**: Scan barcode produk (EAN-13/UPC) langsung dari kamera — untuk menambah barang ke keranjang maupun mengisi barcode saat menambah produk baru.
 - **Cetak struk thermal**: Cetak struk ke printer thermal Bluetooth 58mm/80mm setelah transaksi.
 - **Cetak ulang struk**: Struk transaksi lama bisa dicetak lagi kapan saja dari riwayat transaksi — berguna kalau kertas habis, printer mati, atau pelanggan minta salinan.
@@ -150,14 +151,14 @@ cloudflare/                          # Server aktivasi lisensi (Worker + D1)
 
 ## Skema Database (SQLite)
 
-Versi skema: **5**. Migrasi berjalan otomatis dan tidak menghapus data yang sudah ada — kolom baru selalu ditambahkan lewat `ALTER TABLE`, sedangkan tabel lama tidak pernah ditulis ulang.
+Versi skema: **6**. Migrasi berjalan otomatis dan tidak menghapus data yang sudah ada — kolom baru selalu ditambahkan lewat `ALTER TABLE`, sedangkan tabel lama tidak pernah ditulis ulang.
 
 | Table | Purpose |
 |-------|---------|
 | `users` | Akun dengan email, password hash, nama toko, telepon toko, path logo |
 | `products` | Produk dengan nama, kategori, harga modal/jual, stok, satuan, dan path foto |
-| `sales` | Transaksi dengan invoice number, total, laba, metode bayar, penanda hutang |
-| `sale_items` | Line items per transaksi (product, qty, satuan saat terjual, subtotal) |
+| `sales` | Transaksi dengan invoice number, total, laba, metode bayar, penanda hutang, dan potongan nota |
+| `sale_items` | Line items per transaksi (product, qty, satuan saat terjual, subtotal setelah potongan, potongan baris) |
 | `suppliers` | Data pemasok yang bisa diedit |
 | `payment_methods` | Metode pembayaran yang bisa diaktifkan/dinonaktifkan |
 | `debts` | Piutang pelanggan & hutang ke supplier (terhubung ke `sale_id` / `product_id`) |
@@ -177,6 +178,25 @@ dirawat: setiap laporan bisa ditelusuri balik ke transaksi aslinya.
 Neraca selalu seimbang. Karena stok awal contoh tidak punya jurnal pembuka,
 muncul satu baris penyeimbang bernama **"Modal awal & penyesuaian"** dengan
 penjelasan di layar maupun di PDF — bukan ketidakseimbangan yang disembunyikan.
+
+### Catatan potongan harga
+
+Potongan **per barang** disimpan sudah terpotong di dalam
+`sale_items.subtotal`, sedangkan potongan **seluruh nota** disimpan di
+`sales.discount` dan mengurangi `sales.total_amount`. Dengan begitu berlaku
+satu aturan yang dipegang seluruh laporan:
+
+```
+SUM(sale_items.subtotal) = sales.total_amount + sales.discount
+```
+
+Artinya semua laporan yang membaca `sales.total_amount` (pendapatan harian,
+bulanan, buku kas) dan semua yang membaca `SUM(sale_items.subtotal)`
+(produk terlaris, rincian produk terjual) **otomatis ikut benar** tanpa perlu
+diubah. Yang harus ikut diubah hanyalah perhitungan **laba**, karena laba tidak
+boleh dihitung dari harga label — potongan yang diberikan kasir adalah uang yang
+tidak jadi masuk. Karena itu `sale_items.profit` dan seluruh query laba
+memakai `subtotal - cost_price * quantity`, bukan `sell_price - cost_price`.
 
 ## Palet Warna
 

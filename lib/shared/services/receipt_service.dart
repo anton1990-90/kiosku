@@ -112,12 +112,36 @@ class ReceiptService {
           styles: const PosStyles(align: PosAlign.right),
         ),
       ]);
+      // Baris potongan hanya muncul kalau kasir memang memberi potongan untuk
+      // barang ini — kalau tidak, struk biasa tidak bertambah panjang.
+      if (item.discount > 0) {
+        bytes += generator.row([
+          PosColumn(text: '  Potongan', width: 7),
+          PosColumn(
+            text: '-${Formatters.rupiah(item.discount)}',
+            width: 5,
+            styles: const PosStyles(align: PosAlign.right),
+          ),
+        ]);
+      }
     }
 
     bytes += generator.text(
       '--------------------------------',
       styles: const PosStyles(align: PosAlign.center),
     );
+
+    // Potongan nota, di luar potongan per baris yang sudah dicetak di atas.
+    if (sale.discount > 0) {
+      bytes += generator.row([
+        PosColumn(text: 'Potongan nota', width: 7),
+        PosColumn(
+          text: '-${Formatters.rupiah(sale.discount)}',
+          width: 5,
+          styles: const PosStyles(align: PosAlign.right),
+        ),
+      ]);
+    }
 
     // Totals
     bytes += generator.row([
@@ -327,8 +351,14 @@ class ReceiptService {
       buffer.writeln(item.productName);
       buffer.writeln(
           '  ${item.quantity} ${item.unit} x ${Formatters.rupiah(item.sellPrice)} = ${Formatters.rupiah(item.subtotal)}');
+      if (item.discount > 0) {
+        buffer.writeln('  Potongan        : -${Formatters.rupiah(item.discount)}');
+      }
     }
     buffer.write(line);
+    if (sale.discount > 0) {
+      buffer.writeln('Potongan nota: -${Formatters.rupiah(sale.discount)}');
+    }
     buffer.writeln('TOTAL      : ${Formatters.rupiah(sale.totalAmount)}');
     buffer.writeln('Tunai      : ${Formatters.rupiah(sale.paidAmount)}');
     buffer.writeln('Kembali    : ${Formatters.rupiah(sale.changeAmount)}');

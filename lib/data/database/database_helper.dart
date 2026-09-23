@@ -15,13 +15,18 @@ import 'package:sqflite/sqflite.dart';
 ///   4 — + kolom pembayaran pada users: qris_path (gambar QRIS),
 ///       bank_name, bank_account_number, bank_account_name
 ///   5 — + kolom pada products: unit (satuan: pcs, kg, liter, …) dan
-///       photo_path (foto barang dari galeri; emoji tetap jadi cadangan)
+///       photo_path (foto barang dari galeri; emoji tetap jadi cadangan),
+///       serta sale_items.unit (satuan yang direkam saat barang terjual)
+///   6 — + kolom diskon: sales.discount (potongan nota) dan
+///       sale_items.discount (potongan per baris). Sejak versi ini
+///       `sale_items.subtotal` menyimpan harga SETELAH potongan baris, dan
+///       `sales.total_amount` adalah jumlah yang benar-benar dibayar.
 class DatabaseHelper {
   DatabaseHelper._();
   static final DatabaseHelper instance = DatabaseHelper._();
 
   static const _dbName = 'tokoku.db';
-  static const _dbVersion = 5;
+  static const _dbVersion = 6;
 
   Database? _database;
 
@@ -51,6 +56,7 @@ class DatabaseHelper {
     await _createV3Tables(db);
     await _upgradeV4(db);
     await _upgradeV5(db);
+    await _upgradeV6(db);
     await _seedProducts(db);
     await _seedPaymentMethods(db);
   }
@@ -329,6 +335,25 @@ class DatabaseHelper {
     await _addColumnIfMissing(db, 'sale_items', 'unit', "TEXT NOT NULL DEFAULT 'pcs'");
   }
 
+  /// Kolom versi 6 — potongan harga.
+  ///
+  /// Dua tingkat, karena begitulah cara toko sungguhan berjualan:
+  ///   * `sale_items.discount` — potongan per barang ("beli 2 kurang 500")
+  ///   * `sales.discount`      — potongan seluruh nota ("borongan kurang 2000")
+  ///
+  /// Nilainya rupiah, bukan persen: pemilik toko menyebut potongan dalam
+  /// rupiah, dan persen menuntut pembulatan yang bisa bikin total tidak cocok
+  /// dengan uang yang benar-benar diterima.
+  ///
+  /// Sejak versi ini `sale_items.subtotal` adalah harga **setelah** potongan
+  /// barisnya, dan `sales.total_amount` adalah jumlah yang benar-benar
+  /// dibayar. Dengan begitu seluruh laporan yang membaca `total_amount`
+  /// otomatis ikut benar tanpa perlu diubah.
+  Future<void> _upgradeV6(Database db) async {
+    await _addColumnIfMissing(db, 'sales', 'discount', 'INTEGER NOT NULL DEFAULT 0');
+    await _addColumnIfMissing(db, 'sale_items', 'discount', 'INTEGER NOT NULL DEFAULT 0');
+  }
+
   /// Migrasi dari versi lama. Data yang sudah ada tidak boleh hilang.
   Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
     if (oldVersion < 2) {
@@ -345,6 +370,9 @@ class DatabaseHelper {
     }
     if (oldVersion < 5) {
       await _upgradeV5(db);
+    }
+    if (oldVersion < 6) {
+      await _upgradeV6(db);
     }
   }
 

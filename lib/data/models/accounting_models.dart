@@ -150,6 +150,8 @@ class SaleWithItems {
   final int paidAmount;
   final int changeAmount;
   final bool isDebt;
+  /// Potongan untuk seluruh nota, di luar potongan per baris. Dalam rupiah.
+  final int discount;
   final DateTime createdAt;
   final List<SaleLine> lines;
 
@@ -164,9 +166,15 @@ class SaleWithItems {
     required this.paidAmount,
     required this.changeAmount,
     this.isDebt = false,
+    this.discount = 0,
     required this.createdAt,
     this.lines = const [],
   });
+
+  /// Semua potongan yang berlaku pada nota ini: potongan per baris ditambah
+  /// potongan nota.
+  int get totalDiscount =>
+      lines.fold(0, (s, l) => s + l.discount) + discount;
 
   int get sisaBelumDibayar {
     final sisa = totalAmount - paidAmount;
@@ -180,7 +188,10 @@ class SaleLine {
   final int quantity;
   final int sellPrice;
   final int costPrice;
+  /// Harga baris setelah potongan baris dikurangi.
   final int subtotal;
+  /// Potongan untuk baris ini, dalam rupiah.
+  final int discount;
 
   const SaleLine({
     required this.productName,
@@ -188,7 +199,9 @@ class SaleLine {
     required this.sellPrice,
     required this.costPrice,
     required this.subtotal,
+    this.discount = 0,
   });
 
-  int get profit => (sellPrice - costPrice) * quantity;
+  /// Laba baris ini, dihitung dari uang yang benar-benar dibayar.
+  int get profit => subtotal - costPrice * quantity;
 }

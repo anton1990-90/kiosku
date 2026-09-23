@@ -210,7 +210,8 @@ class AccountingRepository {
     final ids = saleRows.map((r) => r['id'] as int).toList();
     final placeholders = List.filled(ids.length, '?').join(',');
     final itemRows = await db.rawQuery('''
-      SELECT sale_id, product_name, quantity, sell_price, cost_price, subtotal
+      SELECT sale_id, product_name, quantity, sell_price, cost_price, subtotal,
+             discount
       FROM sale_items
       WHERE sale_id IN ($placeholders)
       ORDER BY id ASC
@@ -226,6 +227,7 @@ class AccountingRepository {
               sellPrice: (r['sell_price'] as int?) ?? 0,
               costPrice: (r['cost_price'] as int?) ?? 0,
               subtotal: (r['subtotal'] as int?) ?? 0,
+              discount: (r['discount'] as int?) ?? 0,
             ),
           );
     }
@@ -243,6 +245,7 @@ class AccountingRepository {
         paidAmount: (r['paid_amount'] as int?) ?? 0,
         changeAmount: (r['change_amount'] as int?) ?? 0,
         isDebt: ((r['is_debt'] as int?) ?? 0) == 1,
+        discount: (r['discount'] as int?) ?? 0,
         createdAt:
             DateTime.tryParse(r['created_at'] as String? ?? '') ??
                 DateTime.now(),
@@ -259,7 +262,9 @@ class AccountingRepository {
       SELECT si.product_name AS name,
              SUM(si.quantity) AS qty,
              SUM(si.subtotal) AS revenue,
-             SUM((si.sell_price - si.cost_price) * si.quantity) AS profit
+             -- Sama seperti daftar produk terlaris: laba harus dihitung dari
+             -- harga setelah potongan, supaya potongan kasir mengurangi laba.
+             SUM(si.subtotal - si.cost_price * si.quantity) AS profit
       FROM sale_items si
       INNER JOIN sales s ON s.id = si.sale_id
       WHERE s.created_at >= ? AND s.created_at < ?

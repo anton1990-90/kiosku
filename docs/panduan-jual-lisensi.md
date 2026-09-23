@@ -22,6 +22,7 @@ sudah **berjalan**. Tidak ada lagi langkah persiapan yang tertinggal.
 | Halaman unduh APK untuk pelanggan | Selesai — [buka halaman unduh](https://tokoku-lisensi.dompetkuai.workers.dev/unduh) |
 | **Kunci tanda tangan (BAGIAN A)** | **Selesai** — 4 GitHub Secrets sudah terisi, APK ditandatangani kunci rilis |
 | **Server aktivasi (BAGIAN B)** | **Selesai** — berjalan di `https://tokoku-lisensi.dompetkuai.workers.dev` |
+| **Pesanan otomatis dari OrderHero (BAGIAN C-2)** | **Kode selesai & sudah terpasang di server** — tinggal 2 langkah milik Anda: beli domain untuk email, lalu sambungkan OrderHero |
 
 ### Akun GitHub Anda tidak lagi terlihat pelanggan
 
@@ -62,6 +63,10 @@ Pelanggan instal APK
 
 Yang perlu Anda kerjakan hanya **menyerahkan Kode Voucher**. Tidak ada langkah
 manual lagi — pelanggan menyelesaikan sendiri dalam satu menit.
+
+> Kalau Anda berjualan di **OrderHero**, langkah "menyerahkan Kode Voucher" itu
+> pun bisa dihilangkan: kode dikirim otomatis ke email pelanggan begitu
+> pembayaran masuk. Lihat **BAGIAN C-2** di bawah.
 
 Pelanggan yang tidak mau membuka portal juga bisa menempel langsung Kode Voucher
 ke kolom Kode Aktivasi di aplikasi. Hasilnya sama.
@@ -258,6 +263,106 @@ Atau buka `<alamat-worker>/admin`.
 
 ---
 
+## BAGIAN C-2 — Jualan otomatis di OrderHero (opsional)
+
+Bagian ini **tidak wajib**. Kalau Anda menjual manual lewat WhatsApp, BAGIAN C
+sudah cukup. Bagian ini untuk kalau Anda berjualan di **OrderHero**: pelanggan
+yang sudah membayar akan **langsung menerima email berisi kode voucher**, tanpa
+Anda sentuh sama sekali.
+
+```
+Pelanggan bayar di OrderHero
+   → OrderHero memberi tahu server Anda
+   → server membuat 1 kode voucher baru
+   → server mengirim email: kode voucher + tautan unduh + tautan portal
+   → pelanggan mengaktifkan sendiri
+```
+
+Anda hanya perlu menyiapkan dua hal: **alamat email pengirim** dan **menyambungkan
+OrderHero ke server**. Keduanya sekali saja.
+
+### Yang Anda perlukan
+
+| Keperluan | Perkiraan biaya | Wajib? |
+|---|---|---|
+| Domain sendiri untuk alamat email | Rp 150–250rb / tahun | Ya, kalau mau email otomatis |
+| Akun Resend (pengirim email) | **Gratis** — 3.000 email/bulan | Ya, kalau mau email otomatis |
+
+Kalau Anda **belum punya domain**, jangan tunda penjualan karena ini. Tanpa
+domain, kode voucher tetap dibuat otomatis saat ada pembeli — hanya saja
+emailnya tidak terkirim, dan Anda mengirim kodenya manual seperti BAGIAN C.
+Semuanya bisa dinyalakan nanti tanpa mengubah aplikasi pelanggan.
+
+### Langkah 1 — Beli domain, sambungkan ke Resend
+
+1. Beli satu domain di registrar mana pun (Namecheap, Cloudflare Registrar,
+   Niagahoster, Rumahweb — bebas).
+2. Daftar gratis di https://resend.com
+3. **Domains → Add Domain** → masukkan domain Anda
+4. Resend menampilkan beberapa record **SPF** dan **DKIM**. Salin semuanya ke
+   pengaturan DNS domain Anda (di tempat Anda membeli domain).
+5. Tunggu sampai Resend menandainya **Verified**. Biasanya beberapa menit,
+   paling lama beberapa jam.
+
+> Ini yang membuat email Anda tidak masuk folder spam. Tanpa SPF/DKIM, Gmail
+> akan curiga dan email voucher pelanggan bisa nyasar ke spam.
+
+### Langkah 2 — Masukkan tiga rahasia ke Cloudflare
+
+Dari dalam folder `cloudflare/`:
+
+```bash
+npx wrangler secret put ORDERHERO_WEBHOOK_SECRET
+npx wrangler secret put RESEND_API_KEY
+npx wrangler secret put EMAIL_DARI
+```
+
+| Rahasia | Diambil dari |
+|---|---|
+| `ORDERHERO_WEBHOOK_SECRET` | Dashboard OrderHero → Plugin → Webhook (nilai `whsec_...`) |
+| `RESEND_API_KEY` | Resend → API Keys → Create API Key |
+| `EMAIL_DARI` | Alamat pengirim pilihan Anda, mis. `TokoKu <kode@domainanda.com>` |
+
+`EMAIL_DARI` **harus** memakai domain yang sudah diverifikasi di Langkah 1.
+
+### Langkah 3 — Sambungkan OrderHero ke server
+
+Buka dashboard OrderHero → **Plugin → Webhook**, lalu isi:
+
+| Kolom | Isi |
+|---|---|
+| URL | `https://tokoku-lisensi.dompetkuai.workers.dev/webhook/orderhero` |
+| Event | centang `order_paid` (pesanan lunas) |
+| Secret | salin nilainya, lalu pakai sebagai `ORDERHERO_WEBHOOK_SECRET` di Langkah 2 |
+
+OrderHero akan mengirim percobaan. Kalau server menjawab sukses, sambungan
+sudah beres.
+
+### Cara memastikan sudah jalan
+
+Setelah semuanya terpasang, lakukan **satu pembelian percobaan** di toko
+OrderHero Anda sendiri (pakai email Anda). Dalam waktu kurang dari satu menit:
+
+- email berisi kode voucher harus masuk — cek juga folder **spam**
+- kode itu harus muncul di halaman admin Anda, di kolom **Pesanan**
+
+Kalau email tidak masuk tapi kodenya muncul di admin, berarti emailnya yang
+bermasalah (biasanya domain belum **Verified** di Resend) — kodenya tetap aman
+dan bisa Anda kirim manual. Kalau kode tidak muncul sama sekali, berarti
+sambungan webhook belum benar.
+
+### Hal-hal yang sudah dijaga server untuk Anda
+
+- **Tidak bisa dipalsukan.** Setiap kabar dari OrderHero wajib membawa tanda
+  tangan rahasia. Orang lain yang tahu alamat webhook tetap tidak bisa membuat
+  voucher.
+- **Tidak bisa dobel.** Kalau OrderHero mengirim kabar yang sama dua kali (itu
+  normal, namanya percobaan ulang), server hanya membuat **satu** voucher.
+- **Kode yang gagal dikirim email tetap tersimpan.** Kalau emailnya gagal,
+  vouchernya tidak hilang — Anda tinggal kirim ulang dari halaman admin.
+
+---
+
 ## BAGIAN D — Merilis update aplikasi
 
 Setiap kali kode diubah:
@@ -375,6 +480,14 @@ gagal, APK-nya tetap "hijau" di GitHub tapi tidak layak dijual:
       pesan "sudah dipakai di HP lain"
 - [ ] Voucher percobaan sudah dinonaktifkan dari halaman admin
 
+**Hanya kalau Anda mau jualan lewat OrderHero (BAGIAN C-2):**
+
+- [ ] Domain sudah dibeli dan sudah **Verified** di Resend
+- [ ] Tiga rahasia sudah diisi: `ORDERHERO_WEBHOOK_SECRET`, `RESEND_API_KEY`, `EMAIL_DARI`
+- [ ] Webhook sudah didaftarkan di dashboard OrderHero dengan event `order_paid`
+- [ ] Sudah tes beli sendiri 1× → email voucher masuk (cek juga folder spam)
+- [ ] Sudah tes: kirim kabar yang sama 2× → tetap **1** voucher, bukan 2
+
 ---
 
 ## Kalau nanti mau menambah fitur
@@ -383,8 +496,11 @@ Beberapa hal yang mudah ditambahkan tanpa mengubah arsitektur:
 
 - **Kode voucher berisi harga.** Tambahkan kolom di tabel `vouchers`, lalu
   tampilkan di portal supaya pelanggan tahu paket yang dibeli.
-- **Pembelian otomatis.** Kalau nanti jualan lewat marketplace atau toko online,
-  server marketplace bisa memanggil `POST /admin/vouchers` untuk membuat kode
-  otomatis saat ada yang membayar.
+- **Pembelian otomatis di platform lain.** Untuk OrderHero sudah jadi
+  (BAGIAN C-2). Untuk platform lain (Lynk.id, Tokopedia, dsb.) caranya sama —
+  cukup tambahkan satu fungsi penerima di `cloudflare/src/index.js` yang
+  membuat voucher lalu memanggil `kirimEmailVoucher`. **Tapi jangan dikerjakan
+  sebelum punya contoh payload asli dari platform itu**, karena format tanda
+  tangan tiap platform berbeda dan tidak boleh ditebak-tebak.
 - **Masa berlaku voucher.** Tambahkan kolom tanggal kedaluwarsa dan periksa di
   `/api/aktivasi`.

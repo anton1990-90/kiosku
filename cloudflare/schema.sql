@@ -1,10 +1,14 @@
 -- ============================================================================
 -- TokoKu — Skema database lisensi (Cloudflare D1 / SQLite)
 --
--- Cara pakai:
+-- Cara pakai (database baru):
 --   npx wrangler d1 execute tokoku-lisensi --remote --file=cloudflare/schema.sql
 --
 -- Aman dijalankan berulang kali (semua pakai "if not exists").
+--
+-- CATATAN: berkas ini menggambarkan bentuk AKHIR. Untuk database yang sudah
+-- ada, jangan pakai berkas ini — pakai berkas di folder `migrasi/` (SQLite
+-- tidak mendukung "add column if not exists").
 -- ============================================================================
 
 
@@ -15,13 +19,15 @@
 -- sekali pakai: begitu ditukar, statusnya jadi 'used' dan terkunci ke satu HP.
 -- ---------------------------------------------------------------------------
 create table if not exists vouchers (
-  code          text primary key,               -- VC-XXXX-XXXX-XXXX
-  batch         text not null default '',       -- penanda kelompok, mis. "Grosir-2026-09"
-  customer_name text not null default '',       -- nama pembeli (opsional, diisi saat buat)
-  status        text not null default 'unused', -- unused | used | revoked
-  license_code  text,                           -- Kode Aktivasi hasil penukaran (AK-...)
-  created_at    text not null,
-  used_at       text
+  code           text primary key,               -- VC-XXXX-XXXX-XXXX
+  batch          text not null default '',       -- penanda kelompok, mis. "Grosir-2026-09"
+  customer_name  text not null default '',       -- nama pembeli (opsional, diisi saat buat)
+  customer_email text not null default '',       -- email pembeli (diisi webhook pesanan)
+  order_ref      text not null default '',       -- nomor pesanan platform, mis. FO25ABCD1234
+  status         text not null default 'unused', -- unused | used | revoked
+  license_code   text,                           -- Kode Aktivasi hasil penukaran (AK-...)
+  created_at     text not null,
+  used_at        text
 );
 
 create index if not exists vouchers_status_idx on vouchers (status);
@@ -51,6 +57,29 @@ create index if not exists licenses_status_idx  on licenses (status);
 
 
 -- ---------------------------------------------------------------------------
+-- Tabel webhook_events — pesanan dari platform jualan (OrderHero / Lynk).
+--
+-- delivery_id adalah kunci utama, dan itulah yang membuat penerimaan pesanan
+-- IDEMPOTEN: platform bisa mengirim satu event lebih dari sekali, dan tanpa
+-- tabel ini kita akan membuat dua voucher untuk satu pembayaran.
+-- ---------------------------------------------------------------------------
+create table if not exists webhook_events (
+  delivery_id  text primary key,                -- X-Webhook-Delivery dari platform
+  sumber       text not null default '',        -- orderhero | lynk
+  event        text not null default '',        -- order_paid | order_new | ...
+  status       text not null default '',        -- processed | ignored | error
+  voucher_code text,                            -- voucher yang dibuat
+  email        text not null default '',        -- email pembeli
+  email_status text not null default '',        -- terkirim | gagal:<alasan> | dilewati
+  alasan       text not null default '',        -- keterangan tambahan
+  received_at  text not null
+);
+
+create index if not exists webhook_events_waktu_idx on webhook_events (received_at);
+create index if not exists webhook_events_voucher_idx on webhook_events (voucher_code);
+
+
+-- ---------------------------------------------------------------------------
 -- Contoh pemeriksaan manual (pakai wrangler):
 --
 --   -- lihat semua lisensi yang sudah aktif
@@ -64,4 +93,8 @@ create index if not exists licenses_status_idx  on licenses (status);
 --   -- nonaktifkan lisensi (mis. pelanggan minta refund)
 --   npx wrangler d1 execute tokoku-lisensi --remote --command \
 --     "update licenses set status = 'revoked' where code = 'AK-XXXX-XXXX-XXXX'"
+--
+--   -- lihat pesanan yang masuk dari platform jualan
+--   npx wrangler d1 execute tokoku-lisensi --remote --command \
+--     "select delivery_id, event, status, voucher_code, email_status from webhook_events order by received_at desc limit 20"
 -- ---------------------------------------------------------------------------

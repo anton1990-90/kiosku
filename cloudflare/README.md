@@ -5,6 +5,11 @@
 > Database D1 `tokoku-lisensi` sudah dibuat dan `schema.sql` sudah dijalankan.
 > Secret `ADMIN_KEY` sudah terpasang. Langkah di bawah disimpan untuk keadaan
 > darurat — misalnya kalau server perlu dibuat ulang dari nol.
+>
+> **Belum terpasang:** tiga rahasia untuk pesanan otomatis —
+> `ORDERHERO_WEBHOOK_SECRET`, `RESEND_API_KEY`, `EMAIL_DARI`. Selama ketiganya
+> kosong, penjualan lewat OrderHero belum mengirim email; lihat bagian
+> [Pesanan otomatis dari OrderHero](#pesanan-otomatis-dari-orderhero).
 
 Folder ini berisi seluruh server aktivasi lisensi TokoKu: satu Worker yang
 sekaligus menjadi **API aktivasi**, **portal pelanggan**, **halaman unduh APK**,
@@ -34,6 +39,11 @@ Cloudflare Worker **tidak pernah dibekukan**. Kuota gratisnya juga lebih besar:
 - **Node.js** 18 atau lebih baru (untuk menjalankan `wrangler`)
 
 Tidak perlu kartu kredit. Tidak perlu beli domain.
+
+> **Kecuali** Anda ingin email voucher terkirim otomatis ke pembeli. Mengirim
+> email butuh domain sendiri (alamat `*.workers.dev` tidak bisa jadi pengirim).
+> Kalau belum punya domain, lewati saja dulu — pembuatan voucher otomatis tetap
+> jalan, hanya emailnya yang dilewati.
 
 ---
 
@@ -72,6 +82,11 @@ npx wrangler d1 execute tokoku-lisensi --remote --file=schema.sql
 ```
 
 Aman dijalankan berulang kali.
+
+> **Sudah punya database dari versi lama?** Jangan pakai `schema.sql` saja — kolom
+> dan tabel baru tidak akan ikut masuk ke tabel yang sudah ada. Jalankan berkas
+> migrasi di folder `migrasi/` secara berurutan, sekali masing-masing. Lihat
+> bagian [Pesanan otomatis dari OrderHero](#pesanan-otomatis-dari-orderhero).
 
 ### 5. Buat kunci admin
 
@@ -168,10 +183,16 @@ python tools/buat-voucher.py --ringkasan          # lihat lisensi aktif
 | `GET` | `/admin` | Halaman admin penjual | — |
 | `GET` | `/health` | Cek server hidup | — |
 | `POST` | `/api/aktivasi` | Tukar voucher / aktifkan lisensi | — |
-| `GET` | `/admin/data` | Ringkasan + daftar voucher & lisensi | ✔ |
+| `GET` | `/admin/data` | Ringkasan + daftar voucher, lisensi & pesanan | ✔ |
 | `POST` | `/admin/vouchers` | Buat voucher baru | ✔ |
+| `POST` | `/admin/kirim-email` | Kirim ulang email voucher ke pembeli | ✔ |
 | `POST` | `/admin/reset` | Lepaskan lisensi dari HP lama | ✔ |
 | `POST` | `/admin/revoke` | Nonaktifkan voucher / lisensi | ✔ |
+| `POST` | `/webhook/orderhero` | Kabar pesanan lunas dari OrderHero | tanda tangan |
+
+`GET /unduh/apk` juga menerima `HEAD` (dipakai aplikasi untuk membaca ukuran
+berkas sebelum mengunduh) dan meneruskan header `Range`, sehingga unduhan 34 MB
+yang terputus bisa dilanjutkan, bukan mengulang dari nol.
 
 `POST /api/aktivasi` menerima satu bentuk permintaan untuk dua keperluan:
 
@@ -195,6 +216,123 @@ Jawaban gagal (selalu berstatus HTTP 200 supaya pesannya terbaca aplikasi):
 
 Kemungkinan `reason`: `invalid_code`, `not_found`, `used_on_other_device`,
 `revoked`, `device_code_entered`, `busy`, `server_error`, `bad_request`.
+
+---
+
+## Pesanan otomatis dari OrderHero
+
+Kalau Anda berjualan di **OrderHero**, pelanggan tidak perlu menunggu Anda
+mengirim kode secara manual. Begitu pembayaran dikonfirmasi, OrderHero memanggil
+`POST /webhook/orderhero`; server membuat satu voucher baru dan **mengirimnya ke
+email pembeli**. Anda tidak melakukan apa pun.
+
+Alurnya:
+
+```
+Pelanggan bayar di OrderHero
+   → OrderHero memanggil POST /webhook/orderhero
+   → Worker memeriksa tanda tangan (HMAC-SHA256)
+   → Worker membuat 1 voucher baru  → tercatat di tabel vouchers
+   → Worker mengirim email berisi kode voucher + tautan unduh & portal
+   → Anda bisa melihatnya di /admin (kolom "Pesanan")
+```
+
+### Yang membuat ini aman
+
+- **Tanda tangan wajib.** Setiap panggilan membawa header
+  `X-Webhook-Signature: t=<detik>,v1=<hex>`. Worker menghitung ulang
+  HMAC-SHA256 atas `"<detik>.<badan permintaan mentah>"` memakai
+  `ORDERHERO_WEBHOOK_SECRET`, lalu membandingkannya dengan waktu tetap
+  (*constant time*). Tanda tangan salah → `401`.
+- **Tolak yang kedaluwarsa.** Permintaan yang stempel waktunya lebih tua dari
+  **300 detik** ditolak, supaya panggilan lama tidak bisa diputar ulang.
+- **Idempoten.** OrderHero bisa mengirim ulang kabar yang sama. Setiap panggilan
+  punya `X-Webhook-Delivery` yang unik; Worker mencatatnya di tabel
+  `webhook_events` (kunci utama). Pengiriman ulang yang sama **tidak** membuat
+  voucher kedua — jadi satu pembelian tetap satu voucher, tidak pernah dobel.
+- **Tanpa rahasia, mati.** Kalau `ORDERHERO_WEBHOOK_SECRET` belum diisi, endpoint
+  menjawab `500 not_configured` dan tidak membuat voucher apa pun.
+
+### Langkah memasang (sekali saja)
+
+**1. Punya domain sendiri untuk email.** Pengirim email tidak boleh memakai
+alamat `*.workers.dev`. Beli satu domain (Rp 150–250rb/tahun), lalu daftarkan di
+[Resend](https://resend.com) → **Domains → Add Domain** → salin record SPF dan
+DKIM yang diberikan ke pengaturan DNS domain Anda. Tunggu sampai Resend
+menandainya **Verified** (biasanya beberapa menit).
+
+> Resend punya paket gratis **3.000 email/bulan, gratis selamanya**, tanpa perlu
+> kartu kredit. Untuk penjualan ratusan lisensi per bulan itu lebih dari cukup.
+> Kalau Anda tidak mau mengurus domain, lewati saja bagian email — vouchernya
+> tetap dibuat otomatis, Anda tinggal mengirim kodenya manual.
+
+**2. Isi tiga rahasia baru** (dari dalam folder `cloudflare/`):
+
+```bash
+npx wrangler secret put ORDERHERO_WEBHOOK_SECRET   # dari dashboard OrderHero
+npx wrangler secret put RESEND_API_KEY             # dari Resend → API Keys
+npx wrangler secret put EMAIL_DARI                 # mis. TokoKu <kode@domainanda.com>
+```
+
+`EMAIL_DARI` harus memakai domain yang sudah diverifikasi di langkah 1, dan
+formatnya `Nama <alamat@domain>`. Kalau `RESEND_API_KEY` atau `EMAIL_DARI`
+kosong, server tetap membuat voucher tapi emailnya dilewati — tercatat sebagai
+`dilewati:email_belum_diatur` di `/admin`.
+
+**3. Daftarkan alamat webhook di OrderHero.** Buka dashboard OrderHero →
+**Plugin → Webhook**, lalu isi:
+
+| Kolom | Isi |
+|---|---|
+| URL | `https://tokoku-lisensi.dompetkuai.workers.dev/webhook/orderhero` |
+| Event | `order_paid` (wajib), `order_new` boleh ikut |
+| Secret | salin nilai `whsec_...` yang ditampilkan, lalu pakai sebagai `ORDERHERO_WEBHOOK_SECRET` |
+
+OrderHero akan mengirim percobaan (*test delivery*). Balasan `200` berarti
+berhasil tersambung.
+
+**4. Perbarui database kalau sudah pernah dipakai.** Database yang dibuat sebelum
+23 September 2026 belum punya kolom email dan tabel `webhook_events`. Jalankan
+sekali:
+
+```bash
+npx wrangler d1 execute tokoku-lisensi --remote --file=migrasi/2026-09-23-webhook.sql
+```
+
+> Kalau berkas ini dijalankan dua kali, muncul `duplicate column name` — **itu
+> wajar**, bukan kerusakan. SQLite tidak punya `add column if not exists`, jadi
+> barisnya memang akan menolak diulang. Tabel dan indeksnya tetap aman.
+
+### Kalau email gagal terkirim
+
+Voucher tetap dibuat — email yang gagal tidak boleh membuat pelanggan kehilangan
+kode yang sudah dibayar. Kegagalannya tercatat di `/admin` pada kolom status
+email (`gagal:<alasan>`), dan Anda bisa mengirim ulang:
+
+```bash
+curl -X POST "$TOKOKU_URL/admin/kirim-email" \
+  -H "x-admin-key: $TOKOKU_ADMIN_KEY" \
+  -d '{"delivery_id":"<id dari /admin>"}'
+```
+
+### Mencoba webhook tanpa menunggu pesanan sungguhan
+
+```bash
+BODY='{"event":"order_paid","data":{"customer":{"email":"uji@example.com","name":"Budi"},"id":"INV-1"}}'
+TS=$(date +%s)
+SIG=$(printf '%s' "$TS.$BODY" | openssl dgst -sha256 -hmac "$ORDERHERO_WEBHOOK_SECRET" -hex | awk '{print $2}')
+
+curl -X POST "$TOKOKU_URL/webhook/orderhero" \
+  -H "Content-Type: application/json" \
+  -H "X-Webhook-Event: order_paid" \
+  -H "X-Webhook-Delivery: uji-$TS" \
+  -H "X-Webhook-Signature: t=$TS,v1=$SIG" \
+  --data-raw "$BODY"
+```
+
+Kirim ulang perintah yang sama (dengan `X-Webhook-Delivery` yang sama) untuk
+membuktikan idempotensi: panggilan kedua harus menjawab `duplicate` dan **tidak**
+menambah voucher.
 
 ---
 
@@ -244,3 +382,11 @@ Untuk 10.000 pelanggan pun masih jauh di bawah batas gratis.
 - Satu voucher hanya bisa ditukar sekali. Klaimnya dilakukan dengan satu
   perintah `UPDATE ... WHERE status = 'unused'`, jadi dua HP yang menekan tombol
   bersamaan tidak bisa dua-duanya berhasil.
+- `POST /webhook/orderhero` adalah satu-satunya endpoint publik yang **membuat**
+  voucher. Pintu itu dijaga tanda tangan HMAC-SHA256 dengan batas waktu 300 detik
+  dan pencatatan idempoten, jadi orang yang tahu alamatnya tetap tidak bisa
+  membuat voucher tanpa `ORDERHERO_WEBHOOK_SECRET`.
+- `ORDERHERO_WEBHOOK_SECRET`, `RESEND_API_KEY`, dan `EMAIL_DARI` hanya ada di
+  Cloudflare (lewat `wrangler secret put`). Jangan pernah ditulis di repo ini.
+- Email voucher **tidak pernah** memuat tautan GitHub — semua tautannya menunjuk
+  ke server aktivasi Anda sendiri.

@@ -26,6 +26,7 @@
 import { halamanPortal } from './halaman-portal.js';
 import { halamanAdmin } from './halaman-admin.js';
 import { halamanUnduh, halamanUnduhGagal } from './halaman-unduh.js';
+import { emailVoucher } from './email-voucher.js';
 
 /**
  * Alfabet kode. Huruf I, O, 0, dan 1 dibuang karena sering tertukar saat
@@ -376,7 +377,8 @@ async function tanganiNonaktifkan(request, env) {
 
 async function tanganiDataAdmin(env) {
   const vouchers = await env.DB.prepare(
-    'SELECT code, batch, customer_name, status, license_code, created_at, used_at ' +
+    'SELECT code, batch, customer_name, customer_email, order_ref, status, ' +
+      'license_code, created_at, used_at ' +
       'FROM vouchers ORDER BY created_at DESC, code ASC LIMIT 500'
   ).all();
 
@@ -395,12 +397,259 @@ async function tanganiDataAdmin(env) {
       "(select count(*) from licenses where status = 'revoked') as lisensi_mati"
   ).first();
 
+  // Catatan pesanan dari platform jualan, supaya penjual bisa memeriksa
+  // "pesanan ini sudah masuk atau belum" dan mengirim ulang emailnya.
+  const pesanan = await env.DB.prepare(
+    'SELECT delivery_id, event, status, voucher_code, email, email_status, ' +
+      'alasan, received_at FROM webhook_events ' +
+      'ORDER BY received_at DESC LIMIT 50'
+  ).all();
+
   return balasJson({
     ok: true,
     ringkas: ringkas ?? {},
     vouchers: vouchers.results ?? [],
     licenses: licenses.results ?? [],
+    pesanan: pesanan.results ?? [],
   });
+}
+
+// ---------------------------------------------------------------------------
+// Pesanan otomatis dari platform jualan (OrderHero)
+// ---------------------------------------------------------------------------
+//
+// Pelanggan membayar di OrderHero -> OrderHero mengirim webhook ke sini ->
+// tanda tangan diverifikasi -> satu voucher dibuat -> email berisi kode dan
+// tautan unduh dikirim ke pembeli. Penjual tidak menyentuh apa pun.
+//
+// Dua hal yang WAJIB benar:
+//   1. Tanda tangan diverifikasi. Tanpa ini siapa pun bisa mengirim pesanan
+//      palsu dan mendapat voucher gratis.
+//   2. Penerimaan idempoten. OrderHero bisa mengirim satu event lebih dari
+//      sekali; tanpa penjaga ini satu pembayaran menghasilkan dua voucher.
+
+/** Verifikasi header X-Webhook-Signature ala OrderHero: "t=<detik>,v1=<hex>". */
+async function tandaTanganSah(rawBody, header, secret) {
+  const cocok = /^t=(\d+),v1=([a-f0-9]+)$/i.exec(String(header || '').trim());
+  if (!cocok) return false;
+
+  const cap = cocok[1];
+  const diberi = cocok[2].toLowerCase();
+
+  // Tolak yang kedaluwarsa, supaya rekaman permintaan lama tidak bisa
+  // diputar ulang oleh orang lain.
+  const sekarang = Math.floor(Date.now() / 1000);
+  if (Math.abs(sekarang - Number(cap)) > 300) return false;
+
+  const enc = new TextEncoder();
+  const kunci = await crypto.subtle.importKey(
+    'raw',
+    enc.encode(secret),
+    { name: 'HMAC', hash: 'SHA-256' },
+    false,
+    ['sign']
+  );
+  const tanda = await crypto.subtle.sign('HMAC', kunci, enc.encode(`${cap}.${rawBody}`));
+  const hex = [...new Uint8Array(tanda)]
+    .map((b) => b.toString(16).padStart(2, '0'))
+    .join('');
+
+  return kunciSama(hex, diberi);
+}
+
+/**
+ * Kirim email berisi voucher lewat Resend.
+ * Selalu mengembalikan keterangan status (untuk dicatat), tidak pernah melempar.
+ */
+async function kirimEmailVoucher(env, o) {
+  const kunci = String((env && env.RESEND_API_KEY) || '').trim();
+  const dari = String((env && env.EMAIL_DARI) || '').trim();
+  if (!kunci || !dari) return 'dilewati:email_belum_diatur';
+  if (!o.email) return 'dilewati:tanpa_email';
+
+  const isi = emailVoucher({
+    namaPembeli: o.nama,
+    kodeVoucher: o.voucher,
+    namaAplikasi: String((env && env.APP_NAME) || 'TokoKu'),
+    halamanUnduh: o.halamanUnduh,
+    portal: o.portal,
+  });
+
+  try {
+    const res = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${kunci}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        from: dari,
+        to: [o.email],
+        subject: isi.subject,
+        html: isi.html,
+        text: isi.text,
+      }),
+      // OrderHero menuntut jawaban dalam 10 detik, jadi jangan menggantung.
+      signal: AbortSignal.timeout(6000),
+    });
+    if (!res.ok) {
+      const pesan = (await res.text().catch(() => '')).slice(0, 140);
+      return `gagal:${res.status}${pesan ? ' ' + pesan : ''}`;
+    }
+    return 'terkirim';
+  } catch (e) {
+    return `gagal:${String((e && e.message) || e).slice(0, 100)}`;
+  }
+}
+
+/** Buat satu voucher lengkap dengan email pembeli. Null kalau gagal. */
+async function buatSatuVoucher(env, batch, nama, email, orderRef) {
+  const waktu = sekarangIso();
+  for (let coba = 0; coba < 5; coba += 1) {
+    const kode = kodeAcak(AWALAN_VOUCHER);
+    try {
+      await env.DB.prepare(
+        'INSERT INTO vouchers ' +
+          '(code, batch, customer_name, customer_email, order_ref, status, created_at) ' +
+          "VALUES (?, ?, ?, ?, ?, 'unused', ?)"
+      )
+        .bind(kode, batch, nama, email, orderRef, waktu)
+        .run();
+      return kode;
+    } catch (_) {
+      // Bentrok kode (sangat jarang sekali) — coba kode lain.
+    }
+  }
+  return null;
+}
+
+async function tanganiWebhookOrderHero(request, env) {
+  const secret = String((env && env.ORDERHERO_WEBHOOK_SECRET) || '').trim();
+  if (!secret) return balasJson({ ok: false, reason: 'not_configured' }, 500);
+
+  // Tanda tangan dihitung atas badan permintaan APA ADANYA, jadi baca sebagai
+  // teks mentah DULU. Kalau JSON di-parse lalu diserialisasi ulang, teksnya
+  // berubah dan tanda tangannya tidak akan pernah cocok.
+  const raw = await request.text();
+
+  const sah = await tandaTanganSah(
+    raw,
+    request.headers.get('X-Webhook-Signature'),
+    secret
+  );
+  if (!sah) return balasJson({ ok: false, reason: 'bad_signature' }, 401);
+
+  let data;
+  try {
+    data = JSON.parse(raw);
+  } catch (_) {
+    return balasJson({ ok: false, reason: 'bad_json' }, 400);
+  }
+
+  const event = String((data && data.event) || request.headers.get('X-Webhook-Event') || '');
+  const delivery = String(
+    request.headers.get('X-Webhook-Delivery') || (data && data.delivery_id) || ''
+  ).trim();
+  const isi = (data && data.data) || {};
+
+  const catat = async (status, kode, email, emailStatus, alasan) => {
+    if (!delivery) return;
+    try {
+      await env.DB.prepare(
+        'INSERT OR REPLACE INTO webhook_events ' +
+          '(delivery_id, sumber, event, status, voucher_code, email, email_status, ' +
+          'alasan, received_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
+      )
+        .bind(
+          delivery,
+          'orderhero',
+          event,
+          status,
+          kode,
+          email,
+          emailStatus,
+          alasan,
+          sekarangIso()
+        )
+        .run();
+    } catch (_) {
+      // Pencatatan gagal tidak boleh menggagalkan pembuatan voucher.
+    }
+  };
+
+  // Idempotensi: pengiriman ulang tidak boleh menghasilkan voucher kedua.
+  if (delivery) {
+    const sudah = await env.DB.prepare(
+      'SELECT voucher_code FROM webhook_events WHERE delivery_id = ?'
+    )
+      .bind(delivery)
+      .first();
+    if (sudah) {
+      return balasJson({ ok: true, duplikat: true, voucher: sudah.voucher_code ?? null });
+    }
+  }
+
+  // Baru bertindak setelah pembayaran benar-benar masuk.
+  if (event !== 'order_paid') {
+    await catat('ignored', null, '', '', 'event ' + (event || '(kosong)') + ' diabaikan');
+    return balasJson({ ok: true, diabaikan: true, event: event });
+  }
+
+  const email = String(isi.customer_email || '').trim().slice(0, 160);
+  const nama = String(isi.customer_name || '').trim().slice(0, 80);
+  const orderRef = String(isi.order_number || isi.order_id || '').trim().slice(0, 60);
+
+  const kode = await buatSatuVoucher(env, (orderRef || 'PESANAN').slice(0, 40), nama, email, orderRef);
+  if (!kode) {
+    await catat('error', null, email, '', 'gagal membuat voucher');
+    return balasJson({ ok: false, reason: 'server_error' }, 500);
+  }
+
+  const asal = new URL(request.url).origin;
+  const emailStatus = await kirimEmailVoucher(env, {
+    email: email,
+    nama: nama,
+    voucher: kode,
+    halamanUnduh: asal + '/unduh',
+    portal: asal,
+  });
+
+  await catat('processed', kode, email, emailStatus, '');
+  return balasJson({ ok: true, voucher: kode, email: emailStatus });
+}
+
+/** Kirim ulang email voucher dari halaman admin (kalau email pertama gagal). */
+async function tanganiKirimUlangEmail(request, env) {
+  const body = (await bacaJson(request)) ?? {};
+  const kode = normalisasi(body.code);
+  if (!kode) return balasJson({ ok: false, reason: 'invalid_code' }, 400);
+
+  const v = await env.DB.prepare(
+    'SELECT code, customer_name, customer_email FROM vouchers WHERE code = ?'
+  )
+    .bind(kode)
+    .first();
+  if (!v) return balasJson({ ok: false, reason: 'not_found' }, 404);
+  if (!v.customer_email) return balasJson({ ok: false, reason: 'tanpa_email' }, 400);
+
+  const asal = new URL(request.url).origin;
+  const status = await kirimEmailVoucher(env, {
+    email: v.customer_email,
+    nama: v.customer_name,
+    voucher: v.code,
+    halamanUnduh: asal + '/unduh',
+    portal: asal,
+  });
+
+  try {
+    await env.DB.prepare('UPDATE webhook_events SET email_status = ? WHERE voucher_code = ?')
+      .bind(status, v.code)
+      .run();
+  } catch (_) {
+    // Bukan hal fatal — voucher tetap ada.
+  }
+
+  return balasJson({ ok: status === 'terkirim', status: status });
 }
 
 // ---------------------------------------------------------------------------
@@ -568,6 +817,12 @@ export default {
         return await tanganiAktivasi(request, env);
       }
 
+      // Pesanan dari platform jualan (OrderHero). Diverifikasi dengan
+      // tanda tangan, jadi endpoint ini boleh publik.
+      if (jalur === '/webhook/orderhero' && metode === 'POST') {
+        return await tanganiWebhookOrderHero(request, env);
+      }
+
       // Pembaruan aplikasi — pengganti tautan GitHub supaya akun GitHub
       // penjual tidak terlihat pelanggan.
       if (jalur === '/api/versi' && metode === 'GET') {
@@ -604,6 +859,10 @@ export default {
         }
         if (jalur === '/admin/vouchers' && metode === 'POST') {
           return await tanganiBuatVoucher(request, env);
+        }
+
+        if (jalur === '/admin/kirim-email' && metode === 'POST') {
+          return await tanganiKirimUlangEmail(request, env);
         }
         if (jalur === '/admin/reset' && metode === 'POST') {
           return await tanganiLepasPerangkat(request, env);

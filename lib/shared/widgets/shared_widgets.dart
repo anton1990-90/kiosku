@@ -73,6 +73,25 @@ class StoreAvatar extends StatelessWidget {
   }
 }
 
+/// Dekorasi kartu di beranda — latar putih, sudut membulat, bayangan tipis.
+///
+/// Dipakai bersama oleh [StatCard] dan [QuickAction]. Sengaja tinggal di satu
+/// tempat: kalau radius atau bayangannya diubah di salah satu saja, kedua kartu
+/// itu berhenti terlihat sekeluarga dan tidak ada yang menyadarinya.
+BoxDecoration dekorasiKartuBeranda() {
+  return BoxDecoration(
+    color: AppColors.bgCard,
+    borderRadius: BorderRadius.circular(16),
+    boxShadow: const [
+      BoxShadow(
+        color: AppColors.shadow,
+        blurRadius: 10,
+        offset: Offset(0, 2),
+      ),
+    ],
+  );
+}
+
 /// Stat card for dashboard — shows a metric with icon and trend.
 /// Kalau [onTap] diisi, kartu bisa diketuk dan muncul tanda panah kecil.
 class StatCard extends StatelessWidget {
@@ -99,32 +118,31 @@ class StatCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // `Spacer` di bawah menuntut tinggi yang terbatas, jadi kartu ini hanya
+    // boleh dipakai di dalam grid yang tingginya ditetapkan (`mainAxisExtent`),
+    // bukan di dalam kolom yang tingginya mengikuti isi.
     final card = Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppColors.bgCard,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.border, width: 0.5),
-      ),
+      padding: const EdgeInsets.all(14),
+      decoration: dekorasiKartuBeranda(),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Container(
-                width: 32,
-                height: 32,
+                width: 34,
+                height: 34,
                 decoration: BoxDecoration(
                   color: iconBgColor,
-                  borderRadius: BorderRadius.circular(8),
+                  borderRadius: BorderRadius.circular(11),
                 ),
-                child: Icon(icon, size: 16, color: iconColor),
+                child: Icon(icon, size: 17, color: iconColor),
               ),
+              const Spacer(),
               if (trend != null)
                 Container(
                   padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                   decoration: BoxDecoration(
                     color: isUp == true
                         ? AppColors.successLight
@@ -135,7 +153,7 @@ class StatCard extends StatelessWidget {
                     trend!,
                     style: TextStyle(
                       fontSize: 11,
-                      fontWeight: FontWeight.w600,
+                      fontWeight: FontWeight.w700,
                       color: isUp == true
                           ? AppColors.successMid
                           : AppColors.dangerMid,
@@ -150,21 +168,29 @@ class StatCard extends StatelessWidget {
                 ),
             ],
           ),
-          const SizedBox(height: 12),
+          // Angka dan label selalu menempel ke dasar kartu, jadi kartu berlabel
+          // satu baris dan dua baris tetap punya garis dasar yang sama.
+          const Spacer(),
           Text(
             value,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
             style: const TextStyle(
-              fontSize: 22,
+              fontSize: 21,
+              height: 1.15,
               fontWeight: FontWeight.w800,
               color: AppColors.textMain,
-              letterSpacing: -0.5,
+              letterSpacing: -0.6,
             ),
           ),
           const SizedBox(height: 2),
           Text(
             label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
             style: const TextStyle(
-              fontSize: 12,
+              fontSize: 11.5,
+              height: 1.25,
               color: AppColors.textSecondary,
             ),
           ),
@@ -178,7 +204,7 @@ class StatCard extends StatelessWidget {
       color: Colors.transparent,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(16),
         child: card,
       ),
     );
@@ -204,37 +230,49 @@ class QuickAction extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 8),
-        decoration: BoxDecoration(
-          color: AppColors.bgCard,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: AppColors.border, width: 0.5),
-        ),
-        child: Column(
-          children: [
-            Container(
-              width: 40,
-              height: 40,
-              decoration: BoxDecoration(
-                color: iconBgColor,
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Icon(icon, size: 20, color: iconColor),
+    return Container(
+      decoration: dekorasiKartuBeranda(),
+      // Warnanya ada di Container, jadi riaknya perlu lapisan Material
+      // transparan sendiri. Kalau tidak, riak tergambar DI BAWAH latar putih
+      // dan tombolnya terlihat mati walau tetap bisa diketuk.
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(16),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 6),
+            child: Column(
+              // Isi selalu di tengah, jadi label satu baris ("Hutang") dan dua
+              // baris ("Tambah Stok") tetap sejajar satu sama lain.
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: iconBgColor,
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: Icon(icon, size: 22, color: iconColor),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  label,
+                  textAlign: TextAlign.center,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 10.5,
+                    height: 1.25,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.textMain,
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(height: 8),
-            Text(
-              label,
-              style: const TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.w600,
-                color: AppColors.textMain,
-              ),
-              textAlign: TextAlign.center,
-            ),
-          ],
+          ),
         ),
       ),
     );
@@ -302,28 +340,42 @@ class SectionTitle extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.only(bottom: 14),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                title,
-                style: const TextStyle(
-                  fontSize: 17,
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.textMain,
-                ),
-              ),
-              if (subtitle != null)
+          // Batang aksen di kiri judul — penanda bagian yang jauh lebih ringan
+          // daripada garis pemisah selebar halaman.
+          Container(
+            width: 3.5,
+            height: subtitle == null ? 18 : 32,
+            decoration: BoxDecoration(
+              color: AppColors.primary,
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
                 Text(
-                  subtitle!,
+                  title,
                   style: const TextStyle(
-                    fontSize: 13,
-                    color: AppColors.textSecondary,
+                    fontSize: 16.5,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.textMain,
+                    letterSpacing: -0.2,
                   ),
                 ),
-            ],
+                if (subtitle != null)
+                  Text(
+                    subtitle!,
+                    style: const TextStyle(
+                      fontSize: 12.5,
+                      height: 1.3,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+              ],
+            ),
           ),
           if (actionLabel != null)
             GestureDetector(

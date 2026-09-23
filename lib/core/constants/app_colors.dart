@@ -29,6 +29,13 @@ class AppColors {
   // Borders
   static const Color border = Color(0xFFE8E9EB);
 
+  /// Bayangan kartu — hitam 8 %, sebaran pendek, tanpa warna.
+  ///
+  /// Kartu di beranda memakai ini sebagai ganti garis tepi 0,5 px: garis tepi
+  /// membuat halaman terbaca seperti tabel, sedangkan bayangan tipis
+  /// mengangkat kartunya tanpa menambah garis.
+  static const Color shadow = Color(0x14000000);
+
   // Semantic - Success (Green)
   static const Color success = Color(0xFF1D9E75);
   static const Color successLight = Color(0xFFE1F5EE);

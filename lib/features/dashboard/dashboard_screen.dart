@@ -93,6 +93,66 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     await ref.read(productProvider.notifier).loadProducts();
   }
 
+  /// Satu sisi kartu Kas: ikon bulat, label, lalu nominalnya.
+  ///
+  /// Dipakai dua kali (uang keluar dan uang masuk). Sengaja satu metode dan
+  /// bukan dua blok yang disalin — dua salinan seperti itu cepat menyimpang.
+  Widget _blokArus({
+    required IconData ikon,
+    required String label,
+    required String nilai,
+    required Color warna,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.10),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 22,
+                height: 22,
+                decoration: BoxDecoration(
+                  color: warna.withOpacity(0.18),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(ikon, size: 13, color: warna),
+              ),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: Colors.white70,
+                    fontSize: 11,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Text(
+            nilai,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              color: warna,
+              fontSize: 15,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final authState = ref.watch(authProvider);
@@ -208,159 +268,125 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                     onTap: () => context.push('/kas'),
                     borderRadius: BorderRadius.circular(16),
                     child: Container(
-                      padding: const EdgeInsets.fromLTRB(20, 16, 20, 18),
+                      padding: const EdgeInsets.fromLTRB(18, 16, 18, 16),
                       decoration: BoxDecoration(
                         gradient: const LinearGradient(
                           colors: [AppColors.primary, AppColors.primaryDark],
                           begin: Alignment.topLeft,
                           end: Alignment.bottomRight,
                         ),
-                        borderRadius: BorderRadius.circular(16),
+                        borderRadius: BorderRadius.circular(20),
                       ),
                       child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          // Judul di kiri, jalan ke riwayat di kanan. "Riwayat"
+                          // dibungkus pil supaya jelas bisa diketuk.
+                          Row(
                             children: [
-                              Row(
-                                children: [
-                                  Icon(
-                                    Icons.account_balance_wallet_outlined,
-                                    size: 16,
-                                    color: Colors.white70,
-                                  ),
-                                  SizedBox(width: 6),
-                                  Text(
-                                    'Kas',
-                                    style: TextStyle(
-                                      color: Colors.white70,
-                                      fontSize: 13,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                ],
+                              const Icon(
+                                Icons.account_balance_wallet_outlined,
+                                size: 16,
+                                color: Colors.white70,
                               ),
-                              Row(
-                                children: [
-                                  Text(
-                                    'Riwayat',
-                                    style: TextStyle(
-                                      color: Colors.white70,
-                                      fontSize: 11,
+                              const SizedBox(width: 6),
+                              const Text(
+                                'Kas',
+                                style: TextStyle(
+                                  color: Colors.white70,
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              const Spacer(),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 10, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withOpacity(0.14),
+                                  borderRadius: BorderRadius.circular(20),
+                                ),
+                                child: const Row(
+                                  children: [
+                                    Text(
+                                      'Riwayat',
+                                      style: TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w600,
+                                      ),
                                     ),
-                                  ),
-                                  Icon(Icons.chevron_right,
-                                      size: 16, color: Colors.white70),
-                                ],
+                                    Icon(Icons.chevron_right,
+                                        size: 15, color: Colors.white),
+                                  ],
+                                ),
                               ),
                             ],
                           ),
-                          const SizedBox(height: 8),
-                          Text(
-                            Formatters.rupiah(dashState.kasSaldo),
-                            textAlign: TextAlign.center,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 30,
-                              fontWeight: FontWeight.w800,
-                              letterSpacing: -0.5,
-                            ),
-                          ),
-                          const SizedBox(height: 2),
+                          const SizedBox(height: 14),
+                          // Label dulu, baru angkanya. Angka besar tanpa label
+                          // di atasnya terbaca sebagai judul, bukan saldo.
                           const Text(
                             'Saldo kas sekarang',
                             style: TextStyle(
                               color: Colors.white60,
                               fontSize: 11,
+                              letterSpacing: 0.2,
                             ),
                           ),
-                          const SizedBox(height: 16),
-                          Container(
-                            height: 1,
-                            color: Colors.white.withOpacity(0.18),
+                          const SizedBox(height: 2),
+                          Text(
+                            Formatters.rupiah(dashState.kasSaldo),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 30,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: -0.6,
+                            ),
+                          ),
+                          const SizedBox(height: 14),
+                          Row(
+                            children: [
+                              const Text(
+                                'Arus kas hari ini',
+                                style: TextStyle(
+                                  color: Colors.white60,
+                                  fontSize: 10.5,
+                                  letterSpacing: 0.2,
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Container(
+                                  height: 1,
+                                  color: Colors.white.withOpacity(0.18),
+                                ),
+                              ),
+                            ],
                           ),
                           const SizedBox(height: 12),
                           Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              // Kiri bawah — uang keluar.
                               Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    const Row(
-                                      children: [
-                                        Icon(Icons.arrow_downward,
-                                            size: 13,
-                                            color: Color(0xFFFFC9C7)),
-                                        SizedBox(width: 4),
-                                        Text(
-                                          'Uang keluar',
-                                          style: TextStyle(
-                                            color: Colors.white70,
-                                            fontSize: 11.5,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                    const SizedBox(height: 3),
-                                    Text(
-                                      Formatters.rupiahCompact(
-                                          dashState.kasKeluarHariIni),
-                                      style: const TextStyle(
-                                        color: Color(0xFFFFD9D8),
-                                        fontSize: 15,
-                                        fontWeight: FontWeight.w700,
-                                      ),
-                                    ),
-                                    const Text(
-                                      'hari ini',
-                                      style: TextStyle(
-                                        color: Colors.white54,
-                                        fontSize: 10,
-                                      ),
-                                    ),
-                                  ],
+                                child: _blokArus(
+                                  ikon: Icons.arrow_downward,
+                                  label: 'Uang keluar',
+                                  nilai: Formatters.rupiahCompact(
+                                      dashState.kasKeluarHariIni),
+                                  warna: const Color(0xFFFFD9D8),
                                 ),
                               ),
-                              // Kanan bawah — uang masuk.
+                              const SizedBox(width: 10),
                               Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.end,
-                                  children: [
-                                    const Row(
-                                      mainAxisAlignment: MainAxisAlignment.end,
-                                      children: [
-                                        Icon(Icons.arrow_upward,
-                                            size: 13,
-                                            color: Color(0xFFB6F0D8)),
-                                        SizedBox(width: 4),
-                                        Text(
-                                          'Uang masuk',
-                                          style: TextStyle(
-                                            color: Colors.white70,
-                                            fontSize: 11.5,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                    const SizedBox(height: 3),
-                                    Text(
-                                      Formatters.rupiahCompact(
-                                          dashState.kasMasukHariIni),
-                                      style: const TextStyle(
-                                        color: Color(0xFFC6F6E2),
-                                        fontSize: 15,
-                                        fontWeight: FontWeight.w700,
-                                      ),
-                                    ),
-                                    const Text(
-                                      'hari ini',
-                                      style: TextStyle(
-                                        color: Colors.white54,
-                                        fontSize: 10,
-                                      ),
-                                    ),
-                                  ],
+                                child: _blokArus(
+                                  ikon: Icons.arrow_upward,
+                                  label: 'Uang masuk',
+                                  nilai: Formatters.rupiahCompact(
+                                      dashState.kasMasukHariIni),
+                                  warna: const Color(0xFFC6F6E2),
                                 ),
                               ),
                             ],
@@ -376,13 +402,18 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
             SliverToBoxAdapter(
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: GridView.count(
+                child: GridView(
                   shrinkWrap: true,
                   physics: const NeverScrollableScrollPhysics(),
-                  crossAxisCount: 4,
-                  mainAxisSpacing: 12,
-                  crossAxisSpacing: 12,
-                  childAspectRatio: 0.8,
+                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 4,
+                    mainAxisSpacing: 12,
+                    crossAxisSpacing: 12,
+                    // Cukup untuk label dua baris seperti "Tambah Stok";
+                    // label satu baris otomatis di tengah, jadi keempat
+                    // tombol tetap sejajar.
+                    mainAxisExtent: 108,
+                  ),
                   children: [
                     QuickAction(
                       icon: Icons.receipt_long,
@@ -420,15 +451,21 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
             SliverToBoxAdapter(
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(16, 20, 16, 20),
-                child: GridView.count(
+                child: GridView(
                   shrinkWrap: true,
                   physics: const NeverScrollableScrollPhysics(),
-                  // Di tablet kartu statistik ditata 4 sejajar supaya tidak
-                  // menyisakan ruang kosong di sisi kanan.
-                  crossAxisCount: Responsive.isTablet(context) ? 4 : 2,
-                  mainAxisSpacing: 12,
-                  crossAxisSpacing: 12,
-                  childAspectRatio: Responsive.isTablet(context) ? 1.25 : 1.4,
+                  // Tinggi kartu ditetapkan langsung lewat `mainAxisExtent`,
+                  // bukan diturunkan dari lebar seperti `childAspectRatio`.
+                  // Dengan rasio, kartu makin pendek di HP sempit sampai
+                  // labelnya terpotong.
+                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                    // Di tablet kartu statistik ditata 4 sejajar supaya tidak
+                    // menyisakan ruang kosong di sisi kanan.
+                    crossAxisCount: Responsive.isTablet(context) ? 4 : 2,
+                    mainAxisSpacing: 12,
+                    crossAxisSpacing: 12,
+                    mainAxisExtent: 128,
+                  ),
                   children: [
                     StatCard(
                       icon: Icons.trending_up,
@@ -645,33 +682,47 @@ class _TombolNotifikasi extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return IconButton(
-      onPressed: onTap,
-      tooltip: adaPembaruan ? 'Ada pembaruan aplikasi' : 'Notifikasi',
-      icon: Stack(
-        clipBehavior: Clip.none,
-        children: [
-          const Icon(
-            Icons.notifications_outlined,
-            color: AppColors.textSecondary,
-          ),
-          if (adaPembaruan)
-            Positioned(
-              top: 0,
-              right: 0,
-              child: Container(
-                width: 9,
-                height: 9,
-                decoration: BoxDecoration(
-                  color: AppColors.danger,
-                  shape: BoxShape.circle,
-                  // Cincin sewarna kartu supaya titiknya tetap terlihat jelas
-                  // di atas ikon lonceng.
-                  border: Border.all(color: AppColors.bgCard, width: 1.5),
+    // Kotak berwarna lembut, bukan ikon telanjang: sejajar dengan kotak aksi
+    // cepat di bawahnya, dan sasaran ketuknya tetap 44 px.
+    return Material(
+      color: AppColors.bgSoft,
+      borderRadius: BorderRadius.circular(14),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        child: Tooltip(
+          message: adaPembaruan ? 'Ada pembaruan aplikasi' : 'Notifikasi',
+          child: SizedBox(
+            width: 44,
+            height: 44,
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                const Icon(
+                  Icons.notifications_outlined,
+                  size: 22,
+                  color: AppColors.textMain,
                 ),
-              ),
+                if (adaPembaruan)
+                  Positioned(
+                    top: 9,
+                    right: 9,
+                    child: Container(
+                      width: 8,
+                      height: 8,
+                      decoration: BoxDecoration(
+                        color: AppColors.danger,
+                        shape: BoxShape.circle,
+                        // Cincin sewarna tombol supaya titiknya tidak menyatu
+                        // dengan ikon lonceng di belakangnya.
+                        border: Border.all(color: AppColors.bgSoft, width: 1.5),
+                      ),
+                    ),
+                  ),
+              ],
             ),
-        ],
+          ),
+        ),
       ),
     );
   }

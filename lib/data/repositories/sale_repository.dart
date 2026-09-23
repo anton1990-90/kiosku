@@ -172,6 +172,137 @@ class SaleRepository {
     );
   }
 
+  /// Batalkan transaksi penjualan.
+  ///
+  /// Transaksinya **tidak dihapus**. Statusnya berubah jadi 'batal' dan seluruh
+  /// akibatnya dibalik dengan catatan baru, semuanya dalam SATU transaksi
+  /// database — kalau ada satu langkah yang gagal, tidak ada yang setengah jalan:
+  ///
+  ///   1. stok setiap barang dikembalikan, dengan jejak di `stock_movements`
+  ///   2. uang yang pernah masuk dikeluarkan lagi di `cash_transactions`
+  ///   3. piutang yang lahir dari transaksi ini dihapus
+  ///
+  /// Karena seluruh laporan membaca view `sales_aktif` yang menyaring status,
+  /// transaksi ini langsung hilang dari semua laporan **tanpa satu pun query
+  /// laporan perlu diubah**.
+  ///
+  /// Piutang yang **sudah ada pembayarannya** membuat pembatalan ditolak:
+  /// pembayaran itu uang yang benar-benar diterima, dan menghapusnya diam-diam
+  /// akan membuat kas tidak cocok. Karena `debt_payments` memakai
+  /// `ON DELETE CASCADE`, menghapus piutangnya akan ikut menghapus riwayat
+  /// pembayaran tanpa peringatan — jadi penolakan ini yang menjaga, bukan kunci
+  /// asingnya.
+  Future<({bool berhasil, String pesan, int itemKembali, int uangKeluar})>
+      batalkan({required int saleId, String? reason}) async {
+    final db = await _db.database;
+
+    // Dibaca lewat `sales_semua`: transaksi yang sudah dibatalkan harus tetap
+    // bisa ditemukan, kalau tidak pembatalan kedua kali akan tampak "berhasil".
+    final sale = await getSaleById(saleId);
+    if (sale == null) {
+      return (
+        berhasil: false,
+        pesan: 'Transaksi tidak ditemukan',
+        itemKembali: 0,
+        uangKeluar: 0,
+      );
+    }
+    if (sale.dibatalkan) {
+      return (
+        berhasil: false,
+        pesan: 'Transaksi ${sale.invoiceNumber} sudah dibatalkan',
+        itemKembali: 0,
+        uangKeluar: 0,
+      );
+    }
+
+    final piutangDenganBayar = await db.rawQuery('''
+      SELECT COUNT(*) AS c
+      FROM debt_payments dp
+      INNER JOIN debts d ON d.id = dp.debt_id
+      WHERE d.sale_id = ?
+    ''', [saleId]);
+    final adaPembayaran = (Sqflite.firstIntValue(piutangDenganBayar) ?? 0) > 0;
+    if (adaPembayaran) {
+      return (
+        berhasil: false,
+        pesan: 'Piutang dari transaksi ini sudah ada pembayarannya. '
+            'Batalkan pembayarannya dulu di menu Hutang & Piutang.',
+        itemKembali: 0,
+        uangKeluar: 0,
+      );
+    }
+
+    final items = await getSaleItems(saleId);
+    final now = DateTime.now();
+    final alasan = (reason ?? '').trim();
+    final catatan = alasan.isEmpty
+        ? 'Pembatalan ${sale.invoiceNumber}'
+        : 'Pembatalan ${sale.invoiceNumber} — $alasan';
+
+    var itemKembali = 0;
+    var uangKeluar = 0;
+
+    await db.transaction((txn) async {
+      await txn.update(
+        'sales',
+        {
+          'status': SaleStatus.batal,
+          'cancel_reason': alasan.isEmpty ? null : alasan,
+        },
+        where: 'id = ?',
+        whereArgs: [saleId],
+      );
+
+      for (final item in items) {
+        await txn.rawUpdate(
+          'UPDATE products SET stock = stock + ?, updated_at = ? WHERE id = ?',
+          [item.quantity, now.toIso8601String(), item.productId],
+        );
+        await txn.insert('stock_movements', {
+          'product_id': item.productId,
+          'product_name': item.productName,
+          'type': 'in',
+          'quantity': item.quantity,
+          'total_cost': item.costPrice * item.quantity,
+          'note': catatan,
+          'ref_type': 'sale_cancel',
+          'ref_id': saleId,
+          'date': now.toIso8601String(),
+          'created_at': now.toIso8601String(),
+        });
+        itemKembali += item.quantity;
+      }
+
+      // Uang yang pernah masuk dikembalikan ke pelanggan.
+      if (sale.paidAmount > 0) {
+        await txn.insert('cash_transactions', {
+          'type': CashType.keluar,
+          'amount': sale.paidAmount,
+          'category': CashCategory.penjualan,
+          'note': catatan,
+          'ref_type': 'sale_cancel',
+          'ref_id': saleId,
+          'date': now.toIso8601String(),
+          'created_at': now.toIso8601String(),
+        });
+        uangKeluar = sale.paidAmount;
+      }
+
+      // Piutang dari transaksi ini tidak boleh hidup lebih lama daripada
+      // transaksinya. Disaring lewat `sale_id`, bukan `debt_id` saja, supaya
+      // tidak ada piutang yang tertinggal kalau penghubungnya kosong.
+      await txn.delete('debts', where: 'sale_id = ?', whereArgs: [saleId]);
+    });
+
+    return (
+      berhasil: true,
+      pesan: 'Transaksi ${sale.invoiceNumber} dibatalkan',
+      itemKembali: itemKembali,
+      uangKeluar: uangKeluar,
+    );
+  }
+
   /// Generate invoice number: TK-YYYYMMDD-HHMMSS
   String _generateInvoiceNumber() {
     final now = DateTime.now();
@@ -206,7 +337,7 @@ class SaleRepository {
     }
 
     final results = await db.query(
-      'sales',
+      'sales_aktif',
       where: where.isEmpty ? null : where,
       whereArgs: args.isEmpty ? null : args,
       orderBy: 'created_at DESC',
@@ -220,10 +351,14 @@ class SaleRepository {
   /// Dipakai untuk mencetak ulang struk dari riwayat transaksi: riwayat hanya
   /// menyimpan ringkasan, sedangkan pembuat struk memerlukan model penjualan
   /// yang utuh (invoice, metode bayar, jumlah dibayar, dan kembalian).
+  ///
+  /// Membaca `sales_semua`, bukan `sales_aktif`: transaksi yang sudah
+  /// dibatalkan tetap harus bisa ditemukan, kalau tidak proses pembatalannya
+  /// sendiri tidak bisa memeriksa status yang sekarang.
   Future<SaleModel?> getSaleById(int saleId) async {
     final db = await _db.database;
     final results = await db.query(
-      'sales',
+      'sales_semua',
       where: 'id = ?',
       whereArgs: [saleId],
       limit: 1,
@@ -251,7 +386,7 @@ class SaleRepository {
     final endOfDay = startOfDay.add(const Duration(days: 1));
 
     final result = await db.rawQuery(
-      'SELECT COALESCE(SUM(total_amount), 0) as total FROM sales WHERE created_at >= ? AND created_at < ?',
+      'SELECT COALESCE(SUM(total_amount), 0) as total FROM sales_aktif WHERE created_at >= ? AND created_at < ?',
       [startOfDay.toIso8601String(), endOfDay.toIso8601String()],
     );
     return Sqflite.firstIntValue(result) ?? 0;
@@ -265,7 +400,7 @@ class SaleRepository {
     final endOfDay = startOfDay.add(const Duration(days: 1));
 
     final result = await db.rawQuery(
-      'SELECT COUNT(*) as c FROM sales WHERE created_at >= ? AND created_at < ?',
+      'SELECT COUNT(*) as c FROM sales_aktif WHERE created_at >= ? AND created_at < ?',
       [startOfDay.toIso8601String(), endOfDay.toIso8601String()],
     );
     return Sqflite.firstIntValue(result) ?? 0;
@@ -286,7 +421,7 @@ class SaleRepository {
       final endOfDay = startOfDay.add(const Duration(days: 1));
 
       final result = await db.rawQuery(
-        'SELECT COALESCE(SUM(total_amount), 0) as total FROM sales WHERE created_at >= ? AND created_at < ?',
+        'SELECT COALESCE(SUM(total_amount), 0) as total FROM sales_aktif WHERE created_at >= ? AND created_at < ?',
         [startOfDay.toIso8601String(), endOfDay.toIso8601String()],
       );
       results.add((

@@ -18,7 +18,7 @@ class ReportRepository {
              COALESCE(SUM(total_profit), 0) AS total_profit,
              COUNT(*) AS transactions,
              COALESCE(SUM(total_items), 0) AS items_sold
-      FROM sales
+      FROM sales_aktif
       WHERE created_at >= ? AND created_at < ?
     ''', [start.toIso8601String(), end.toIso8601String()]);
 
@@ -50,7 +50,7 @@ class ReportRepository {
              s.payment_method, s.is_debt, s.total_amount, s.paid_amount,
              COALESCE(d.amount - d.paid_amount, 0) AS sisa
       FROM sale_items si
-      INNER JOIN sales s ON s.id = si.sale_id
+      INNER JOIN sales_aktif s ON s.id = si.sale_id
       LEFT JOIN debts d ON d.sale_id = s.id
       WHERE s.created_at >= ? AND s.created_at < ?
       ORDER BY s.created_at DESC, si.id ASC
@@ -76,7 +76,7 @@ class ReportRepository {
              -- ikut mengurangi laba dan laba yang dilaporkan jadi terlalu besar.
              SUM(si.subtotal - si.cost_price * si.quantity) AS profit
       FROM sale_items si
-      INNER JOIN sales s ON s.id = si.sale_id
+      INNER JOIN sales_aktif s ON s.id = si.sale_id
       WHERE s.created_at >= ? AND s.created_at < ?
       GROUP BY si.product_name
       ORDER BY qty DESC, revenue DESC
@@ -101,7 +101,7 @@ class ReportRepository {
     final db = await _db.database;
     final rows = await db.rawQuery('''
       SELECT date(created_at) AS d, COALESCE(SUM(total_amount), 0) AS total
-      FROM sales
+      FROM sales_aktif
       WHERE created_at >= ? AND created_at < ?
       GROUP BY d
       ORDER BY d ASC
@@ -124,7 +124,7 @@ class ReportRepository {
     final rows = await db.rawQuery('''
       SELECT strftime('%m', created_at) AS m,
              COALESCE(SUM(total_amount), 0) AS total
-      FROM sales
+      FROM sales_aktif
       WHERE created_at >= ? AND created_at < ?
       GROUP BY m
       ORDER BY m ASC
@@ -166,7 +166,7 @@ class ReportRepository {
     final start = DateTime(day.year, day.month, day.day);
     final end = start.add(const Duration(days: 1));
     final rows = await db.rawQuery(
-      'SELECT COUNT(*) AS c FROM sales WHERE created_at >= ? AND created_at < ?',
+      'SELECT COUNT(*) AS c FROM sales_aktif WHERE created_at >= ? AND created_at < ?',
       [start.toIso8601String(), end.toIso8601String()],
     );
     return Sqflite.firstIntValue(rows) ?? 0;

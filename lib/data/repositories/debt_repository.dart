@@ -253,7 +253,7 @@ class DebtRepository {
 
     if (debt.saleId != null) {
       final sales = await db.query(
-        'sales',
+        'sales_semua',
         columns: ['invoice_number'],
         where: 'id = ?',
         whereArgs: [debt.saleId],

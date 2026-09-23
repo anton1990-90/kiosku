@@ -25,8 +25,8 @@ class AccountingRepository {
   Future<int> getPendapatan(DateTime start, DateTime end) async {
     final db = await _db.database;
     final rows = await db.rawQuery('''
-      SELECT COALESCE(SUM(total_amount), 0) AS total
-      FROM sales
+      SELECT COALESCE(SUM(total_amount), 0)       AS total
+      FROM sales_aktif
       WHERE created_at >= ? AND created_at < ?
     ''', [start.toIso8601String(), end.toIso8601String()]);
     return (rows.first['total'] as int?) ?? 0;
@@ -38,7 +38,7 @@ class AccountingRepository {
     final rows = await db.rawQuery('''
       SELECT COALESCE(SUM(si.cost_price * si.quantity), 0) AS total
       FROM sale_items si
-      INNER JOIN sales s ON s.id = si.sale_id
+      INNER JOIN sales_aktif s ON s.id = si.sale_id
       WHERE s.created_at >= ? AND s.created_at < ?
     ''', [start.toIso8601String(), end.toIso8601String()]);
     return (rows.first['total'] as int?) ?? 0;
@@ -69,12 +69,12 @@ class AccountingRepository {
 
     final penjualan = await db.rawQuery('''
       SELECT COALESCE(SUM(total_amount), 0) AS total
-      FROM sales WHERE created_at < ?
+      FROM sales_aktif WHERE created_at < ?
     ''', [iso]);
     final hpp = await db.rawQuery('''
       SELECT COALESCE(SUM(si.cost_price * si.quantity), 0) AS total
       FROM sale_items si
-      INNER JOIN sales s ON s.id = si.sale_id
+      INNER JOIN sales_aktif s ON s.id = si.sale_id
       WHERE s.created_at < ?
     ''', [iso]);
     final beban = await db.rawQuery('''
@@ -152,11 +152,16 @@ class AccountingRepository {
     ''', [CashType.masuk, CashCategory.modal]);
 
     final penjualan = await db.rawQuery(
-      'SELECT COALESCE(SUM(total_amount), 0) AS total FROM sales',
+      'SELECT COALESCE(SUM(total_amount), 0) AS total FROM sales_aktif',
     );
+    // Tanpa join ke `sales_aktif`, HPP transaksi yang sudah dibatalkan ikut
+    // terhitung — padahal barangnya sudah kembali ke rak. Ini satu-satunya
+    // query `sale_items` yang tidak menyaring lewat `sale_id`, jadi join-nya
+    // ditulis di sini.
     final hpp = await db.rawQuery('''
       SELECT COALESCE(SUM(si.cost_price * si.quantity), 0) AS total
       FROM sale_items si
+      INNER JOIN sales_aktif s ON s.id = si.sale_id
     ''');
     final beban = await db.rawQuery(
       'SELECT COALESCE(SUM(amount), 0) AS total FROM expenses',
@@ -199,7 +204,7 @@ class AccountingRepository {
   }) async {
     final db = await _db.database;
     final saleRows = await db.rawQuery('''
-      SELECT * FROM sales
+      SELECT * FROM sales_aktif
       WHERE created_at >= ? AND created_at < ?
       ORDER BY created_at DESC
       LIMIT ?
@@ -266,7 +271,7 @@ class AccountingRepository {
              -- harga setelah potongan, supaya potongan kasir mengurangi laba.
              SUM(si.subtotal - si.cost_price * si.quantity) AS profit
       FROM sale_items si
-      INNER JOIN sales s ON s.id = si.sale_id
+      INNER JOIN sales_aktif s ON s.id = si.sale_id
       WHERE s.created_at >= ? AND s.created_at < ?
       GROUP BY si.product_name
       ORDER BY revenue DESC
@@ -289,7 +294,7 @@ class AccountingRepository {
     final rows = await db.rawQuery('''
       SELECT COUNT(*) AS c
       FROM sale_items si
-      INNER JOIN sales s ON s.id = si.sale_id
+      INNER JOIN sales_aktif s ON s.id = si.sale_id
       WHERE s.created_at >= ? AND s.created_at < ?
     ''', [start.toIso8601String(), end.toIso8601String()]);
     return Sqflite.firstIntValue(rows) ?? 0;

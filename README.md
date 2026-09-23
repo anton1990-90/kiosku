@@ -1,4 +1,4 @@
-# TokoKu — Aplikasi UMKM Toko Sembako & Penjualan (v1.13.0)
+# TokoKu — Aplikasi UMKM Toko Sembako & Penjualan (v1.14.0)
 
 Aplikasi mobile cross-platform (Android & iOS) untuk toko sembako UMKM. Dibuat dengan Flutter, bekerja **offline-first** dengan autentikasi email.
 
@@ -8,6 +8,7 @@ Aplikasi mobile cross-platform (Android & iOS) untuk toko sembako UMKM. Dibuat d
 - **Autentikasi email**: Login dengan email & password. Akses penjualan dikendalikan sesuai email terdaftar.
 - **Kasir (POS)**: Transaksi cepat dengan keranjang otomatis, pilihan metode pembayaran (tunai, QRIS, e-wallet), dan kalkulasi kembalian.
 - **Potongan harga**: Potongan bisa diberikan **per barang** ("beli 2 kurang 500") maupun **untuk seluruh nota** ("borongan kurang 2.000"). Nilainya rupiah, bukan persen, dan selalu dibatasi harga barangnya supaya total tidak pernah negatif. Potongan ikut tercetak di struk, terlihat di riwayat transaksi, dan **mengurangi laba** yang dilaporkan — bukan hanya mengurangi total bayar.
+- **Batal / retur transaksi**: Transaksi yang salah input bisa dibatalkan dari riwayat transaksi. Stok setiap barang dikembalikan, uang yang pernah masuk dikeluarkan lagi dari kas, dan piutang yang lahir dari transaksi itu dihapus — semuanya dalam **satu transaksi database**, jadi tidak ada pembatalan yang setengah jalan. Transaksinya **tidak dihapus**: statusnya berubah jadi "batal" dan jejaknya tetap bisa dilihat di Buku Kas dan Riwayat Stok, supaya pertanyaan "kenapa stok saya beda?" selalu bisa dijawab. Pembatalan ditolak kalau piutangnya sudah ada pembayarannya (uang itu benar-benar diterima, dan menghapusnya akan membuang riwayat bayar).
 - **Scan barcode**: Scan barcode produk (EAN-13/UPC) langsung dari kamera — untuk menambah barang ke keranjang maupun mengisi barcode saat menambah produk baru.
 - **Cetak struk thermal**: Cetak struk ke printer thermal Bluetooth 58mm/80mm setelah transaksi.
 - **Cetak ulang struk**: Struk transaksi lama bisa dicetak lagi kapan saja dari riwayat transaksi — berguna kalau kertas habis, printer mati, atau pelanggan minta salinan.
@@ -151,13 +152,13 @@ cloudflare/                          # Server aktivasi lisensi (Worker + D1)
 
 ## Skema Database (SQLite)
 
-Versi skema: **6**. Migrasi berjalan otomatis dan tidak menghapus data yang sudah ada — kolom baru selalu ditambahkan lewat `ALTER TABLE`, sedangkan tabel lama tidak pernah ditulis ulang.
+Versi skema: **7**. Migrasi berjalan otomatis dan tidak menghapus data yang sudah ada — kolom baru selalu ditambahkan lewat `ALTER TABLE`, sedangkan tabel lama tidak pernah ditulis ulang.
 
 | Table | Purpose |
 |-------|---------|
 | `users` | Akun dengan email, password hash, nama toko, telepon toko, path logo |
 | `products` | Produk dengan nama, kategori, harga modal/jual, stok, satuan, dan path foto |
-| `sales` | Transaksi dengan invoice number, total, laba, metode bayar, penanda hutang, dan potongan nota |
+| `sales` | Transaksi dengan invoice number, total, laba, metode bayar, penanda hutang, potongan nota, **status** (`selesai`/`batal`), dan **alasan pembatalan** |
 | `sale_items` | Line items per transaksi (product, qty, satuan saat terjual, subtotal setelah potongan, potongan baris) |
 | `suppliers` | Data pemasok yang bisa diedit |
 | `payment_methods` | Metode pembayaran yang bisa diaktifkan/dinonaktifkan |
@@ -197,6 +198,33 @@ diubah. Yang harus ikut diubah hanyalah perhitungan **laba**, karena laba tidak
 boleh dihitung dari harga label — potongan yang diberikan kasir adalah uang yang
 tidak jadi masuk. Karena itu `sale_items.profit` dan seluruh query laba
 memakai `subtotal - cost_price * quantity`, bukan `sell_price - cost_price`.
+
+### Catatan pembatalan transaksi
+
+Transaksi yang dibatalkan **tidak dihapus**. `sales.status` berubah jadi
+`batal` dan akibatnya dibalik dengan catatan baru: stok masuk kembali lewat
+`stock_movements`, uang yang pernah diterima keluar lagi lewat
+`cash_transactions`, dan piutangnya dihapus. Semuanya dalam **satu transaksi
+database** — kalau ada satu langkah yang gagal, tidak ada yang setengah jalan.
+
+Supaya transaksi batal tidak ikut terhitung di laporan mana pun, ada dua view
+di atas tabel `sales`:
+
+| View | Isi | Dipakai oleh |
+|------|-----|--------------|
+| `sales_aktif` | Hanya transaksi berstatus `selesai` | **Seluruh laporan**, buku kas, dan daftar transaksi |
+| `sales_semua` | Semua transaksi, termasuk yang dibatalkan | Cetak ulang struk, proses pembatalan itu sendiri, dan pencadangan data |
+
+Aturannya sederhana: **tidak ada berkas di luar `database_helper.dart` yang
+boleh membaca tabel `sales` langsung.** Dengan begitu transaksi batal hilang
+dari semua laporan tanpa satu pun query laporan perlu ditulis ulang, dan query
+laporan baru otomatis ikut benar.
+
+Kolom `status` punya nilai awal `'selesai'` karena nota lama belum punya kolom
+itu. Nilai awal itulah yang menentukan nasib seluruh riwayat penjualan yang
+sudah ada — kalau salah, semua transaksi lama langsung hilang dari setiap
+laporan tanpa galat apa pun. Karena itu nilainya dikunci oleh pemeriksa statis
+dan diuji-negatif.
 
 ## Palet Warna
 

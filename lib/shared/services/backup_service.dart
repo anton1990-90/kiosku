@@ -144,7 +144,10 @@ class BackupService {
     final db = await DatabaseHelper.instance.database;
 
     final products = await db.query('products', orderBy: 'id ASC');
-    final sales = await db.query('sales', orderBy: 'id ASC');
+    // Cadangan harus memuat SEMUA transaksi, termasuk yang dibatalkan — kalau
+    // tidak, memulihkan cadangan akan menghidupkan kembali transaksi batal
+    // sebagai transaksi biasa dan laporan jadi salah setelah pemulihan.
+    final sales = await db.query('sales_semua', orderBy: 'id ASC');
     final saleItems = await db.query('sale_items', orderBy: 'id ASC');
     final debts = await db.query('debts', orderBy: 'id ASC');
     final debtPayments = await db.query('debt_payments', orderBy: 'id ASC');

@@ -1,3 +1,16 @@
+/// Status transaksi penjualan.
+///
+/// Transaksi yang dibatalkan tidak dihapus, hanya berubah statusnya. Seluruh
+/// laporan menyaringnya lewat view `sales_aktif` (lihat `DatabaseHelper`), jadi
+/// nilai ini hanya perlu diperiksa di tempat yang memang harus membedakan —
+/// mis. sebelum mencetak ulang struk.
+class SaleStatus {
+  static const selesai = 'selesai';
+  static const batal = 'batal';
+
+  static const semua = [selesai, batal];
+}
+
 /// Sale (transaction) model — a complete POS transaction.
 class SaleModel {
   final int? id;
@@ -14,6 +27,8 @@ class SaleModel {
   final int? debtId; // id catatan piutang yang dibuat dari transaksi ini
   /// Potongan untuk seluruh nota, di luar potongan per baris. Dalam rupiah.
   final int discount;
+  /// 'selesai' atau 'batal'.
+  final String status;
   final DateTime createdAt;
 
   SaleModel({
@@ -30,8 +45,12 @@ class SaleModel {
     this.isDebt = false,
     this.debtId,
     this.discount = 0,
+    this.status = SaleStatus.selesai,
     required this.createdAt,
   });
+
+  /// Transaksi ini sudah dibatalkan.
+  bool get dibatalkan => status == SaleStatus.batal;
 
   /// Harga barang sebelum potongan nota dikurangi.
   ///
@@ -61,6 +80,7 @@ class SaleModel {
       'is_debt': isDebt ? 1 : 0,
       'debt_id': debtId,
       'discount': discount,
+      'status': status,
       'created_at': createdAt.toIso8601String(),
     };
   }
@@ -81,6 +101,8 @@ class SaleModel {
       debtId: map['debt_id'] as int?,
       // Nota yang tercatat sebelum versi 6 belum punya kolom ini.
       discount: (map['discount'] as int?) ?? 0,
+      // Nota sebelum versi 7 belum punya kolom status — semuanya 'selesai'.
+      status: (map['status'] as String?) ?? SaleStatus.selesai,
       createdAt: DateTime.parse(map['created_at'] as String),
     );
   }

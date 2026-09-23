@@ -1006,6 +1006,8 @@ class _DialogDetailKas extends StatelessWidget {
     switch (refType) {
       case 'sale':
         return 'Transaksi penjualan';
+      case 'sale_cancel':
+        return 'Pembatalan penjualan';
       case 'debt':
         return 'Catatan hutang';
       case 'debt_payment':

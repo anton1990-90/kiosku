@@ -21,12 +21,16 @@ import 'package:sqflite/sqflite.dart';
 ///       sale_items.discount (potongan per baris). Sejak versi ini
 ///       `sale_items.subtotal` menyimpan harga SETELAH potongan baris, dan
 ///       `sales.total_amount` adalah jumlah yang benar-benar dibayar.
+///   7 — + pembatalan transaksi: sales.status ('selesai' / 'batal') dan
+///       sales.cancel_reason. Dua view ditambahkan: `sales_aktif` (hanya yang
+///       tidak dibatalkan) dan `sales_semua` (semua, untuk struk & cadangan).
+///       Seluruh laporan membaca `sales_aktif`.
 class DatabaseHelper {
   DatabaseHelper._();
   static final DatabaseHelper instance = DatabaseHelper._();
 
   static const _dbName = 'tokoku.db';
-  static const _dbVersion = 6;
+  static const _dbVersion = 7;
 
   Database? _database;
 
@@ -57,6 +61,7 @@ class DatabaseHelper {
     await _upgradeV4(db);
     await _upgradeV5(db);
     await _upgradeV6(db);
+    await _upgradeV7(db);
     await _seedProducts(db);
     await _seedPaymentMethods(db);
   }
@@ -354,6 +359,55 @@ class DatabaseHelper {
     await _addColumnIfMissing(db, 'sale_items', 'discount', 'INTEGER NOT NULL DEFAULT 0');
   }
 
+  /// Kolom versi 7 — pembatalan transaksi.
+  ///
+  /// Transaksi yang dibatalkan **tidak dihapus**: statusnya berubah jadi
+  /// 'batal' dan seluruh akibatnya dibalik dengan catatan baru (stok kembali di
+  /// `stock_movements`, uang keluar di `cash_transactions`). Dengan begitu
+  /// riwayatnya tetap bisa ditelusuri — berbeda dengan menghapus baris, yang
+  /// membuat "kenapa stok saya beda?" tidak bisa dijawab lagi.
+  ///
+  /// `cancel_reason` diisi alasan dari pemilik toko dan ikut tercetak di catatan
+  /// Buku Kas serta Riwayat Stok, jadi bukan kolom tulis-saja.
+  ///
+  /// Lihat [_buatViewPenjualan] untuk cara seluruh laporan menyaring transaksi
+  /// yang dibatalkan.
+  Future<void> _upgradeV7(Database db) async {
+    await _addColumnIfMissing(
+        db, 'sales', 'status', "TEXT NOT NULL DEFAULT 'selesai'");
+    await _addColumnIfMissing(db, 'sales', 'cancel_reason', 'TEXT');
+    await _buatViewPenjualan(db);
+  }
+
+  /// Dua view di atas tabel `sales`.
+  ///
+  /// `sales_aktif` — hanya transaksi yang tidak dibatalkan. **Seluruh laporan,
+  /// rekap uang, dan daftar transaksi membaca view ini.** Menaruh syaratnya di
+  /// satu tempat, bukan di 24 query, membuat query baru otomatis benar: selama
+  /// ia membaca `sales_aktif`, transaksi batal tidak akan pernah ikut terhitung.
+  ///
+  /// `sales_semua` — semua transaksi, termasuk yang dibatalkan. Dipakai oleh
+  /// hal-hal yang memang harus melihat segalanya: mencetak ulang struk lama,
+  /// proses pembatalan itu sendiri, dan pencadangan data. Namanya sengaja
+  /// dibuat berbeda supaya niatnya terbaca di tempat pemakaian.
+  ///
+  /// `SELECT *` dipakai supaya kolom yang ditambahkan migrasi berikutnya ikut
+  /// terbawa tanpa perlu menyunting view ini. SQLite menyimpan teks SQL view
+  /// dan mengurainya ulang saat dipakai, jadi bintangnya mengikuti skema terbaru.
+  ///
+  /// `IF NOT EXISTS` membuat pemanggilan ulang aman — dipakai baik saat membuat
+  /// database baru maupun saat migrasi.
+  Future<void> _buatViewPenjualan(Database db) async {
+    await db.execute('''
+      CREATE VIEW IF NOT EXISTS sales_aktif AS
+      SELECT * FROM sales WHERE status = 'selesai'
+    ''');
+    await db.execute('''
+      CREATE VIEW IF NOT EXISTS sales_semua AS
+      SELECT * FROM sales
+    ''');
+  }
+
   /// Migrasi dari versi lama. Data yang sudah ada tidak boleh hilang.
   Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
     if (oldVersion < 2) {
@@ -373,6 +427,9 @@ class DatabaseHelper {
     }
     if (oldVersion < 6) {
       await _upgradeV6(db);
+    }
+    if (oldVersion < 7) {
+      await _upgradeV7(db);
     }
   }
 

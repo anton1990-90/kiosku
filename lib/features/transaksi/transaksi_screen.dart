@@ -86,11 +86,61 @@ class _TransaksiScreenState extends ConsumerState<TransaksiScreen> {
     final items = await repo.getSaleItems(trx.saleId);
     if (!mounted) return;
 
+    // Mencetak struk untuk transaksi yang sudah dibatalkan akan menyesatkan
+    // pelanggan: kertasnya terlihat seperti bukti jual-beli yang sah.
+    if (sale.dibatalkan) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Transaksi ini sudah dibatalkan, struknya tidak dicetak'),
+          backgroundColor: AppColors.danger,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+
     await cetakStruk(
       context: context,
       sale: sale,
       items: items,
       user: user,
+    );
+  }
+
+  /// Batalkan satu transaksi: stok kembali, uang dikembalikan, piutang dihapus.
+  ///
+  /// Transaksinya tidak dihapus — ia hilang dari daftar ini dan dari seluruh
+  /// laporan, tapi jejaknya tetap ada di Buku Kas dan Riwayat Stok. Dialog
+  /// konfirmasinya menyebutkan hal itu supaya pemilik toko tahu ke mana harus
+  /// mencari kalau nanti bertanya-tanya.
+  Future<void> _batalkanTransaksi(SaleWithItems trx) async {
+    final alasan = await showDialog<String>(
+      context: context,
+      builder: (ctx) => _DialogBatal(trx: trx),
+    );
+    if (alasan == null || !mounted) return;
+
+    final hasil = await SaleRepository().batalkan(
+      saleId: trx.saleId,
+      reason: alasan.isEmpty ? null : alasan,
+    );
+    if (!mounted) return;
+
+    if (hasil.berhasil) {
+      await _muat();
+      if (!mounted) return;
+    }
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(hasil.berhasil
+            ? '${hasil.pesan} · ${hasil.itemKembali} barang kembali ke stok'
+                '${hasil.uangKeluar > 0 ? ' · ${Formatters.rupiah(hasil.uangKeluar)} keluar dari kas' : ''}'
+            : hasil.pesan),
+        backgroundColor: hasil.berhasil ? AppColors.success : AppColors.danger,
+        behavior: SnackBarBehavior.floating,
+        duration: Duration(seconds: hasil.berhasil ? 4 : 6),
+      ),
     );
   }
 
@@ -505,12 +555,133 @@ class _TransaksiScreenState extends ConsumerState<TransaksiScreen> {
             ),
           ),
           const Divider(height: 18),
-          Align(
-            alignment: Alignment.centerRight,
-            child: TextButton.icon(
-              onPressed: () => _cetakUlangStruk(trx),
-              icon: const Icon(Icons.print_outlined, size: 18),
-              label: const Text('Cetak struk'),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              TextButton.icon(
+                onPressed: () => _batalkanTransaksi(trx),
+                icon: const Icon(Icons.cancel_outlined, size: 18),
+                label: const Text('Batalkan'),
+                style: TextButton.styleFrom(
+                  foregroundColor: AppColors.danger,
+                ),
+              ),
+              const SizedBox(width: 4),
+              TextButton.icon(
+                onPressed: () => _cetakUlangStruk(trx),
+                icon: const Icon(Icons.print_outlined, size: 18),
+                label: const Text('Cetak struk'),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Dialog konfirmasi pembatalan transaksi.
+///
+/// Mengembalikan alasan yang diketik (boleh kosong) kalau pemilik toko
+/// menyetujui, dan `null` kalau tidak jadi. Karena alasan kosong tetap berarti
+/// "ya", tombol setujunya mengirim string kosong — bukan `null`.
+///
+/// Isi dialognya sengaja menyebutkan akibatnya satu per satu, termasuk ke mana
+/// jejaknya pergi. Pembatalan mengubah stok dan kas, jadi pemilik toko berhak
+/// tahu persis apa yang akan terjadi sebelum menekan tombolnya.
+class _DialogBatal extends StatefulWidget {
+  final SaleWithItems trx;
+
+  const _DialogBatal({required this.trx});
+
+  @override
+  State<_DialogBatal> createState() => _DialogBatalState();
+}
+
+class _DialogBatalState extends State<_DialogBatal> {
+  final _alasan = TextEditingController();
+
+  @override
+  void dispose() {
+    _alasan.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final trx = widget.trx;
+    return AlertDialog(
+      title: const Text('Batalkan transaksi?'),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              '${trx.invoiceNumber} · ${Formatters.rupiah(trx.totalAmount)}',
+              style: const TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w700,
+                color: AppColors.textMain,
+              ),
+            ),
+            const SizedBox(height: 12),
+            _akibat('Stok ${trx.totalItems} barang dikembalikan'),
+            if (trx.paidAmount > 0)
+              _akibat('${Formatters.rupiah(trx.paidAmount)} keluar dari kas'),
+            if (trx.isDebt)
+              const _akibat('Piutang dari transaksi ini dihapus'),
+            const SizedBox(height: 10),
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: AppColors.infoLight,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Text(
+                'Transaksinya tidak dihapus. Jejak pembatalannya tetap bisa '
+                'dilihat di Buku Kas dan Riwayat Stok.',
+                style: TextStyle(fontSize: 12, color: AppColors.infoMid),
+              ),
+            ),
+            const SizedBox(height: 14),
+            TextField(
+              controller: _alasan,
+              decoration: const InputDecoration(
+                labelText: 'Alasan (boleh dikosongkan)',
+                hintText: 'mis. salah input',
+                border: OutlineInputBorder(),
+              ),
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Tidak jadi'),
+        ),
+        ElevatedButton(
+          onPressed: () => Navigator.pop(context, _alasan.text.trim()),
+          style: ElevatedButton.styleFrom(backgroundColor: AppColors.danger),
+          child: const Text('Ya, batalkan'),
+        ),
+      ],
+    );
+  }
+
+  Widget _akibat(String teks) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 4),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Icon(Icons.circle, size: 6, color: AppColors.textTertiary),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              teks,
+              style: const TextStyle(fontSize: 13, color: AppColors.textMain),
             ),
           ),
         ],

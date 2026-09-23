@@ -20,6 +20,7 @@ import '../features/hutang/hutang_screen.dart';
 import '../features/license/activation_screen.dart';
 import '../features/dashboard/dashboard_screen.dart';
 import '../features/kas/kas_screen.dart';
+import '../features/kas/tutup_kasir_screen.dart';
 import '../features/kasir/kasir_screen.dart';
 import '../features/produk/produk_screen.dart';
 import '../features/profile/customer_screen.dart';
@@ -280,6 +281,16 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/kas',
         name: 'kas',
         builder: (context, state) => const KasScreen(),
+      ),
+      // Tutup kasir — hitung uang fisik di laci dan bandingkan dengan sistem.
+      //
+      // Terbuka untuk kasir maupun pemilik toko: yang menghitung uang di laci
+      // adalah orang yang memegang lacinya. Karena itu rute ini **tidak**
+      // ditambahkan ke [_rutePemilik].
+      GoRoute(
+        path: '/kas/tutup',
+        name: 'tutupKasir',
+        builder: (context, state) => const TutupKasirScreen(),
       ),
       // Detail transaksi (hari ini / minggu / bulan).
       GoRoute(

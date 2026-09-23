@@ -31,6 +31,14 @@ class SaleModel {
   final String status;
   final DateTime createdAt;
 
+  /// Sesi kas tempat nota ini terjadi, kalau ada.
+  ///
+  /// `null` berarti nota dibuat saat belum ada sesi kas yang dibuka. Itu
+  /// keadaan yang sah: sesi kas adalah alat kontrol, bukan syarat berjualan.
+  /// Karena itu kolomnya boleh kosong dan penjualan tidak pernah ditolak
+  /// hanya karena laci belum dibuka.
+  final int? sessionId;
+
   SaleModel({
     this.id,
     required this.invoiceNumber,
@@ -46,6 +54,7 @@ class SaleModel {
     this.debtId,
     this.discount = 0,
     this.status = SaleStatus.selesai,
+    this.sessionId,
     required this.createdAt,
   });
 
@@ -81,6 +90,7 @@ class SaleModel {
       'debt_id': debtId,
       'discount': discount,
       'status': status,
+      'session_id': sessionId,
       'created_at': createdAt.toIso8601String(),
     };
   }
@@ -103,6 +113,8 @@ class SaleModel {
       discount: (map['discount'] as int?) ?? 0,
       // Nota sebelum versi 7 belum punya kolom status — semuanya 'selesai'.
       status: (map['status'] as String?) ?? SaleStatus.selesai,
+      // Nota sebelum versi 10 belum punya kolom ini.
+      sessionId: map['session_id'] as int?,
       createdAt: DateTime.parse(map['created_at'] as String),
     );
   }

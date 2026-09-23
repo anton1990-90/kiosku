@@ -9,6 +9,7 @@ import '../../core/utils/responsive.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/backup_provider.dart';
 import '../../providers/cash_provider.dart';
+import '../../providers/cash_session_provider.dart';
 import '../../providers/debt_provider.dart';
 import '../../providers/license_provider.dart';
 import '../../providers/note_provider.dart';
@@ -855,6 +856,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     final supplierState = ref.watch(supplierProvider);
     final paymentState = ref.watch(paymentMethodProvider);
     final cashState = ref.watch(cashProvider);
+    final sesiKas = ref.watch(cashSessionProvider);
     final user = authState.user;
     final userState = ref.watch(userProvider);
 
@@ -1101,6 +1103,19 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                                   'riwayat kas masuk & keluar',
                           trailing: Icons.chevron_right,
                           onTap: () => context.push('/kas'),
+                        ),
+                        // Bisa dibuka kasir maupun pemilik: yang menghitung
+                        // uang di laci adalah orang yang memegang lacinya.
+                        _MenuItem(
+                          icon: Icons.lock_outline,
+                          color: AppColors.warningMid,
+                          title: 'Tutup kasir',
+                          subtitle: sesiKas.adaSesiTerbuka
+                              ? 'Sesi terbuka · seharusnya di laci '
+                                  '${Formatters.rupiah(sesiKas.saldoSistem)}'
+                              : 'Hitung uang di laci & cocokkan dengan sistem',
+                          trailing: Icons.chevron_right,
+                          onTap: () => context.push('/kas/tutup'),
                         ),
                         if (pemilik)
                           _MenuItem(

@@ -5,7 +5,7 @@ Disusun 23 September 2026, berdasarkan pembacaan langsung kode di `lib/`
 
 > **Catatan pemutakhiran.** Nomor skema di tiap usulan di bawah ditulis saat
 > dokumen ini disusun, ketika versi skema masih 4 — jadi semuanya berbunyi
-> "versi 5". Versi skema sekarang **9** (v1.16.0), dan usulan yang belum
+> "versi 5". Versi skema sekarang **10** (v1.17.0), dan usulan yang belum
 > dikerjakan akan memakai versi berikutnya, bukan 5. Bagian yang sudah
 > dikerjakan ditandai di judulnya.
 
@@ -23,7 +23,7 @@ Dokumen ini **hanya memuat yang belum ada**. Semua fitur di bagian
 | 3 | Diskon per item / per nota — **selesai v1.13.0** | Sedang | Kebiasaan jualan sembako, belum bisa dicatat |
 | 4 | Satuan produk (kg, liter, ikat) — **tahap A selesai v1.12.0** | Kecil | Struk "2" tidak jelas; salah tafsir |
 | 5 | Data pelanggan tetap — **selesai v1.15.0** | Sedang | Piutang sekarang pakai teks bebas |
-| 6 | Tutup kasir / hitung uang | Sedang | Kontrol harian kalau ada karyawan |
+| 6 | Tutup kasir / hitung uang — **selesai v1.17.0** | Sedang | Kontrol harian kalau ada karyawan |
 | 7 | Pembelian ke supplier | Besar | Menyambung stok masuk ↔ hutang |
 | 8 | Akun kasir + hak akses — **selesai v1.16.0** | Besar | Dua peran: pemilik & kasir |
 | — | Cetak label barcode | Besar | Hanya perlu kalau repack barang |
@@ -31,8 +31,8 @@ Dokumen ini **hanya memuat yang belum ada**. Semua fitur di bagian
 | — | Sinkronisasi multi-HP | Besar | **Bertentangan** dengan model 1 lisensi = 1 HP |
 
 > Tabel di atas dan penanda **SELESAI** di judul tiap bagian sudah
-> disamakan. Yang masih terbuka: bagian 4 tahap B, bagian 6, bagian 7,
-> dan bagian 8 sengaja disisakan untuk izin per pengguna yang lebih rinci.
+> disamakan. Yang masih terbuka: bagian 4 tahap B dan bagian 7, sedangkan
+> bagian 8 sengaja disisakan untuk izin per pengguna yang lebih rinci.
 
 ---
 
@@ -149,21 +149,28 @@ Nilai tambah setelah ini tinggal: harga khusus pelanggan tetap.
 
 ---
 
-## 6. Tutup kasir / hitung uang
+## 6. Tutup kasir / hitung uang — **SELESAI di v1.17.0**
 
-**Kondisi sekarang.** Tidak ada konsep sesi kasir. `cash_transactions`
-mencatat setiap pergerakan, tetapi tidak ada ritual "hitung uang fisik di
-laci, bandingkan dengan sistem".
+**Kondisi sekarang.** Tabel `cash_sessions` menyimpan setiap sesi kasir:
+saldo awal, siapa yang membuka, saldo akhir menurut sistem, uang fisik yang
+dihitung, selisihnya, siapa yang menutup, dan catatan. Layar `/kas/tutup`
+menjalankan ritualnya dua langkah, dan setiap penjualan menyimpan
+`sales.session_id` sesi yang sedang terbuka.
 
-**Masalah nyata.** Begitu toko punya karyawan, ini kontrol harian yang
+**Masalah yang dulu ada.** Begitu toko punya karyawan, ini kontrol harian yang
 paling penting. Tanpa ini, selisih kas baru ketahuan berbulan-bulan
 kemudian dan tidak bisa ditelusuri ke siapa.
 
-**Rancangan.** Tabel `cash_sessions` (saldo awal, saldo akhir sistem, uang
-fisik yang dihitung, selisih, waktu, catatan) dan satu layar tutup kasir.
-Setiap transaksi diberi `session_id` supaya bisa direkap per sesi.
+**Yang dikerjakan.** Skema v10: tabel `cash_sessions` + kolom
+`sales.session_id`. Dua angka yang dibandingkan (`opening_balance` dan
+`expected_closing`) sama-sama dibaca dari `CashRepository.getSaldo()` supaya
+"seharusnya di laci" tidak pernah berbeda dari saldo yang dilihat kasir di
+Buku Kas. Selisih bukan nol **wajib** bercatatan, dan hanya satu sesi boleh
+terbuka dalam satu waktu. Rutenya (`/kas` dan `/kas/tutup`) sengaja terbuka
+untuk kasir maupun pemilik — yang menghitung uang adalah orang yang memegang
+lacinya — sementara Laporan dan Laporan Keuangan tetap tertutup untuk kasir.
 
-**Usaha:** sedang. **Skema:** versi 10 (versi 9 sudah dipakai akun kasir).
+**Usaha:** sedang. **Skema:** versi 10 (versi 9 dipakai akun kasir).
 
 ---
 

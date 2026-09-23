@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import '../../data/database/database_helper.dart';
+import '../../data/models/cash_session_model.dart';
 import '../../data/models/user_model.dart';
 import 'export_service.dart';
 import 'xlsx_builder.dart';
@@ -10,8 +11,8 @@ import 'xlsx_builder.dart';
 ///
 /// Satu lembar per jenis data supaya mudah dibaca dan diolah lagi di Excel:
 /// Produk, Penjualan, Item Penjualan, Hutang & Piutang, Pembayaran Hutang,
-/// Kas, Beban, Prive, Riwayat Stok, Supplier, Catatan, plus satu lembar
-/// Ringkasan.
+/// Kas, Beban, Prive, Riwayat Stok, Supplier, Pelanggan, Sesi Kas, Catatan,
+/// plus satu lembar Ringkasan.
 ///
 /// Semua kolom uang ditulis sebagai **angka** (bukan teks "Rp 65.000") supaya
 /// bisa langsung dijumlahkan di Excel. Kolom tanggal ditulis apa adanya dalam
@@ -34,6 +35,7 @@ class BackupService {
     'products',
     'suppliers',
     'customers',
+    'cash_sessions',
     'sales',
     'debts',
     'notes',
@@ -59,6 +61,7 @@ class BackupService {
     'expenses',
     'prive',
     'sales',
+    'cash_sessions',
     'debts',
     'customers',
     'notes',
@@ -165,6 +168,7 @@ class BackupService {
     );
     final suppliers = await db.query('suppliers', orderBy: 'id ASC');
     final customers = await db.query('customers', orderBy: 'id ASC');
+    final sessions = await db.query('cash_sessions', orderBy: 'id ASC');
     final notes = await db.query('notes', orderBy: 'id ASC');
 
     // Peta bantuan supaya lembar anak bisa menampilkan nomor nota / nama
@@ -194,6 +198,7 @@ class BackupService {
       _riwayatStok(stockMoves),
       _supplier(suppliers),
       _pelanggan(customers),
+      _sesiKas(sessions),
       _catatan(notes),
     ];
 
@@ -530,6 +535,46 @@ class BackupService {
             (_int(n['is_pinned']) ?? 0) == 1 ? 'Ya' : 'Tidak',
             _teks(n['created_at']),
             _teks(n['updated_at']),
+          ],
+      ],
+    );
+  }
+
+  /// Lembar sesi kas — hitung uang per giliran jaga.
+  ///
+  /// Selisih ditulis apa adanya sebagai angka, termasuk kalau negatif: di
+  /// Excel angka negatif terbaca sebagai kurang, dan justru itu yang dicari
+  /// pemilik toko saat memeriksa kasnya.
+  static XlsxSheet _sesiKas(List<Map<String, Object?>> rows) {
+    return XlsxSheet(
+      name: 'Sesi Kas',
+      rows: [
+        [
+          'ID',
+          'Dibuka',
+          'Saldo awal',
+          'Dibuka oleh',
+          'Ditutup',
+          'Seharusnya',
+          'Uang fisik',
+          'Selisih',
+          'Ditutup oleh',
+          'Catatan',
+          'Status',
+        ],
+        for (final s in rows)
+          [
+            _int(s['id']),
+            _teks(s['opened_at']),
+            _int(s['opening_balance']),
+            _teks(s['opened_by']),
+            _teks(s['closed_at']),
+            _int(s['expected_closing']),
+            _int(s['counted_cash']),
+            _int(s['difference']),
+            _teks(s['closed_by']),
+            _teks(s['note']),
+            CashSessionStatus.label(_teks(s['status'])),
           ],
       ],
     );

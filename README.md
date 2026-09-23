@@ -1,4 +1,4 @@
-# TokoKu — Aplikasi UMKM Toko Sembako & Penjualan (v1.16.0)
+# TokoKu — Aplikasi UMKM Toko Sembako & Penjualan (v1.17.0)
 
 Aplikasi mobile cross-platform (Android & iOS) untuk toko sembako UMKM. Dibuat dengan Flutter, bekerja **offline-first** dengan autentikasi email.
 
@@ -12,12 +12,13 @@ Aplikasi mobile cross-platform (Android & iOS) untuk toko sembako UMKM. Dibuat d
 - **Scan barcode**: Scan barcode produk (EAN-13/UPC) langsung dari kamera — untuk menambah barang ke keranjang maupun mengisi barcode saat menambah produk baru.
 - **Cetak struk thermal**: Cetak struk ke printer thermal Bluetooth 58mm/80mm setelah transaksi.
 - **Cetak ulang struk**: Struk transaksi lama bisa dicetak lagi kapan saja dari riwayat transaksi — berguna kalau kertas habis, printer mati, atau pelanggan minta salinan.
-- **Beranda**: Tombol aksi cepat berikon untuk hal yang paling sering dipakai — Transaksi, Tambah Stok, Laporan, Laporan Keuangan, Hutang & Piutang, Cetak Ulang Struk, Buku Kas, dan Catatan.
+- **Beranda**: Tombol aksi cepat berikon untuk hal yang paling sering dipakai — Transaksi, Tambah Stok, Laporan, Laporan Keuangan, Hutang & Piutang, Cetak Ulang Struk, Buku Kas, **Buka/Tutup Kasir**, dan Catatan. Tombol kasir itu berubah sendiri mengikuti keadaan: menulis "Buka Kasir" kalau belum ada sesi, dan "Tutup Kasir" kalau sesi sedang berjalan.
 - **Manajemen produk**: Tambah, edit, hapus produk dengan kategori, harga modal & jual, barcode, dan stok. Supplier dipilih dari daftar yang bisa diedit. **Ikon produk bisa memakai foto dari galeri HP**, dan setiap produk punya **satuan** (pcs, kg, liter, ikat) supaya struk menulis "2 kg" dan bukan sekadar "2".
 - **Manajemen stok**: Visual progress bar, peringatan stok menipis & habis, restok mudah. Daftar produk bisa langsung diklik untuk restok, dan kartu "stok menipis" di beranda membuka rincian produk yang perlu ditambah.
 - **Laporan berkala**: Laporan **harian, mingguan, dan bulanan** dengan grafik, ringkasan laba, produk terlaris, dan **detail produk per item** lengkap dengan tanggal, waktu, harga, dan laba per transaksi.
 - **Rincian produk terjual**: Maksimal 5 baris di layar Laporan, lalu "Lihat semua" membuka rincian lengkap yang bisa difilter harian/mingguan/bulanan, menampilkan total pendapatan beserta labanya, dan bisa **diekspor ke PDF & CSV**.
 - **Kas**: Satu buku kas untuk semua uang masuk & keluar. Beranda menampilkan saldo kas di tengah, uang keluar di kiri bawah, uang masuk di kanan bawah. Setiap penjualan, pembayaran hutang/piutang, restok, beban, dan prive tercatat otomatis — plus riwayat lengkap dan pencatatan manual.
+- **Tutup kasir (hitung uang)**: Sebelum tutup toko, kasir menghitung uang fisik di laci dan aplikasi membandingkannya dengan catatan sistem. Selisihnya ditampilkan lebih/kurang **sebelum** disimpan, dan kalau tidak cocok **wajib** diisi penjelasannya. Setiap sesi mencatat siapa yang membuka, siapa yang menutup, saldo awal, jumlah seharusnya, uang fisik, dan selisihnya — jadi uang yang tidak cocok tidak pernah hilang diam-diam. Transaksi yang terjadi selama sesi ikut terhitung ke sesi itu.
 - **Laporan keuangan standar akuntansi**: **Laba rugi**, **perubahan ekuitas**, **neraca**, dan **arus kas**, semuanya bisa diekspor ke PDF & CSV. Ada juga pencatatan **beban usaha** dan **prive** (pengambilan pemilik).
 - **Hutang & piutang**: Catat piutang pelanggan dan hutang ke supplier, cicilan pembayaran, riwayat bayar, serta peringatan jatuh tempo. Terhubung ke stok produk: restok yang belum dibayar penuh otomatis jadi hutang supplier, dan transaksi yang belum dibayar penuh jadi piutang pelanggan (dengan ceklist "Transaksi ini hutang?" di layar kasir).
 - **Data pelanggan**: Buku pelanggan yang bisa ditambah, diedit, dan dihapus — nama, nomor HP, alamat, dan catatan. Tiap pelanggan menampilkan **sisa piutang** dan **total belanjanya**, dan nomor HP-nya bisa langsung dibuka di WhatsApp. Piutang dari nota kasir maupun yang dicatat manual otomatis terhubung ke pelanggannya, dan nama yang belum ada di buku akan ditambahkan sendiri. Nama pelanggan tetap terekam apa adanya di setiap nota, jadi mengganti namanya **tidak mengubah struk dan laporan yang sudah terbit** — dan menghapus pelanggan **tidak menghapus riwayat transaksinya**.
@@ -153,13 +154,13 @@ cloudflare/                          # Server aktivasi lisensi (Worker + D1)
 
 ## Skema Database (SQLite)
 
-Versi skema: **9**. Migrasi berjalan otomatis dan tidak menghapus data yang sudah ada — kolom baru selalu ditambahkan lewat `ALTER TABLE`, sedangkan tabel lama tidak pernah ditulis ulang.
+Versi skema: **10**. Migrasi berjalan otomatis dan tidak menghapus data yang sudah ada — kolom baru selalu ditambahkan lewat `ALTER TABLE`, sedangkan tabel lama tidak pernah ditulis ulang.
 
 | Table | Purpose |
 |-------|---------|
 | `users` | Akun dengan email, password hash, nama toko, telepon toko, path logo |
 | `products` | Produk dengan nama, kategori, harga modal/jual, stok, satuan, dan path foto |
-| `sales` | Transaksi dengan invoice number, total, laba, metode bayar, penanda hutang, potongan nota, **status** (`selesai`/`batal`), **alasan pembatalan**, dan penghubung `customer_id` |
+| `sales` | Transaksi dengan invoice number, total, laba, metode bayar, penanda hutang, potongan nota, **status** (`selesai`/`batal`), **alasan pembatalan**, penghubung `customer_id`, dan penghubung `session_id` ke sesi kasir |
 | `sale_items` | Line items per transaksi (product, qty, satuan saat terjual, subtotal setelah potongan, potongan baris) |
 | `suppliers` | Data pemasok yang bisa diedit |
 | `customers` | **Buku pelanggan** — nama, nomor HP, alamat, catatan yang bisa diedit |
@@ -168,6 +169,7 @@ Versi skema: **9**. Migrasi berjalan otomatis dan tidak menghapus data yang suda
 | `debt_payments` | Riwayat pembayaran cicilan hutang |
 | `notes` | Catatan bebas pemilik toko |
 | `cash_transactions` | **Buku kas** — satu-satunya sumber saldo, uang masuk/keluar, dan arus kas |
+| `cash_sessions` | **Sesi kasir** — saldo awal, siapa membuka/menutup, uang seharusnya, uang fisik, selisih, catatan, status |
 | `expenses` | Beban usaha (listrik, sewa, gaji, dll.) |
 | `prive` | Pengambilan uang toko oleh pemilik (bukan beban) |
 | `stock_movements` | Riwayat pergerakan stok (masuk/keluar) beserta nilai belanjanya |
@@ -262,6 +264,58 @@ adalah catatan uang, bukan data pelanggan. Buku pelanggan juga ikut
 dicadangkan (`BackupService.tabelCadangan`) dan ikut dikosongkan saat
 memulihkan, dengan urutan yang sama persis dengan "Reset semua data".
 
+### Catatan tutup kasir
+
+Sesi kasir menjawab satu pertanyaan yang paling sering ditanyakan pemilik toko
+di penghujung hari: **"uang di laci kok tidak sama dengan catatan?"** Sebelum
+v1.17.0 aplikasi ini tahu berapa saldo menurut sistem, tetapi tidak pernah
+menyimpan berapa uang yang benar-benar dihitung orang.
+
+Alurnya dua langkah. Kasir membuka sesi — saldo awal dicatat otomatis dari
+saldo sistem, bukan diketik — lalu di akhir hari menutupnya dengan mengetik
+jumlah uang fisik yang ia hitung. Aplikasi menampilkan selisihnya **lebih
+dulu** — lebih atau kurang sekian — baru menyimpannya.
+
+Dua angka yang dibandingkan sengaja diambil dari **sumber yang sama**, yaitu
+`CashRepository.getSaldo()`:
+
+| Kolom | Isi | Sumber |
+|-------|-----|--------|
+| `opening_balance` | Saldo kas saat sesi dibuka | `CashRepository.getSaldo()` |
+| `expected_closing` | Saldo kas saat sesi ditutup | `CashRepository.getSaldo()` |
+
+Itu disengaja: angka "seharusnya ada di laci" tidak boleh pernah berbeda dari
+saldo yang dibaca kasir di layar Buku Kas. Kalau keduanya dihitung dengan cara
+berbeda, satu-satunya hasilnya adalah kasir yang berdebat dengan aplikasinya
+sendiri. Karena itu `opening_balance` **tidak** bisa diberi nilai awal di
+skema: nilai awal SQLite tidak boleh mengacu ke kolom atau tabel lain, jadi
+`bukaSesi()` yang membacanya. Kolom `expected_closing` dan `opening_balance`
+juga berarti saldo itu **sudah termasuk** uang awal — ia tidak boleh
+ditambahkan lagi saat membandingkan.
+
+`difference = counted_cash - expected_closing`. Nilai **negatif berarti uang
+kurang**, positif berarti lebih. Kalau selisihnya bukan nol, catatan
+**wajib** diisi sebelum tombol simpan bekerja — tanpa itu, uang yang tidak
+cocok bisa hilang tanpa satu pun penjelasan tertulis. Untuk alasan yang sama,
+sesi yang masih terbuka tidak boleh ada dua: `bukaSesi()` menolak membuka sesi
+baru selama sesi sebelumnya belum ditutup, dan penolakan itu terjadi **di dalam
+transaksi database** supaya dua orang yang menekan tombol hampir bersamaan
+tidak bisa menciptakan dua sesi terbuka.
+
+Setiap penjualan menyimpan `sales.session_id` sesi yang sedang terbuka, dibaca
+`SaleRepository.createSale` sendiri lewat `CashSessionRepository.idSesiAktif()`
+— **bukan** diserahkan ke pemanggil. Kalau pemanggil yang harus mengirimnya,
+satu tempat yang lupa akan membuat nota itu hilang dari rekap sesi tanpa satu
+pun galat muncul. Nota yang dibuat saat tidak ada sesi terbuka tetap sah;
+`session_id`-nya kosong.
+
+Sesi kasir ikut dicadangkan (`BackupService.tabelCadangan`) dan ikut
+dikosongkan saat memulihkan, dengan urutan yang sama persis dengan "Reset semua
+data". Kolom `status` punya nilai awal `'open'`, dan seperti `sales.status`,
+nilai awal itu adalah baris paling berbahaya di rilis ini: salah nilai berarti
+seluruh riwayat sesi lenyap dari daftar tanpa galat apa pun — karena itu ia
+dikunci oleh pemeriksa statis dan diuji-negatif.
+
 ### Akun kasir dan hak akses
 
 Sampai v1.15.0 aplikasi ini hanya mengenal satu akun, dan akun itu adalah
@@ -300,6 +354,15 @@ ada di `app_router.dart` dan **menutup** rute yang disebut di dalamnya;
 `/stok/menipis` sengaja dikecualikan karena kasir memang perlu tahu barang
 apa yang habis. Menyembunyikan tombol di dasbor dan menu Profil hanya
 polesan — yang menentukan adalah pengalihan rutenya.
+
+**Kasir boleh membuka Buku Kas dan menutup kasir.** Dua rute itu — `/kas` dan
+`/kas/tutup` — sengaja **tidak** ada di daftar rute pemilik. Yang menghitung
+uang di laci adalah orang yang memegang lacinya, jadi menutupnya dari layar
+pemilik justru memindahkan pekerjaan orang yang tidak memegang uangnya. Yang
+tetap tertutup untuk kasir adalah **Laporan** dan **Laporan Keuangan**: kasir
+cukup tahu saldo kas dan selisih laci sesinya sendiri, bukan laba dan neraca
+toko. Karena itu `/kas/tutup` juga hanya bisa dibuka kasir dan pemilik —
+aturannya ditegakkan di router, bukan dengan menyembunyikan tombol.
 
 **Akun pertama adalah pemilik.** Pendaftaran mandiri hanya terbuka pada
 pemasangan baru; begitu ada akun, rute `/auth/register` ditutup dan akun

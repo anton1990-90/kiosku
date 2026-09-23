@@ -7,6 +7,7 @@ import '../../core/utils/formatters.dart';
 import '../../core/utils/responsive.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/backup_provider.dart';
+import '../../providers/cash_session_provider.dart';
 import '../../providers/dashboard_provider.dart';
 import '../../providers/product_provider.dart';
 import '../../providers/update_provider.dart';
@@ -158,6 +159,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     final authState = ref.watch(authProvider);
     final dashState = ref.watch(dashboardProvider);
     final productState = ref.watch(productProvider);
+    final sesiKas = ref.watch(cashSessionProvider);
     final user = authState.user;
 
     return Scaffold(
@@ -468,6 +470,19 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                       iconBgColor: AppColors.successLight,
                       label: 'Buku Kas',
                       onTap: () => context.push('/kas'),
+                    ),
+                    // Tutup kasir — hitung uang di laci dan cocokkan dengan
+                    // catatan sistem. Bisa dipakai kasir maupun pemilik toko.
+                    // Labelnya mengikuti keadaan supaya lacinya terbaca
+                    // sekilas: sedang terbuka, atau belum pernah dibuka.
+                    QuickAction(
+                      icon: Icons.lock_outline,
+                      iconColor: AppColors.warningMid,
+                      iconBgColor: AppColors.warningLight,
+                      label: sesiKas.adaSesiTerbuka
+                          ? 'Tutup Kasir'
+                          : 'Buka Kasir',
+                      onTap: () => context.push('/kas/tutup'),
                     ),
                     QuickAction(
                       icon: Icons.note_alt_outlined,

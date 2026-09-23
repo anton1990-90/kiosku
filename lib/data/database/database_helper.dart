@@ -39,12 +39,19 @@ import 'package:sqflite/sqflite.dart';
 ///       pengguna sekaligus, tanpa pemilik tersisa yang bisa memperbaikinya.
 ///       Akun TIDAK PERNAH dihapus — `sales.user_id` punya kunci asing, dan
 ///       riwayat harus tetap punya pemiliknya; akun kasir dinonaktifkan.
+///  10 — + sesi kas (tutup kasir): tabel `cash_sessions` (saldo awal, saldo
+///       akhir sistem, uang fisik yang dihitung, selisih, waktu, catatan) dan
+///       kolom penghubung `sales.session_id`. `opening_balance` dan
+///       `expected_closing` sama-sama dibaca dari `getSaldo()` — sumber yang
+///       sama dengan layar Buku Kas — supaya "seharusnya di laci" tidak
+///       mungkin berbeda dengan saldo yang dilihat kasir. `difference` negatif
+///       berarti uang di laci kurang. Hanya boleh ada satu sesi terbuka.
 class DatabaseHelper {
   DatabaseHelper._();
   static final DatabaseHelper instance = DatabaseHelper._();
 
   static const _dbName = 'tokoku.db';
-  static const _dbVersion = 9;
+  static const _dbVersion = 10;
 
   Database? _database;
 
@@ -78,6 +85,7 @@ class DatabaseHelper {
     await _upgradeV7(db);
     await _upgradeV8(db);
     await _upgradeV9(db);
+    await _upgradeV10(db);
     await _seedProducts(db);
     await _seedPaymentMethods(db);
   }
@@ -546,6 +554,63 @@ class DatabaseHelper {
         db, 'users', 'is_active', 'INTEGER NOT NULL DEFAULT 1');
   }
 
+  /// Tabel versi 10 — sesi kas (tutup kasir / hitung uang).
+  ///
+  /// Sesi kas adalah ritual harian yang paling penting begitu toko punya
+  /// karyawan: hitung uang fisik di laci, bandingkan dengan catatan sistem.
+  /// Tanpa itu, selisih kas baru ketahuan berbulan-bulan kemudian dan tidak
+  /// bisa lagi ditelusuri ke siapa.
+  ///
+  /// **`opening_balance` diisi otomatis dari `getSaldo()` saat sesi dibuka,
+  /// dan `expected_closing` juga dari `getSaldo()` saat sesi ditutup.** Kedua
+  /// angka itu sengaja dibaca dari sumber yang sama dengan layar Buku Kas,
+  /// sehingga "seharusnya ada di laci" tidak mungkin berbeda dengan saldo yang
+  /// dilihat kasir di layar Kas. Kalau sesi menghitung sendiri dari rentang
+  /// waktunya, satu perubahan cara pencatatan kas akan membuat dua angka itu
+  /// berselisih — dan kasir dituduh kurang uang tanpa sebab.
+  ///
+  /// `difference` = `counted_cash` - `expected_closing`. **Negatif berarti uang
+  /// di laci kurang.** Nilainya disimpan, bukan dihitung ulang saat dibaca,
+  /// supaya angka yang dilihat pemilik toko tidak berubah kalau ada mutasi kas
+  /// lama yang menyusul dicatat.
+  ///
+  /// `opened_by`/`closed_by` menyimpan **email**, bukan id pengguna — mengikuti
+  /// aturan snapshot yang sama dengan `sale_items.unit` dan `debts.party_name`.
+  /// Alasannya praktis: berkas cadangan bisa dipulihkan di perangkat lain yang
+  /// tidak punya akun itu, sedangkan kolom ini memang tidak punya kunci asing
+  /// (dan tidak boleh punya, karena tabel `users` tidak ikut dicadangkan).
+  ///
+  /// **Hanya boleh ada satu sesi terbuka.** `CashSessionRepository` menolak
+  /// membuka sesi kedua: dua sesi terbuka membuat pertanyaan "seharusnya
+  /// berapa isi laci sekarang?" tidak bisa dijawab.
+  ///
+  /// `sales.session_id` hanya **penghubung**, sama seperti `sales.customer_id`
+  /// (versi 8): kolom hasil `ALTER TABLE` tidak bisa membawa kunci asing, dan
+  /// nota tanpa sesi tetap sah — penjualan tidak pernah dihalangi oleh sesi
+  /// yang belum dibuka.
+  Future<void> _upgradeV10(Database db) async {
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS cash_sessions (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        opened_at TEXT NOT NULL,
+        opening_balance INTEGER NOT NULL DEFAULT 0,
+        opened_by TEXT,
+        closed_at TEXT,
+        expected_closing INTEGER,
+        counted_cash INTEGER,
+        difference INTEGER,
+        closed_by TEXT,
+        note TEXT,
+        status TEXT NOT NULL DEFAULT 'open'
+      )
+    ''');
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS idx_cash_sessions_status '
+      'ON cash_sessions(status, opened_at)',
+    );
+    await _addColumnIfMissing(db, 'sales', 'session_id', 'INTEGER');
+  }
+
   /// Migrasi dari versi lama. Data yang sudah ada tidak boleh hilang.
   Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
     if (oldVersion < 2) {
@@ -575,6 +640,9 @@ class DatabaseHelper {
     if (oldVersion < 9) {
       await _upgradeV9(db);
     }
+    if (oldVersion < 10) {
+      await _upgradeV10(db);
+    }
   }
 
   /// Hapus seluruh data usaha — produk, penjualan, hutang, kas, beban,
@@ -597,6 +665,7 @@ class DatabaseHelper {
       'expenses',
       'prive',
       'sales',
+      'cash_sessions',
       'debts',
       'customers',
       'notes',

@@ -4,6 +4,7 @@ import '../models/cash_model.dart';
 import '../models/debt_model.dart';
 import '../models/sale_item_model.dart';
 import '../models/sale_model.dart';
+import 'cash_session_repository.dart';
 import 'customer_repository.dart';
 
 /// Sale repository — handles transaction creation and history queries.
@@ -21,6 +22,7 @@ import 'customer_repository.dart';
 class SaleRepository {
   final DatabaseHelper _db = DatabaseHelper.instance;
   final CustomerRepository _customerRepo = CustomerRepository();
+  final CashSessionRepository _sesiRepo = CashSessionRepository();
 
   /// Create a new sale transaction with all line items.
   /// Also reduces product stock for each item.
@@ -91,6 +93,13 @@ class SaleRepository {
     int? saleId;
     int? debtId;
 
+    // Sesi kas yang sedang terbuka, kalau ada. Sengaja dibaca di sini dan
+    // **bukan** diserahkan ke pemanggil: kalau pemanggil yang harus
+    // mengirimnya, satu tempat yang lupa akan membuat nota itu hilang dari
+    // rekap sesi tanpa satu pun galat muncul. `null` sah — sesi kas adalah
+    // alat kontrol, bukan syarat berjualan.
+    final sessionId = await _sesiRepo.idSesiAktif();
+
     await db.transaction((txn) async {
       // Pelanggan dikaitkan di dalam transaksi yang sama: kalau penjualannya
       // gagal di tengah jalan, pelanggan yang baru dibuat pun ikut batal
@@ -99,6 +108,7 @@ class SaleRepository {
           await _customerRepo.pastikanPelanggan(txn, customerName);
       final petaSale = sale.toMap();
       if (customerId != null) petaSale['customer_id'] = customerId;
+      if (sessionId != null) petaSale['session_id'] = sessionId;
       saleId = await txn.insert('sales', petaSale);
 
       for (final item in items) {
@@ -180,6 +190,7 @@ class SaleRepository {
       changeAmount: sale.changeAmount,
       isDebt: sale.isDebt,
       debtId: debtId,
+      sessionId: sessionId,
       createdAt: sale.createdAt,
     );
   }

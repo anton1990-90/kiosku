@@ -84,8 +84,18 @@ jobs:
       - name: Install dependencies
         run: flutter pub get
 
-      - name: Analisa kode (hanya info, tidak menggagalkan build)
-        run: flutter analyze --no-fatal-infos --no-fatal-warnings || true
+      - name: Analisa kode (info & peringatan tidak menggagalkan build, ERROR menggagalkan)
+        # Hanya `lib/`. Folder `test/` dibuat oleh `flutter create .` di langkah
+        # sebelumnya dan memakai nama `MyApp` bawaan template, yang bukan kelas
+        # di proyek ini — menganalisa folder itu akan selalu merah karena berkas
+        # yang kita sendiri hasilkan.
+        #
+        # `|| true` DIHAPUS. v1.14.0 membuktikan harganya: satu `const _akibat(...)`
+        # (method, bukan konstruktor) tercetak sebagai ERROR di sini lalu
+        # diabaikan, dan build baru gagal tiga menit kemudian di dalam Gradle
+        # dengan pesan yang jauh lebih samar. Analisa yang tidak bisa menggagalkan
+        # apa pun bukan pemeriksaan, melainkan hiasan.
+        run: flutter analyze lib/ --no-fatal-infos --no-fatal-warnings
 
       - name: Build APK release
         # PENTING: ci_patch.py menulis `System.getenv("KEYSTORE_PASSWORD")` dan

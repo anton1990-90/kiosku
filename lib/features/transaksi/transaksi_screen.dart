@@ -630,7 +630,7 @@ class _DialogBatalState extends State<_DialogBatal> {
             if (trx.paidAmount > 0)
               _akibat('${Formatters.rupiah(trx.paidAmount)} keluar dari kas'),
             if (trx.isDebt)
-              const _akibat('Piutang dari transaksi ini dihapus'),
+              _akibat('Piutang dari transaksi ini dihapus'),
             const SizedBox(height: 10),
             Container(
               padding: const EdgeInsets.all(10),

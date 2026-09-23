@@ -6,6 +6,9 @@ import '../../core/utils/report_period.dart';
 import '../../core/utils/responsive.dart';
 import '../../data/models/accounting_models.dart';
 import '../../data/repositories/accounting_repository.dart';
+import '../../data/repositories/sale_repository.dart';
+import '../../providers/auth_provider.dart';
+import '../../shared/services/receipt_printer.dart';
 
 /// Daftar transaksi penjualan beserta rinciannya.
 ///
@@ -44,6 +47,51 @@ class _TransaksiScreenState extends ConsumerState<TransaksiScreen> {
   Future<void> _gantiPeriode(ReportPeriod periode) async {
     setState(() => _period = periode);
     await _muat();
+  }
+
+  /// Cetak ulang struk untuk satu transaksi lama.
+  ///
+  /// Struk aslinya hanya bisa dicetak sekali, di layar kasir. Kalau kertas
+  /// habis, printer mati, atau pelanggan minta salinan, transaksi lama harus
+  /// tetap bisa dicetak dari sini.
+  Future<void> _cetakUlangStruk(SaleWithItems trx) async {
+    final user = ref.read(authProvider).user;
+    if (user == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Sesi tidak ditemukan, silakan masuk ulang'),
+          backgroundColor: AppColors.danger,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+
+    // Riwayat hanya menyimpan ringkasan, jadi penjualan dan baris barangnya
+    // diambil ulang dari database sebelum disusun menjadi struk.
+    final repo = SaleRepository();
+    final sale = await repo.getSaleById(trx.saleId);
+    if (!mounted) return;
+    if (sale == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Transaksi tidak ditemukan'),
+          backgroundColor: AppColors.danger,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+
+    final items = await repo.getSaleItems(trx.saleId);
+    if (!mounted) return;
+
+    await cetakStruk(
+      context: context,
+      sale: sale,
+      items: items,
+      user: user,
+    );
   }
 
   int get _totalPenjualan =>
@@ -423,6 +471,15 @@ class _TransaksiScreenState extends ConsumerState<TransaksiScreen> {
                   ),
                 ],
               ),
+            ),
+          ),
+          const Divider(height: 18),
+          Align(
+            alignment: Alignment.centerRight,
+            child: TextButton.icon(
+              onPressed: () => _cetakUlangStruk(trx),
+              icon: const Icon(Icons.print_outlined, size: 18),
+              label: const Text('Cetak struk'),
             ),
           ),
         ],

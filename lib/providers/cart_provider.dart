@@ -40,6 +40,7 @@ class CartState {
               sellPrice: i.product.sellPrice,
               quantity: i.quantity,
               subtotal: i.subtotal,
+              unit: i.product.unit,
             ))
         .toList();
   }

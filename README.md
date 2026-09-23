@@ -1,4 +1,4 @@
-# TokoKu — Aplikasi UMKM Toko Sembako & Penjualan (v1.3.0)
+# TokoKu — Aplikasi UMKM Toko Sembako & Penjualan (v1.12.0)
 
 Aplikasi mobile cross-platform (Android & iOS) untuk toko sembako UMKM. Dibuat dengan Flutter, bekerja **offline-first** dengan autentikasi email.
 
@@ -9,7 +9,9 @@ Aplikasi mobile cross-platform (Android & iOS) untuk toko sembako UMKM. Dibuat d
 - **Kasir (POS)**: Transaksi cepat dengan keranjang otomatis, pilihan metode pembayaran (tunai, QRIS, e-wallet), dan kalkulasi kembalian.
 - **Scan barcode**: Scan barcode produk (EAN-13/UPC) langsung dari kamera — untuk menambah barang ke keranjang maupun mengisi barcode saat menambah produk baru.
 - **Cetak struk thermal**: Cetak struk ke printer thermal Bluetooth 58mm/80mm setelah transaksi.
-- **Manajemen produk**: Tambah, edit, hapus produk dengan kategori, harga modal & jual, barcode, dan stok. Supplier dipilih dari daftar yang bisa diedit.
+- **Cetak ulang struk**: Struk transaksi lama bisa dicetak lagi kapan saja dari riwayat transaksi — berguna kalau kertas habis, printer mati, atau pelanggan minta salinan.
+- **Beranda**: Tombol aksi cepat berikon untuk hal yang paling sering dipakai — Transaksi, Tambah Stok, Laporan, Laporan Keuangan, Hutang & Piutang, Cetak Ulang Struk, Buku Kas, dan Catatan.
+- **Manajemen produk**: Tambah, edit, hapus produk dengan kategori, harga modal & jual, barcode, dan stok. Supplier dipilih dari daftar yang bisa diedit. **Ikon produk bisa memakai foto dari galeri HP**, dan setiap produk punya **satuan** (pcs, kg, liter, ikat) supaya struk menulis "2 kg" dan bukan sekadar "2".
 - **Manajemen stok**: Visual progress bar, peringatan stok menipis & habis, restok mudah. Daftar produk bisa langsung diklik untuk restok, dan kartu "stok menipis" di beranda membuka rincian produk yang perlu ditambah.
 - **Laporan berkala**: Laporan **harian, mingguan, dan bulanan** dengan grafik, ringkasan laba, produk terlaris, dan **detail produk per item** lengkap dengan tanggal, waktu, harga, dan laba per transaksi.
 - **Rincian produk terjual**: Maksimal 5 baris di layar Laporan, lalu "Lihat semua" membuka rincian lengkap yang bisa difilter harian/mingguan/bulanan, menampilkan total pendapatan beserta labanya, dan bisa **diekspor ke PDF & CSV**.
@@ -148,14 +150,14 @@ cloudflare/                          # Server aktivasi lisensi (Worker + D1)
 
 ## Skema Database (SQLite)
 
-Versi skema: **3**. Migrasi dari versi 1 & 2 berjalan otomatis dan tidak menghapus data yang sudah ada.
+Versi skema: **5**. Migrasi berjalan otomatis dan tidak menghapus data yang sudah ada — kolom baru selalu ditambahkan lewat `ALTER TABLE`, sedangkan tabel lama tidak pernah ditulis ulang.
 
 | Table | Purpose |
 |-------|---------|
 | `users` | Akun dengan email, password hash, nama toko, telepon toko, path logo |
-| `products` | Produk dengan nama, kategori, harga modal/jual, stok |
+| `products` | Produk dengan nama, kategori, harga modal/jual, stok, satuan, dan path foto |
 | `sales` | Transaksi dengan invoice number, total, laba, metode bayar, penanda hutang |
-| `sale_items` | Line items per transaksi (product, qty, subtotal) |
+| `sale_items` | Line items per transaksi (product, qty, satuan saat terjual, subtotal) |
 | `suppliers` | Data pemasok yang bisa diedit |
 | `payment_methods` | Metode pembayaran yang bisa diaktifkan/dinonaktifkan |
 | `debts` | Piutang pelanggan & hutang ke supplier (terhubung ke `sale_id` / `product_id`) |

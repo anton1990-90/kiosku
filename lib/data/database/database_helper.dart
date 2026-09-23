@@ -14,12 +14,14 @@ import 'package:sqflite/sqflite.dart';
 ///       dan hutang↔produk
 ///   4 — + kolom pembayaran pada users: qris_path (gambar QRIS),
 ///       bank_name, bank_account_number, bank_account_name
+///   5 — + kolom pada products: unit (satuan: pcs, kg, liter, …) dan
+///       photo_path (foto barang dari galeri; emoji tetap jadi cadangan)
 class DatabaseHelper {
   DatabaseHelper._();
   static final DatabaseHelper instance = DatabaseHelper._();
 
   static const _dbName = 'tokoku.db';
-  static const _dbVersion = 4;
+  static const _dbVersion = 5;
 
   Database? _database;
 
@@ -48,6 +50,7 @@ class DatabaseHelper {
     await _createV2Tables(db);
     await _createV3Tables(db);
     await _upgradeV4(db);
+    await _upgradeV5(db);
     await _seedProducts(db);
     await _seedPaymentMethods(db);
   }
@@ -303,6 +306,29 @@ class DatabaseHelper {
     await _addColumnIfMissing(db, 'users', 'bank_account_name', 'TEXT');
   }
 
+  /// Kolom versi 5 — satuan dan foto barang.
+  ///
+  /// `unit` dipakai supaya struk menulis "2 kg" dan bukan sekadar "2". Nilai
+  /// awalnya `pcs` supaya produk lama tetap punya satuan yang masuk akal.
+  ///
+  /// `photo_path` menyimpan path foto barang yang dipilih dari galeri. Kalau
+  /// kosong, tampilan kembali memakai `emoji` — jadi produk lama tidak perlu
+  /// disunting satu per satu.
+  ///
+  /// `sale_items.unit` merekam satuan **saat barang terjual**, bukan dibaca
+  /// ulang dari tabel `products`. Dengan begitu struk lama tetap benar
+  /// walaupun pemilik mengganti satuan produknya kemudian — perlakuan yang
+  /// sama dengan `cost_price` dan `sell_price` di tabel yang sama.
+  ///
+  /// Semuanya ditambahkan lewat `_addColumnIfMissing`, jadi `CREATE TABLE
+  /// products` dan `CREATE TABLE sale_items` tidak berubah dan data yang sudah
+  /// ada di HP pelanggan aman.
+  Future<void> _upgradeV5(Database db) async {
+    await _addColumnIfMissing(db, 'products', 'unit', "TEXT NOT NULL DEFAULT 'pcs'");
+    await _addColumnIfMissing(db, 'products', 'photo_path', 'TEXT');
+    await _addColumnIfMissing(db, 'sale_items', 'unit', "TEXT NOT NULL DEFAULT 'pcs'");
+  }
+
   /// Migrasi dari versi lama. Data yang sudah ada tidak boleh hilang.
   Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
     if (oldVersion < 2) {
@@ -316,6 +342,9 @@ class DatabaseHelper {
     }
     if (oldVersion < 4) {
       await _upgradeV4(db);
+    }
+    if (oldVersion < 5) {
+      await _upgradeV5(db);
     }
   }
 

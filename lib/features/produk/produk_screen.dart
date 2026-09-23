@@ -225,16 +225,12 @@ class _ProductCard extends StatelessWidget {
       ),
       child: Row(
         children: [
-          Container(
-            width: 48,
-            height: 48,
-            decoration: BoxDecoration(
-              color: AppColors.bgSoft,
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Center(
-              child: Text(product.emoji ?? '📦', style: const TextStyle(fontSize: 22)),
-            ),
+          ProductIcon(
+            photoPath: product.photoPath,
+            emoji: product.emoji,
+            size: 48,
+            radius: 8,
+            emojiSize: 22,
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -262,7 +258,7 @@ class _ProductCard extends StatelessWidget {
                     const Text(' · ',
                         style: TextStyle(color: AppColors.textTertiary, fontSize: 12)),
                     Text(
-                      'Stok ${product.stock}',
+                      'Stok ${product.stock} ${product.unit}',
                       style: TextStyle(
                         fontSize: 12,
                         color: product.stock <= product.minStock

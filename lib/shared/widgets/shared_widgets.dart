@@ -479,3 +479,77 @@ Widget barisRincian(String label, String value, {bool tebal = false}) {
     ),
   );
 }
+
+/// Ikon barang di daftar produk, grid kasir, dan kartu peringatan stok.
+///
+/// Memakai foto dari galeri kalau ada, dan kembali ke emoji kalau tidak.
+/// Produk lama tidak punya foto sama sekali, jadi emoji wajib tetap bekerja —
+/// itulah sebabnya widget ini tidak pernah menggambar kotak kosong.
+///
+/// Pemeriksaan berkas sengaja memakai `existsSync`, bukan versi asinkron:
+/// widget ini dipakai di dalam `GridView.builder`, dan pengecekan asinkron
+/// membuat gambarnya berkedip setiap kali daftar digulir.
+class ProductIcon extends StatelessWidget {
+  final String? photoPath;
+  final String? emoji;
+  final double size;
+  final double radius;
+  final double emojiSize;
+
+  const ProductIcon({
+    super.key,
+    required this.photoPath,
+    required this.emoji,
+    this.size = 40,
+    this.radius = 10,
+    this.emojiSize = 20,
+  });
+
+  /// Benar hanya kalau path terisi dan berkasnya benar-benar ada.
+  ///
+  /// Path basi — misalnya setelah pemilik membersihkan penyimpanan — harus
+  /// jatuh kembali ke emoji, bukan menampilkan gambar rusak.
+  bool get adaFoto {
+    final path = photoPath;
+    if (path == null || path.isEmpty) return false;
+    try {
+      return File(path).existsSync();
+    } catch (_) {
+      return false;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        color: AppColors.bgSoft,
+        borderRadius: BorderRadius.circular(radius),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: adaFoto
+          ? Image.file(
+              File(photoPath!),
+              width: size,
+              height: size,
+              fit: BoxFit.cover,
+              // Berkas rusak di tengah jalan tidak boleh memunculkan kotak
+              // galat di tengah daftar barang.
+              errorBuilder: (context, error, stackTrace) => Center(
+                child: Text(
+                  emoji ?? '📦',
+                  style: TextStyle(fontSize: emojiSize),
+                ),
+              ),
+            )
+          : Center(
+              child: Text(
+                emoji ?? '📦',
+                style: TextStyle(fontSize: emojiSize),
+              ),
+            ),
+    );
+  }
+}

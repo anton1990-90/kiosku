@@ -8,6 +8,8 @@ import '../../data/models/supplier_model.dart';
 import '../../data/repositories/product_repository.dart';
 import '../../providers/product_provider.dart';
 import '../../providers/supplier_provider.dart';
+import '../../shared/services/product_photo_service.dart';
+import '../../shared/widgets/shared_widgets.dart';
 import '../kasir/barcode_scanner_screen.dart';
 
 /// Produk form — tambah atau edit produk.
@@ -33,6 +35,12 @@ class _ProdukFormScreenState extends ConsumerState<ProdukFormScreen> {
   String _category = 'Sembako';
   String _emoji = '📦';
 
+  /// Satuan jual produk — dipakai supaya struk menulis "2 kg", bukan "2".
+  String _unit = 'pcs';
+
+  /// Path foto barang yang dipilih dari galeri. Null berarti memakai emoji.
+  String? _photoPath;
+
   /// Nama supplier terpilih. String kosong berarti "tidak ada supplier" —
   /// dipakai sebagai penanda karena DropdownButton tidak menampilkan item
   /// yang bernilai null.
@@ -41,6 +49,18 @@ class _ProdukFormScreenState extends ConsumerState<ProdukFormScreen> {
 
   final _categories = ['Sembako', 'Minuman', 'Snack', 'Kebutuhan', 'Lainnya'];
   final _emojis = ['📦', '🍚', '🛢️', '🧂', '🥚', '🍜', '☕', '🥛', '🧴', '🧈', '🌾', '💧'];
+  final _units = [
+    'pcs',
+    'kg',
+    'gram',
+    'liter',
+    'ml',
+    'ikat',
+    'bungkus',
+    'sachet',
+    'dus',
+    'karton',
+  ];
 
   bool get isEditing => widget.product != null;
 
@@ -57,6 +77,8 @@ class _ProdukFormScreenState extends ConsumerState<ProdukFormScreen> {
       _minStockController.text = p.minStock.toString();
       _barcodeController.text = p.barcode ?? '';
       _emoji = p.emoji ?? '📦';
+      _unit = p.unit;
+      _photoPath = p.photoPath;
       _supplier = p.supplier ?? '';
     }
     // Pastikan daftar supplier terbaru sudah dimuat untuk dropdown.
@@ -140,6 +162,29 @@ class _ProdukFormScreenState extends ConsumerState<ProdukFormScreen> {
     if (mounted) setState(() => _supplier = name);
   }
 
+  /// Pilih foto barang dari galeri HP.
+  ///
+  /// Foto lama dihapus setelah foto baru berhasil dipilih, supaya berkas tidak
+  /// menumpuk di penyimpanan. Kalau pemilik membatalkan pilihan, tidak ada
+  /// yang berubah.
+  Future<void> _pilihFoto() async {
+    final baru = await ProductPhotoService.instance.pilihDanSimpan();
+    if (baru == null || !mounted) return;
+
+    final lama = _photoPath;
+    setState(() => _photoPath = baru);
+    if (lama != null && lama != baru) {
+      await ProductPhotoService.instance.hapus(lama);
+    }
+  }
+
+  /// Hapus foto dan kembali memakai emoji sebagai ikon barang.
+  Future<void> _hapusFoto() async {
+    final lama = _photoPath;
+    setState(() => _photoPath = null);
+    await ProductPhotoService.instance.hapus(lama);
+  }
+
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
     setState(() => _saving = true);
@@ -182,6 +227,8 @@ class _ProdukFormScreenState extends ConsumerState<ProdukFormScreen> {
       supplier: _supplier.isEmpty ? null : _supplier,
       barcode: barcode.isEmpty ? null : barcode,
       emoji: _emoji,
+      unit: _unit,
+      photoPath: _photoPath,
       createdAt: widget.product?.createdAt ?? DateTime.now(),
       updatedAt: DateTime.now(),
     );
@@ -207,6 +254,15 @@ class _ProdukFormScreenState extends ConsumerState<ProdukFormScreen> {
       if (_supplier != null &&
           !supplierState.suppliers.any((s) => s.name == _supplier))
         _supplier!,
+    ];
+
+    // Satuan produk lama bisa saja di luar daftar baku (misalnya diisi dari
+    // perangkat lain), jadi nilainya selalu disisipkan. Tanpa itu dropdown
+    // tampil kosong, karena `DropdownButtonFormField` tidak menampilkan item
+    // yang tidak ada di daftarnya.
+    final satuanTersedia = <String>[
+      ..._units,
+      if (!_units.contains(_unit)) _unit,
     ];
 
     return Scaffold(
@@ -270,15 +326,77 @@ class _ProdukFormScreenState extends ConsumerState<ProdukFormScreen> {
                 ),
               ),
               const SizedBox(height: 20),
-              // Emoji picker
-              const Text('Ikon produk',
+              // Foto barang — opsional. Kalau diisi, foto inilah yang tampil di
+              // daftar barang dan di kasir. Kalau kosong, emoji yang dipakai.
+              const Text('Foto & ikon produk',
                   style: TextStyle(fontSize: 13, color: AppColors.textSecondary)),
               const SizedBox(height: 8),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  ProductIcon(
+                    photoPath: _photoPath,
+                    emoji: _emoji,
+                    size: 72,
+                    radius: 14,
+                    emojiSize: 34,
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        OutlinedButton.icon(
+                          onPressed: _pilihFoto,
+                          icon: const Icon(Icons.photo_library_outlined,
+                              size: 18),
+                          label: Text(
+                            _photoPath == null
+                                ? 'Pilih dari galeri'
+                                : 'Ganti foto',
+                          ),
+                        ),
+                        if (_photoPath != null) ...[
+                          const SizedBox(height: 6),
+                          TextButton.icon(
+                            onPressed: _hapusFoto,
+                            icon: const Icon(
+                              Icons.delete_outline,
+                              size: 18,
+                              color: AppColors.dangerMid,
+                            ),
+                            label: const Text(
+                              'Hapus foto',
+                              style: TextStyle(color: AppColors.dangerMid),
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 6),
+              Text(
+                _photoPath == null
+                    ? 'Belum ada foto. Barang memakai emoji di bawah — pilih '
+                        'salah satu, atau ambil foto dari galeri HP.'
+                    : 'Foto ini akan tampil di daftar barang, kasir, dan '
+                        'peringatan stok.',
+                style: const TextStyle(
+                  fontSize: 11,
+                  color: AppColors.textTertiary,
+                  height: 1.4,
+                ),
+              ),
+              const SizedBox(height: 12),
               Wrap(
                 spacing: 8,
                 runSpacing: 8,
                 children: _emojis.map((e) {
-                  final isSelected = _emoji == e;
+                  // Emoji ditandai terpilih hanya kalau tidak ada foto, supaya
+                  // pemilik tidak bingung mana yang sebenarnya berlaku.
+                  final isSelected = _photoPath == null && _emoji == e;
                   return GestureDetector(
                     onTap: () => setState(() => _emoji = e),
                     child: Container(
@@ -311,15 +429,43 @@ class _ProdukFormScreenState extends ConsumerState<ProdukFormScreen> {
                     v == null || v.trim().isEmpty ? 'Wajib diisi' : null,
               ),
               const SizedBox(height: 16),
-              DropdownButtonFormField<String>(
-                value: _category,
-                decoration: const InputDecoration(labelText: 'Kategori'),
-                items: _categories
-                    .map((c) => DropdownMenuItem(value: c, child: Text(c)))
-                    .toList(),
-                onChanged: (v) => setState(() => _category = v ?? 'Sembako'),
+              Row(
+                children: [
+                  Expanded(
+                    child: DropdownButtonFormField<String>(
+                      value: _category,
+                      decoration: const InputDecoration(labelText: 'Kategori'),
+                      items: _categories
+                          .map((c) => DropdownMenuItem(value: c, child: Text(c)))
+                          .toList(),
+                      onChanged: (v) =>
+                          setState(() => _category = v ?? 'Sembako'),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: DropdownButtonFormField<String>(
+                      value: _unit,
+                      decoration: const InputDecoration(labelText: 'Satuan'),
+                      items: satuanTersedia
+                          .map((u) => DropdownMenuItem(value: u, child: Text(u)))
+                          .toList(),
+                      onChanged: (v) => setState(() => _unit = v ?? 'pcs'),
+                    ),
+                  ),
+                ],
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 6),
+              const Text(
+                'Satuan dipakai di struk dan laporan — misalnya "2 kg" '
+                'alih-alih sekadar "2".',
+                style: TextStyle(
+                  fontSize: 11,
+                  color: AppColors.textTertiary,
+                  height: 1.4,
+                ),
+              ),
+              const SizedBox(height: 12),
               Row(
                 children: [
                   Expanded(

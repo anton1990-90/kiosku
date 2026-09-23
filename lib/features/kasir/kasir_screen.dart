@@ -14,10 +14,9 @@ import '../../providers/cart_provider.dart';
 import '../../providers/payment_method_provider.dart';
 import '../../providers/product_provider.dart';
 import '../../providers/sale_provider.dart';
-import '../../shared/services/bluetooth_printer_service.dart';
-import '../../shared/services/receipt_service.dart';
+import '../../shared/services/receipt_printer.dart';
+import '../../shared/widgets/shared_widgets.dart';
 import 'barcode_scanner_screen.dart';
-import 'printer_selection_screen.dart';
 
 /// Kasir (POS) — point of sale for making transactions.
 /// Fully offline: products, cart, and checkout all work without internet.
@@ -118,55 +117,20 @@ class _KasirScreenState extends ConsumerState<KasirScreen> {
   }
 
   /// Print the receipt to a Bluetooth thermal printer.
+  ///
+  /// Isi sebenarnya ada di `cetakStruk()` supaya jalur ini dan jalur cetak
+  /// ulang dari riwayat transaksi memakai kode yang sama persis.
   Future<void> _printReceipt(
     SaleModel sale,
     List<SaleItemModel> items,
     UserModel user,
-  ) async {
-    // Show printer selection
-    final device = await Navigator.push(
-      context,
-      MaterialPageRoute(builder: (_) => const PrinterSelectionScreen()),
+  ) {
+    return cetakStruk(
+      context: context,
+      sale: sale,
+      items: items,
+      user: user,
     );
-
-    if (device == null || !mounted) return;
-
-    try {
-      final bytes = await ReceiptService.instance.generateReceipt(
-        sale: sale,
-        items: items,
-        storeName: user.storeName,
-        storeAddress: user.storeAddress,
-        storePhone: user.storePhone,
-        logoPath: user.logoPath,
-        qrisPath: user.qrisPath,
-        bankName: user.bankName,
-        bankAccountNumber: user.bankAccountNumber,
-        bankAccountName: user.bankAccountName,
-      );
-      await BluetoothPrinterService.instance.printBytes(device, bytes);
-      await BluetoothPrinterService.instance.disconnect(device);
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Struk berhasil dicetak'),
-            backgroundColor: AppColors.success,
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Gagal mencetak: $e'),
-            backgroundColor: AppColors.danger,
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
-      }
-    }
   }
 
   void _showReceiptDialog(
@@ -399,9 +363,12 @@ class _KasirScreenState extends ConsumerState<KasirScreen> {
                             width: double.infinity,
                             color: AppColors.bgSoft,
                             child: Center(
-                              child: Text(
-                                product.emoji ?? '📦',
-                                style: const TextStyle(fontSize: 36),
+                              child: ProductIcon(
+                                photoPath: product.photoPath,
+                                emoji: product.emoji,
+                                size: 64,
+                                radius: 0,
+                                emojiSize: 36,
                               ),
                             ),
                           ),

@@ -103,7 +103,7 @@ class ReceiptService {
       bytes += generator.text(item.productName);
       bytes += generator.row([
         PosColumn(
-          text: '${item.quantity} x ${Formatters.rupiah(item.sellPrice)}',
+          text: '${item.quantity} ${item.unit} x ${Formatters.rupiah(item.sellPrice)}',
           width: 7,
         ),
         PosColumn(
@@ -326,7 +326,7 @@ class ReceiptService {
     for (final item in items) {
       buffer.writeln(item.productName);
       buffer.writeln(
-          '  ${item.quantity} x ${Formatters.rupiah(item.sellPrice)} = ${Formatters.rupiah(item.subtotal)}');
+          '  ${item.quantity} ${item.unit} x ${Formatters.rupiah(item.sellPrice)} = ${Formatters.rupiah(item.subtotal)}');
     }
     buffer.write(line);
     buffer.writeln('TOTAL      : ${Formatters.rupiah(sale.totalAmount)}');

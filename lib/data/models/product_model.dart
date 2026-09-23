@@ -11,6 +11,12 @@ class ProductModel {
   final String? supplier;
   final String? emoji;   // Visual placeholder for product image
   final String? barcode; // EAN-13 / UPC barcode for scanning
+  /// Satuan jual: pcs, kg, liter, ikat, dan sebagainya. Dipakai supaya struk
+  /// dan laporan menulis "2 kg", bukan sekadar "2".
+  final String unit;
+  /// Path foto barang yang dipilih dari galeri HP. Kalau null, tampilan
+  /// kembali memakai [emoji] — jadi produk lama tidak perlu disunting.
+  final String? photoPath;
   final DateTime createdAt;
   final DateTime updatedAt;
 
@@ -25,6 +31,8 @@ class ProductModel {
     this.supplier,
     this.emoji,
     this.barcode,
+    this.unit = 'pcs',
+    this.photoPath,
     required this.createdAt,
     required this.updatedAt,
   });
@@ -51,6 +59,8 @@ class ProductModel {
       'supplier': supplier,
       'emoji': emoji,
       'barcode': barcode,
+      'unit': unit,
+      'photo_path': photoPath,
       'created_at': createdAt.toIso8601String(),
       'updated_at': updatedAt.toIso8601String(),
     };
@@ -68,6 +78,8 @@ class ProductModel {
       supplier: map['supplier'] as String?,
       emoji: (map['emoji'] as String?) ?? '📦',
       barcode: map['barcode'] as String?,
+      unit: (map['unit'] as String?) ?? 'pcs',
+      photoPath: map['photo_path'] as String?,
       createdAt: DateTime.parse(map['created_at'] as String),
       updatedAt: DateTime.parse(map['updated_at'] as String),
     );
@@ -84,6 +96,8 @@ class ProductModel {
     String? supplier,
     String? emoji,
     String? barcode,
+    String? unit,
+    String? photoPath,
     DateTime? createdAt,
     DateTime? updatedAt,
   }) {
@@ -98,6 +112,8 @@ class ProductModel {
       supplier: supplier ?? this.supplier,
       emoji: emoji ?? this.emoji,
       barcode: barcode ?? this.barcode,
+      unit: unit ?? this.unit,
+      photoPath: photoPath ?? this.photoPath,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
     );

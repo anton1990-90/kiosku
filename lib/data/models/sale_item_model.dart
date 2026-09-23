@@ -8,6 +8,13 @@ class SaleItemModel {
   final int sellPrice;   // Captured at time of sale
   final int quantity;
   final int subtotal;
+  /// Satuan saat barang ini terjual (pcs, kg, liter, …).
+  ///
+  /// Disimpan per baris, bukan dibaca ulang dari tabel `products`, supaya
+  /// struk lama tetap menampilkan satuan yang benar meskipun pemilik sudah
+  /// mengganti satuan produknya kemudian — perlakuan yang sama dengan
+  /// [costPrice].
+  final String unit;
 
   SaleItemModel({
     this.id,
@@ -18,6 +25,7 @@ class SaleItemModel {
     required this.sellPrice,
     required this.quantity,
     required this.subtotal,
+    this.unit = 'pcs',
   });
 
   int get profit => (sellPrice - costPrice) * quantity;
@@ -32,6 +40,7 @@ class SaleItemModel {
       'sell_price': sellPrice,
       'quantity': quantity,
       'subtotal': subtotal,
+      'unit': unit,
     };
   }
 
@@ -45,6 +54,8 @@ class SaleItemModel {
       sellPrice: map['sell_price'] as int,
       quantity: map['quantity'] as int,
       subtotal: map['subtotal'] as int,
+      // Baris lama belum punya kolom ini, jadi harus punya nilai cadangan.
+      unit: (map['unit'] as String?) ?? 'pcs',
     );
   }
 }

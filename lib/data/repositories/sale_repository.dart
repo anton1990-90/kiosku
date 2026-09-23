@@ -195,6 +195,23 @@ class SaleRepository {
     return results.map((m) => SaleModel.fromMap(m)).toList();
   }
 
+  /// Ambil satu penjualan berdasarkan id.
+  ///
+  /// Dipakai untuk mencetak ulang struk dari riwayat transaksi: riwayat hanya
+  /// menyimpan ringkasan, sedangkan pembuat struk memerlukan model penjualan
+  /// yang utuh (invoice, metode bayar, jumlah dibayar, dan kembalian).
+  Future<SaleModel?> getSaleById(int saleId) async {
+    final db = await _db.database;
+    final results = await db.query(
+      'sales',
+      where: 'id = ?',
+      whereArgs: [saleId],
+      limit: 1,
+    );
+    if (results.isEmpty) return null;
+    return SaleModel.fromMap(results.first);
+  }
+
   /// Get sale items for a specific sale.
   Future<List<SaleItemModel>> getSaleItems(int saleId) async {
     final db = await _db.database;

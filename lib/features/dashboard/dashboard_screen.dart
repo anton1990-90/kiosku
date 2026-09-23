@@ -430,11 +430,39 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                       onTap: () => context.go('/stok'),
                     ),
                     QuickAction(
-                      icon: Icons.handshake_outlined,
+                      icon: Icons.bar_chart_outlined,
+                      iconColor: AppColors.successMid,
+                      iconBgColor: AppColors.successLight,
+                      label: 'Laporan',
+                      onTap: () => context.go('/laporan'),
+                    ),
+                    QuickAction(
+                      icon: Icons.account_balance_outlined,
                       iconColor: AppColors.infoMid,
                       iconBgColor: AppColors.infoLight,
-                      label: 'Hutang',
+                      label: 'Laporan Keuangan',
+                      onTap: () => context.push('/laporan/keuangan'),
+                    ),
+                    QuickAction(
+                      icon: Icons.handshake_outlined,
+                      iconColor: AppColors.warningMid,
+                      iconBgColor: AppColors.warningLight,
+                      label: 'Hutang & Piutang',
                       onTap: () => context.push('/hutang'),
+                    ),
+                    QuickAction(
+                      icon: Icons.print_outlined,
+                      iconColor: AppColors.primary,
+                      iconBgColor: AppColors.primaryLight,
+                      label: 'Cetak Ulang Struk',
+                      onTap: () => context.push('/transaksi'),
+                    ),
+                    QuickAction(
+                      icon: Icons.account_balance_wallet_outlined,
+                      iconColor: AppColors.successMid,
+                      iconBgColor: AppColors.successLight,
+                      label: 'Buku Kas',
+                      onTap: () => context.push('/kas'),
                     ),
                     QuickAction(
                       icon: Icons.note_alt_outlined,
@@ -523,7 +551,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                                   ? '${p.name} habis'
                                   : '${p.name} menipis',
                               subtitle:
-                                  'Sisa ${p.stock} pcs dari minimum ${p.minStock}',
+                                  'Sisa ${p.stock} ${p.unit} dari minimum ${p.minStock}',
                               color: p.stock == 0
                                   ? AppColors.danger
                                   : AppColors.warning,

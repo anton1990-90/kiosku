@@ -5,7 +5,7 @@ Disusun 23 September 2026, berdasarkan pembacaan langsung kode di `lib/`
 
 > **Catatan pemutakhiran.** Nomor skema di tiap usulan di bawah ditulis saat
 > dokumen ini disusun, ketika versi skema masih 4 — jadi semuanya berbunyi
-> "versi 5". Versi skema sekarang **10** (v1.17.0), dan usulan yang belum
+> "versi 5". Versi skema sekarang **11** (v1.18.0), dan usulan yang belum
 > dikerjakan akan memakai versi berikutnya, bukan 5. Bagian yang sudah
 > dikerjakan ditandai di judulnya.
 
@@ -120,7 +120,7 @@ sebagai rilis tersendiri**, jangan digabung dengan fitur lain, karena
 kesalahan pembulatan di sini langsung merusak laporan.
 
 **Usaha:** A kecil, B besar. **Skema:** Tahap A versi 5 (selesai).
-Tahap B menunggu versi 10 dan mengubah `quantity INTEGER` menjadi `REAL`
+Tahap B menunggu versi 12 dan mengubah `quantity INTEGER` menjadi `REAL`
 di `sales`, `sale_items`, dan `stock_movements` — kerjakan sebagai rilis
 tersendiri, seperti catatan di atas.
 
@@ -183,7 +183,7 @@ tercatat di `stock_movements`, dan `debts` sudah punya `supplier_id`.
 stok dan hutang otomatis menyesuaikan. Sekarang stok masuk dan hutang
 dicatat terpisah, jadi rawan tidak sinkron.
 
-**Usaha:** besar. **Skema:** versi 5 (tabel pesanan + baris pesanan).
+**Usaha:** besar. **Skema:** versi 12 (tabel pesanan + baris pesanan).
 
 ---
 
@@ -220,8 +220,6 @@ versi 9 (selesai).
 - **Kategori jadi data tetap.** `products.category` masih teks bebas, jadi
   "Minuman" dan "minuman" bisa terpisah di laporan. Jadikan tabel tersendiri
   seperti `suppliers`.
-- **Footer struk bisa diubah.** Teks "Terima kasih atas kunjungan Anda!"
-  masih tertulis tetap di `receipt_service.dart` (baris 171 dan 359).
 - **Mode gelap.** Belum ada `darkTheme`/`ThemeMode` sama sekali.
 
 ---
@@ -258,7 +256,7 @@ Terverifikasi ada di kode, supaya tidak diusulkan ulang:
 - Data supplier yang bisa diedit
 - Metode pembayaran yang bisa diaktifkan/dinonaktifkan, info QRIS & rekening
 - Catatan berwarna dengan pin
-- Profil toko: nama, alamat, telepon, logo
+- Profil toko: nama, alamat, telepon, logo, **ucapan penutup struk**
 - Cadangan & pemulihan JSON, termasuk cadangan otomatis
 - Kunci PIN, lupa password lewat kode aktivasi (offline)
 - Gerbang lisensi, aktivasi, pemberitahuan pembaruan
@@ -266,17 +264,17 @@ Terverifikasi ada di kode, supaya tidak diusulkan ulang:
 
 ---
 
-## Tiga hal non-fitur yang lebih mendesak daripada fitur apa pun
+## Hal non-fitur yang lebih mendesak daripada fitur apa pun
 
-1. **Cadangkan folder `release-signing` ke dua tempat.** Masih belum
-   tercentang di `docs/panduan-jual-lisensi.md`. Kalau kunci tanda tangan
-   hilang, **tidak akan pernah bisa merilis pembaruan** untuk pelanggan yang
-   sudah membeli — mereka harus memasang ulang dan kehilangan seluruh data.
-   Ini risiko terbesar di seluruh proyek, lebih besar dari fitur apa pun.
+1. ~~**Cadangkan folder `release-signing` ke dua tempat.**~~ **Selesai.**
+   Cadangannya ada di `D:\BACKUP-tokoku-signing` (volume terpisah) dan di
+   OneDrive (di luar mesin ini). Keenam berkasnya sudah dibandingkan
+   `sha256sum`-nya dengan aslinya dan **identik**.
 2. **Cabut lisensi percobaan setelah masa uji selesai.** Lisensi uji
-   bersifat permanen dan tidak akan kedaluwarsa sendiri.
-3. **`README.md` sudah usang** — judulnya masih menyebut v1.3.0, padahal
-   pubspec sekarang `1.11.0+17`.
+   bersifat permanen dan tidak akan kedaluwarsa sendiri. Belum dikerjakan —
+   menunggu masa uji benar-benar berakhir.
+3. ~~**`README.md` sudah usang.**~~ **Selesai** — judul dan versi skema di
+   README kini mengikuti rilis terakhir.
 
 **Terhambat pada Anda:** beli domain lalu pasang SPF/DKIM, supaya email
 voucher otomatis dan ringkasan harian bisa jalan. Belum ada yang bisa
@@ -286,9 +284,10 @@ dikerjakan di sisi kode sebelum domain siap.
 
 ## Catatan teknis untuk pengerjaan nanti
 
-Semua usulan di atas menambah tabel/kolom, jadi **satu migrasi skema versi 5**
-dapat menampung prioritas 2–6 sekaligus. Namun sebaiknya **jangan digabung
-dalam satu rilis** — masing-masing menyentuh perhitungan uang. Urutan yang
+Semua usulan di atas menambah tabel/kolom. Saat dokumen ini disusun semuanya
+dikira bisa ditampung satu migrasi; kenyataannya tiap rilis membawa migrasi
+sendiri (v5 sampai v11) dan itu terbukti lebih aman: **jangan digabung dalam
+satu rilis** — masing-masing menyentuh perhitungan uang. Urutan yang
 disarankan: 1 → 4A → 3 → 2 → 5 → 6.
 
 Ingat jebakan yang sudah pernah menggigit proyek ini:

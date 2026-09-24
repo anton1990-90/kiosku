@@ -179,6 +179,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
     String? bankName,
     String? bankAccountNumber,
     String? bankAccountName,
+    String? receiptFooter,
   }) async {
     final userId = state.user?.id;
     if (userId == null) return false;
@@ -194,6 +195,14 @@ class AuthNotifier extends StateNotifier<AuthState> {
         bankName: bankName ?? state.user?.bankName,
         bankAccountNumber: bankAccountNumber ?? state.user?.bankAccountNumber,
         bankAccountName: bankAccountName ?? state.user?.bankAccountName,
+        // `??` di sini menjaga ucapan struk tetap utuh saat pemilik hanya
+        // mengganti logo atau QRIS: pemanggil yang tidak menyebut kolom ini
+        // mengirim null, dan null berarti "pertahankan yang lama".
+        //
+        // Mengosongkan kolom di Info Toko mengirim string kosong — bukan null —
+        // jadi ia melewati `??`, dibersihkan repositori menjadi NULL, dan struk
+        // kembali memakai teks bawaan. Itulah cara "hapus ucapan" bekerja.
+        receiptFooter: receiptFooter ?? state.user?.receiptFooter,
       );
       state = AuthState(
         user: updated,

@@ -46,12 +46,19 @@ import 'package:sqflite/sqflite.dart';
 ///       sama dengan layar Buku Kas — supaya "seharusnya di laci" tidak
 ///       mungkin berbeda dengan saldo yang dilihat kasir. `difference` negatif
 ///       berarti uang di laci kurang. Hanya boleh ada satu sesi terbuka.
+///  11 — + kolom `users.receipt_footer`: ucapan penutup yang dicetak di bawah
+///       struk, menggantikan teks tetap "Terima kasih atas kunjungan Anda!".
+///       Kolomnya **nullable dan tanpa nilai awal** — baris yang sudah ada
+///       bernilai NULL, dan layar cetak memakai teks bawaan itu. Berbeda
+///       dengan `users.role` (versi 9) dan `cash_sessions.status` (versi 10),
+///       di sini nilai awal tidak bisa salah: NULL berarti "pakai bawaan",
+///       bukan "pakai teks kosong".
 class DatabaseHelper {
   DatabaseHelper._();
   static final DatabaseHelper instance = DatabaseHelper._();
 
   static const _dbName = 'tokoku.db';
-  static const _dbVersion = 10;
+  static const _dbVersion = 11;
 
   Database? _database;
 
@@ -86,6 +93,7 @@ class DatabaseHelper {
     await _upgradeV8(db);
     await _upgradeV9(db);
     await _upgradeV10(db);
+    await _upgradeV11(db);
     await _seedProducts(db);
     await _seedPaymentMethods(db);
   }
@@ -611,6 +619,21 @@ class DatabaseHelper {
     await _addColumnIfMissing(db, 'sales', 'session_id', 'INTEGER');
   }
 
+  /// Versi 11 — ucapan penutup struk yang bisa diubah pemilik toko.
+  ///
+  /// Satu kolom, ditambahkan lewat `_addColumnIfMissing`, jadi `CREATE TABLE
+  /// users` tidak berubah dan data yang sudah ada tetap utuh. Tanpa `NOT NULL`
+  /// dan tanpa `DEFAULT`: baris lama menjadi NULL, dan itu memang yang
+  /// diinginkan — layar cetak membaca NULL sebagai "pakai teks bawaan".
+  ///
+  /// Kalau di sini ditulis `DEFAULT ''`, setiap toko yang memperbarui aplikasi
+  /// akan mencetak struk tanpa ucapan penutup sama sekali, dan pemiliknya tidak
+  /// punya cara tahu bahwa dulu ada teks di sana. NULL menyimpan perbedaan
+  /// antara "belum diatur" dan "sengaja dikosongkan".
+  Future<void> _upgradeV11(Database db) async {
+    await _addColumnIfMissing(db, 'users', 'receipt_footer', 'TEXT');
+  }
+
   /// Migrasi dari versi lama. Data yang sudah ada tidak boleh hilang.
   Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
     if (oldVersion < 2) {
@@ -642,6 +665,9 @@ class DatabaseHelper {
     }
     if (oldVersion < 10) {
       await _upgradeV10(db);
+    }
+    if (oldVersion < 11) {
+      await _upgradeV11(db);
     }
   }
 

@@ -70,7 +70,24 @@ class _LaporanScreenState extends ConsumerState<LaporanScreen> {
             else
               _dailyChart(state.dailyTotals, period),
             const SizedBox(height: 16),
-            _topProducts(state.topProducts),
+            _last7DaysChart(state.last7Days),
+            const SizedBox(height: 16),
+            _productBarChart(
+              judul: 'Produk terlaris',
+              subjudul: 'Paling banyak terjual pada periode ini',
+              produk: state.topProducts,
+              warnaBatang: AppColors.primary,
+            ),
+            const SizedBox(height: 16),
+            _productBarChart(
+              judul: 'Produk kurang laku',
+              subjudul: state.leastProducts.any((p) => p.quantity == 0)
+                  ? 'Paling sedikit terjual, termasuk barang yang belum '
+                      'terjual sama sekali'
+                  : 'Paling sedikit terjual pada periode ini',
+              produk: state.leastProducts,
+              warnaBatang: AppColors.warningMid,
+            ),
             const SizedBox(height: 16),
             _itemDetailSection(state.items, period),
             const SizedBox(height: 16),
@@ -429,104 +446,223 @@ class _LaporanScreenState extends ConsumerState<LaporanScreen> {
     );
   }
 
-  // -------------------------------------------------------- produk terlaris
+  // ------------------------------------------------- grafik batang produk
 
-  Widget _topProducts(List<TopProduct> products) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppColors.bgCard,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.border, width: 0.5),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'Produk terlaris',
-            style: TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w700,
-              color: AppColors.textMain,
-            ),
-          ),
-          const SizedBox(height: 12),
-          if (products.isEmpty)
-            const Text(
-              'Belum ada produk terjual pada periode ini.',
-              style: TextStyle(fontSize: 13, color: AppColors.textTertiary),
+  /// Grafik batang mendatar untuk daftar produk.
+  ///
+  /// Dipakai dua kali — yang paling laku dan yang paling kurang laku — supaya
+  /// keduanya pasti memakai ukuran dan tata letak yang sama. Kalau digambar
+  /// sebagai dua potong kode terpisah, panjang batang di kedua grafik tidak
+  /// bisa dibandingkan satu sama lain.
+  ///
+  /// Bentuknya mendatar, bukan tegak, karena nama barang sembako panjang
+  /// ("Minyak Goreng Kemasan 2 Liter"). Batang tegak memaksa namanya dipotong
+  /// sampai tidak lagi terbaca.
+  Widget _productBarChart({
+    required String judul,
+    required String subjudul,
+    required List<TopProduct> produk,
+    required Color warnaBatang,
+  }) {
+    // Penyebut rasio adalah jumlah terjual terbanyak, jadi ia harus diperiksa
+    // lebih dulu: kalau semua produk terjual nol, nilai ini 0 dan setiap
+    // pembagian di bawah menghasilkan NaN.
+    final maxQty =
+        produk.fold<int>(0, (maks, p) => p.quantity > maks ? p.quantity : maks);
+
+    return _ChartCard(
+      title: judul,
+      subtitle: subjudul,
+      child: produk.isEmpty
+          ? const SizedBox(
+              height: 60,
+              child: Center(
+                child: Text(
+                  'Tidak ada data',
+                  style: TextStyle(color: AppColors.textTertiary, fontSize: 13),
+                ),
+              ),
             )
-          else
-            ...products.asMap().entries.map((entry) {
-              final i = entry.key;
-              final p = entry.value;
-              return Padding(
-                padding: const EdgeInsets.only(bottom: 12),
-                child: Row(
+          : Column(
+              children: produk.map((p) {
+                // Barang yang belum terjual tetap digambar — sebagai batang
+                // kosong selebar minimum. Kalau barisnya dihilangkan, justru
+                // informasi yang paling penting itu yang lenyap dari grafik.
+                final rasio = maxQty == 0 ? 0.0 : p.quantity / maxQty;
+
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              p.productName,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: AppColors.textMain,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            '${p.quantity} terjual',
+                            style: const TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.textSecondary,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: LayoutBuilder(
+                              builder: (context, kotak) => Align(
+                                alignment: Alignment.centerLeft,
+                                child: Container(
+                                  height: 10,
+                                  // `.clamp()` mengembalikan `num`, bukan
+                                  // `double`. Tanpa `.toDouble()` hasilnya tidak
+                                  // bisa dipakai sebagai lebar.
+                                  width: (kotak.maxWidth * rasio)
+                                      .clamp(3.0, kotak.maxWidth)
+                                      .toDouble(),
+                                  decoration: BoxDecoration(
+                                    color: warnaBatang,
+                                    borderRadius: BorderRadius.circular(5),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          SizedBox(
+                            width: 88,
+                            child: Text(
+                              Formatters.rupiahCompact(p.revenue),
+                              textAlign: TextAlign.right,
+                              style: const TextStyle(
+                                fontSize: 11,
+                                color: AppColors.textTertiary,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                );
+              }).toList(),
+            ),
+    );
+  }
+
+  // -------------------------------------------------- grafik tujuh hari
+
+  /// Singkatan nama hari, indeksnya `weekday - 1`.
+  static const List<String> _namaHari = [
+    'Sen',
+    'Sel',
+    'Rab',
+    'Kam',
+    'Jum',
+    'Sab',
+    'Min',
+  ];
+
+  /// Grafik batang penjualan tujuh hari terakhir.
+  ///
+  /// Selalu tujuh batang. Hari tanpa penjualan tetap digambar sebagai batang
+  /// kosong supaya lebar grafiknya tidak berubah-ubah — kalau hanya hari yang
+  /// ada penjualannya yang digambar, "seminggu" bisa tampil sebagai dua batang
+  /// dan naik-turunnya tidak lagi terbaca.
+  ///
+  /// Batang hari ini diberi warna penuh dan harinya dicetak tebal, karena
+  /// itulah yang dicari pemilik toko lebih dulu.
+  Widget _last7DaysChart(List<({DateTime date, int total})> data) {
+    final maxTotal =
+        data.fold<int>(0, (maks, d) => d.total > maks ? d.total : maks);
+    final total = data.fold<int>(0, (jumlah, d) => jumlah + d.total);
+    // `data.length` tidak pernah nol — repositori selalu mengembalikan tepat
+    // tujuh baris — tetapi pembagian ini tetap dijaga supaya tidak bergantung
+    // pada janji itu.
+    final rata = data.isEmpty ? 0 : total ~/ data.length;
+
+    return _ChartCard(
+      title: '7 hari terakhir',
+      subtitle: maxTotal == 0
+          ? 'Belum ada penjualan dalam tujuh hari terakhir'
+          : 'Total ${Formatters.rupiahCompact(total)} · rata-rata '
+              '${Formatters.rupiahCompact(rata)}/hari',
+      child: SizedBox(
+        height: 150,
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: data.asMap().entries.map((entry) {
+            final i = entry.key;
+            final d = entry.value;
+            // Baris terakhir selalu hari ini: repositori menyusunnya urut naik.
+            final iniHariIni = i == data.length - 1;
+            final rasio = maxTotal == 0 ? 0.0 : d.total / maxTotal;
+
+            return Expanded(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 3),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.end,
                   children: [
+                    Text(
+                      d.total == 0
+                          ? ''
+                          : Formatters.rupiahCompact(d.total)
+                              .replaceAll('Rp ', ''),
+                      style: const TextStyle(
+                        fontSize: 9,
+                        color: AppColors.textTertiary,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
                     Container(
-                      width: 24,
-                      height: 24,
+                      height: (110 * rasio).clamp(4.0, 110.0).toDouble(),
                       decoration: BoxDecoration(
-                        color: i == 0
-                            ? AppColors.accentLight
-                            : AppColors.bgSoft,
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: Center(
-                        child: Text(
-                          '${i + 1}',
-                          style: TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w700,
-                            color: i == 0
-                                ? AppColors.accentMid
-                                : AppColors.textSecondary,
-                          ),
+                        color: iniHariIni
+                            ? AppColors.primary
+                            : AppColors.primaryLight,
+                        borderRadius: const BorderRadius.vertical(
+                          top: Radius.circular(4),
                         ),
                       ),
                     ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Text(
-                        p.productName,
-                        style: const TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                          color: AppColors.textMain,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
+                    const SizedBox(height: 4),
+                    Text(
+                      _namaHari[d.date.weekday - 1],
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight:
+                            iniHariIni ? FontWeight.w700 : FontWeight.w400,
+                        color: iniHariIni
+                            ? AppColors.primary
+                            : AppColors.textSecondary,
                       ),
-                    ),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: [
-                        Text(
-                          '${p.quantity} terjual',
-                          style: const TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                            color: AppColors.textMain,
-                          ),
-                        ),
-                        Text(
-                          Formatters.rupiah(p.revenue),
-                          style: const TextStyle(
-                            fontSize: 11,
-                            color: AppColors.textSecondary,
-                          ),
-                        ),
-                      ],
                     ),
                   ],
                 ),
-              );
-            }),
-        ],
+              ),
+            );
+          }).toList(),
+        ),
       ),
     );
   }
+
 
   // ------------------------------------------------------- rincian per item
 

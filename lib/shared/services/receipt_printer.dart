@@ -44,6 +44,7 @@ Future<bool> cetakStruk({
       bankName: user.bankName,
       bankAccountNumber: user.bankAccountNumber,
       bankAccountName: user.bankAccountName,
+      receiptFooter: user.receiptFooter,
     );
     await BluetoothPrinterService.instance.printBytes(device, bytes);
     await BluetoothPrinterService.instance.disconnect(device);

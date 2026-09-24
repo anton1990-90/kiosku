@@ -22,6 +22,25 @@ class ReceiptService {
   /// Lebar kertas dalam titik (dot): 58mm = 384, 80mm = 576.
   static int _lebarKertas(int paperWidth) => paperWidth == 80 ? 576 : 384;
 
+  /// Ucapan penutup bawaan, dipakai selama pemilik toko belum mengubahnya.
+  ///
+  /// Disimpan sebagai konstanta supaya teks ini hidup di **satu** tempat.
+  /// Sebelumnya ia tertulis dua kali — sekali untuk printer termal, sekali
+  /// untuk struk teks — dan itu berarti mengubahnya harus diingat di dua
+  /// tempat. Sekarang keduanya memanggil [footerStruk].
+  static const String footerBawaan = 'Terima kasih atas kunjungan Anda!';
+
+  /// Ucapan penutup yang benar-benar dicetak.
+  ///
+  /// `null` dan spasi saja sama-sama berarti "belum diatur", jadi keduanya
+  /// jatuh ke teks bawaan. Ini juga penjaga terakhir kalau ada baris lama di
+  /// database yang nilainya string kosong: struk tidak akan pernah mencetak
+  /// satu baris kosong di tempat ucapan seharusnya.
+  static String footerStruk(String? footer) {
+    final teks = (footer ?? '').trim();
+    return teks.isEmpty ? footerBawaan : teks;
+  }
+
   /// Generate the receipt bytes for a thermal printer.
   Future<List<int>> generateReceipt({
     required SaleModel sale,
@@ -34,6 +53,7 @@ class ReceiptService {
     String? bankName,
     String? bankAccountNumber,
     String? bankAccountName,
+    String? receiptFooter,
     int paperWidth = 58,
   }) async {
     final profile = await CapabilityProfile.load();
@@ -190,9 +210,11 @@ class ReceiptService {
       lebarKertas: lebar,
     );
 
-    // Footer
+    // Footer — ucapan pemilik toko kalau sudah diatur di Info Toko, teks
+    // bawaan kalau belum. Kedua jalur cetak memakai footerStruk() yang sama
+    // supaya struk termal dan struk teks tidak pernah berbeda ucapan.
     bytes += generator.text(
-      'Terima kasih atas kunjungan Anda!',
+      footerStruk(receiptFooter),
       styles: const PosStyles(align: PosAlign.center),
     );
     bytes += generator.text(
@@ -327,6 +349,7 @@ class ReceiptService {
     String? bankName,
     String? bankAccountNumber,
     String? bankAccountName,
+    String? receiptFooter,
   }) {
     final buffer = StringBuffer();
     final line = '--------------------------------\n';
@@ -386,7 +409,7 @@ class ReceiptService {
     }
 
     buffer.write(line);
-    buffer.writeln('Terima kasih atas kunjungan Anda!');
+    buffer.writeln(footerStruk(receiptFooter));
     buffer.writeln('Powered by TokoKu');
 
     return buffer.toString();

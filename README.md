@@ -1,4 +1,4 @@
-# TokoKu — Aplikasi UMKM Toko Sembako & Penjualan (v1.17.0)
+# TokoKu — Aplikasi UMKM Toko Sembako & Penjualan (v1.18.0)
 
 Aplikasi mobile cross-platform (Android & iOS) untuk toko sembako UMKM. Dibuat dengan Flutter, bekerja **offline-first** dengan autentikasi email.
 
@@ -12,10 +12,11 @@ Aplikasi mobile cross-platform (Android & iOS) untuk toko sembako UMKM. Dibuat d
 - **Scan barcode**: Scan barcode produk (EAN-13/UPC) langsung dari kamera — untuk menambah barang ke keranjang maupun mengisi barcode saat menambah produk baru.
 - **Cetak struk thermal**: Cetak struk ke printer thermal Bluetooth 58mm/80mm setelah transaksi.
 - **Cetak ulang struk**: Struk transaksi lama bisa dicetak lagi kapan saja dari riwayat transaksi — berguna kalau kertas habis, printer mati, atau pelanggan minta salinan.
+- **Ucapan penutup struk bisa diubah**: Teks penutup di bawah struk ("Terima kasih atas kunjungan Anda!") bisa diganti dari **Profil → Info Toko** — misalnya dengan ucapan terima kasih, jam buka, atau nomor WhatsApp toko. Dikosongkan berarti kembali ke teks bawaan, bukan mencetak struk tanpa penutup.
 - **Beranda**: Tombol aksi cepat berikon untuk hal yang paling sering dipakai — Transaksi, Tambah Stok, Laporan, Laporan Keuangan, Hutang & Piutang, Cetak Ulang Struk, Buku Kas, **Buka/Tutup Kasir**, dan Catatan. Tombol kasir itu berubah sendiri mengikuti keadaan: menulis "Buka Kasir" kalau belum ada sesi, dan "Tutup Kasir" kalau sesi sedang berjalan.
 - **Manajemen produk**: Tambah, edit, hapus produk dengan kategori, harga modal & jual, barcode, dan stok. Supplier dipilih dari daftar yang bisa diedit. **Ikon produk bisa memakai foto dari galeri HP**, dan setiap produk punya **satuan** (pcs, kg, liter, ikat) supaya struk menulis "2 kg" dan bukan sekadar "2".
 - **Manajemen stok**: Visual progress bar, peringatan stok menipis & habis, restok mudah. Daftar produk bisa langsung diklik untuk restok, dan kartu "stok menipis" di beranda membuka rincian produk yang perlu ditambah.
-- **Laporan berkala**: Laporan **harian, mingguan, dan bulanan** dengan grafik, ringkasan laba, produk terlaris, dan **detail produk per item** lengkap dengan tanggal, waktu, harga, dan laba per transaksi.
+- **Laporan berkala**: Laporan **harian, mingguan, dan bulanan** dengan grafik, ringkasan laba, **grafik batang barang terlaris dan barang kurang laku**, **grafik batang penjualan tujuh hari terakhir**, produk terlaris, dan **detail produk per item** lengkap dengan tanggal, waktu, harga, dan laba per transaksi.
 - **Rincian produk terjual**: Maksimal 5 baris di layar Laporan, lalu "Lihat semua" membuka rincian lengkap yang bisa difilter harian/mingguan/bulanan, menampilkan total pendapatan beserta labanya, dan bisa **diekspor ke PDF & CSV**.
 - **Kas**: Satu buku kas untuk semua uang masuk & keluar. Beranda menampilkan saldo kas di tengah, uang keluar di kiri bawah, uang masuk di kanan bawah. Setiap penjualan, pembayaran hutang/piutang, restok, beban, dan prive tercatat otomatis — plus riwayat lengkap dan pencatatan manual.
 - **Tutup kasir (hitung uang)**: Sebelum tutup toko, kasir menghitung uang fisik di laci dan aplikasi membandingkannya dengan catatan sistem. Selisihnya ditampilkan lebih/kurang **sebelum** disimpan, dan kalau tidak cocok **wajib** diisi penjelasannya. Setiap sesi mencatat siapa yang membuka, siapa yang menutup, saldo awal, jumlah seharusnya, uang fisik, dan selisihnya — jadi uang yang tidak cocok tidak pernah hilang diam-diam. Transaksi yang terjadi selama sesi ikut terhitung ke sesi itu.
@@ -154,11 +155,11 @@ cloudflare/                          # Server aktivasi lisensi (Worker + D1)
 
 ## Skema Database (SQLite)
 
-Versi skema: **10**. Migrasi berjalan otomatis dan tidak menghapus data yang sudah ada — kolom baru selalu ditambahkan lewat `ALTER TABLE`, sedangkan tabel lama tidak pernah ditulis ulang.
+Versi skema: **11**. Migrasi berjalan otomatis dan tidak menghapus data yang sudah ada — kolom baru selalu ditambahkan lewat `ALTER TABLE`, sedangkan tabel lama tidak pernah ditulis ulang.
 
 | Table | Purpose |
 |-------|---------|
-| `users` | Akun dengan email, password hash, nama toko, telepon toko, path logo |
+| `users` | Akun dengan email, password hash, peran & status aktif, nama toko, telepon toko, path logo, ucapan penutup struk yang bisa diubah |
 | `products` | Produk dengan nama, kategori, harga modal/jual, stok, satuan, dan path foto |
 | `sales` | Transaksi dengan invoice number, total, laba, metode bayar, penanda hutang, potongan nota, **status** (`selesai`/`batal`), **alasan pembatalan**, penghubung `customer_id`, dan penghubung `session_id` ke sesi kasir |
 | `sale_items` | Line items per transaksi (product, qty, satuan saat terjual, subtotal setelah potongan, potongan baris) |
@@ -315,6 +316,88 @@ data". Kolom `status` punya nilai awal `'open'`, dan seperti `sales.status`,
 nilai awal itu adalah baris paling berbahaya di rilis ini: salah nilai berarti
 seluruh riwayat sesi lenyap dari daftar tanpa galat apa pun — karena itu ia
 dikunci oleh pemeriksa statis dan diuji-negatif.
+
+### Catatan ucapan struk dan grafik penjualan
+
+**Ucapan penutup struk.** Sebelum v1.18.0 teks "Terima kasih atas kunjungan
+Anda!" tertulis tetap di dua tempat di `receipt_service.dart`. Sekarang teks itu
+satu konstanta (`ReceiptService.footerBawaan`) yang dipakai dua jalur cetak
+lewat satu fungsi (`ReceiptService.footerStruk`), dan pemilik toko bisa
+menggantinya dari **Profil → Info Toko**.
+
+Skema v11 menambahkan `users.receipt_footer`. Kolom itu sengaja **nullable dan
+tanpa nilai awal** — dan itu kebalikan dari `users.role` (v9) maupun
+`cash_sessions.status` (v10). Di dua rilis itu nilai awal yang salah membuat
+data lama salah **dibaca**; di sini nilai awal yang salah akan **menghapus** teks
+yang sudah ada. Kalau kolomnya diberi `DEFAULT ''`, setiap toko yang memperbarui
+aplikasi langsung mencetak struk tanpa ucapan penutup sama sekali, dan
+pemiliknya tidak punya cara tahu bahwa dulu ada teks di sana. NULL-lah yang
+menyimpan perbedaan antara "belum diatur" dan "sengaja dikosongkan". Mengosongkan
+kolomnya di Info Toko karena itu berarti **kembali ke teks bawaan**, bukan
+mencetak struk tanpa penutup.
+
+**Grafik batang.** Layar Laporan menambah tiga grafik, semuanya digambar
+langsung dari `Row` dan `Container` — proyek ini tidak memakai paket grafik, dan
+itu disengaja: satu dependensi lebih sedikit yang bisa rusak saat Flutter naik
+versi.
+
+Dua di antaranya berbagi satu widget, `_productBarChart`: yang satu menampilkan
+barang **terlaris**, yang satu barang **kurang laku**. Yang kurang laku dibaca
+dari tabel `products` dengan subquery `LEFT JOIN`, bukan dari `sale_items`.
+Perbedaannya bukan soal gaya penulisan: kalau query-nya berangkat dari
+`sale_items`, barang yang tidak terjual sama sekali tidak punya satu pun baris di
+sana, jadi ia hilang dari daftar — dan justru barang itulah yang paling perlu
+diketahui pemilik toko. Syarat tanggalnya juga harus ada **di dalam** subquery;
+kalau dinaikkan ke `WHERE` luar, `LEFT JOIN`-nya berubah menjadi `INNER JOIN`
+dan efeknya sama.
+
+Grafik ketiga menampilkan **tujuh hari terakhir**. Repositori selalu
+mengembalikan tepat tujuh baris — hari tanpa penjualan diisi nol — supaya
+grafiknya tidak pernah tampil sebagai dua batang untuk "seminggu". Ketiga grafik
+menjaga pembagian dengan nol: penyebutnya adalah nilai terbanyak, jadi kalau
+semua nilainya nol setiap batang akan menjadi `NaN`, dan yang muncul di layar
+bukan galat melainkan grafik dengan tinggi yang tidak masuk akal.
+
+### Catatan ucapan struk dan grafik penjualan
+
+**Ucapan penutup struk.** Sebelum v1.18.0 teks "Terima kasih atas kunjungan
+Anda!" tertulis tetap di dua tempat di `receipt_service.dart`. Sekarang teks itu
+satu konstanta (`ReceiptService.footerBawaan`) yang dipakai dua jalur cetak
+lewat satu fungsi (`ReceiptService.footerStruk`), dan pemilik toko bisa
+menggantinya dari **Profil → Info Toko**.
+
+Skema v11 menambahkan `users.receipt_footer`. Kolom itu sengaja **nullable dan
+tanpa nilai awal** — dan itu kebalikan dari `users.role` (v9) maupun
+`cash_sessions.status` (v10). Di dua rilis itu nilai awal yang salah membuat
+data lama salah **dibaca**; di sini nilai awal yang salah akan **menghapus** teks
+yang sudah ada. Kalau kolomnya diberi `DEFAULT ''`, setiap toko yang memperbarui
+aplikasi langsung mencetak struk tanpa ucapan penutup sama sekali, dan
+pemiliknya tidak punya cara tahu bahwa dulu ada teks di sana. NULL-lah yang
+menyimpan perbedaan antara "belum diatur" dan "sengaja dikosongkan". Mengosongkan
+kolomnya di Info Toko karena itu berarti **kembali ke teks bawaan**, bukan
+mencetak struk tanpa penutup.
+
+**Grafik batang.** Layar Laporan menambah tiga grafik, semuanya digambar
+langsung dari `Row` dan `Container` — proyek ini tidak memakai paket grafik, dan
+itu disengaja: satu dependensi lebih sedikit yang bisa rusak saat Flutter naik
+versi.
+
+Dua di antaranya berbagi satu widget, `_productBarChart`: yang satu menampilkan
+barang **terlaris**, yang satu barang **kurang laku**. Yang kurang laku dibaca
+dari tabel `products` dengan subquery `LEFT JOIN`, bukan dari `sale_items`.
+Perbedaannya bukan soal gaya penulisan: kalau query-nya berangkat dari
+`sale_items`, barang yang tidak terjual sama sekali tidak punya satu pun baris di
+sana, jadi ia hilang dari daftar — dan justru barang itulah yang paling perlu
+diketahui pemilik toko. Syarat tanggalnya juga harus ada **di dalam** subquery;
+kalau dinaikkan ke `WHERE` luar, `LEFT JOIN`-nya berubah menjadi `INNER JOIN`
+dan efeknya sama.
+
+Grafik ketiga menampilkan **tujuh hari terakhir**. Repositori selalu
+mengembalikan tepat tujuh baris — hari tanpa penjualan diisi nol — supaya
+grafiknya tidak pernah tampil sebagai dua batang untuk "seminggu". Ketiga grafik
+menjaga pembagian dengan nol: penyebutnya adalah nilai terbanyak, jadi kalau
+semua nilainya nol setiap batang akan menjadi `NaN`, dan yang muncul di layar
+bukan galat melainkan grafik dengan tinggi yang tidak masuk akal.
 
 ### Akun kasir dan hak akses
 

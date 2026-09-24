@@ -345,8 +345,8 @@ class AuthRepository {
     return UserModel.fromMap(results.first);
   }
 
-  /// Simpan perubahan info toko (nama, alamat, telepon, logo, QRIS, bank).
-  /// Mengembalikan user yang sudah diperbarui.
+  /// Simpan perubahan info toko (nama, alamat, telepon, logo, QRIS, bank,
+  /// ucapan penutup struk). Mengembalikan user yang sudah diperbarui.
   Future<UserModel> updateStore({
     required int userId,
     required String storeName,
@@ -357,6 +357,7 @@ class AuthRepository {
     String? bankName,
     String? bankAccountNumber,
     String? bankAccountName,
+    String? receiptFooter,
   }) async {
     final db = await _db.database;
 
@@ -387,6 +388,10 @@ class AuthRepository {
       bankName: bersih(bankName),
       bankAccountNumber: bersih(bankAccountNumber),
       bankAccountName: bersih(bankAccountName),
+      // Ucapan struk juga lewat `bersih()`: spasi saja dianggap "belum diatur",
+      // bukan teks berisi spasi. Mengosongkan kolomnya mengembalikan teks
+      // bawaan di struk, bukan mencetak baris kosong.
+      receiptFooter: bersih(receiptFooter),
       createdAt: current?.createdAt ?? DateTime.now(),
     );
 
@@ -403,6 +408,7 @@ class AuthRepository {
       'bank_name': merged.bankName,
       'bank_account_number': merged.bankAccountNumber,
       'bank_account_name': merged.bankAccountName,
+      'receipt_footer': merged.receiptFooter,
     });
 
     return merged;

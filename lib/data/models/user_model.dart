@@ -43,6 +43,15 @@ class UserModel {
   final String? bankAccountNumber;
   final String? bankAccountName;
 
+  /// Ucapan penutup yang dicetak di bawah struk — menggantikan teks tetap
+  /// "Terima kasih atas kunjungan Anda!".
+  ///
+  /// `null` berarti pemilik belum pernah mengubahnya, dan layar cetak memakai
+  /// teks bawaan itu. String kosong diperlakukan sama: `updateStore` membuang
+  /// spasi dan mengubahnya menjadi `null`, supaya tidak ada struk yang
+  /// mencetak satu baris kosong tanpa alasan yang jelas.
+  final String? receiptFooter;
+
   final DateTime createdAt;
 
   UserModel({
@@ -59,6 +68,7 @@ class UserModel {
     this.bankName,
     this.bankAccountNumber,
     this.bankAccountName,
+    this.receiptFooter,
     required this.createdAt,
   });
 
@@ -106,6 +116,7 @@ class UserModel {
       'bank_name': bankName,
       'bank_account_number': bankAccountNumber,
       'bank_account_name': bankAccountName,
+      'receipt_footer': receiptFooter,
       'created_at': createdAt.toIso8601String(),
     };
   }
@@ -128,6 +139,9 @@ class UserModel {
       bankName: map['bank_name'] as String?,
       bankAccountNumber: map['bank_account_number'] as String?,
       bankAccountName: map['bank_account_name'] as String?,
+      // Baris lama dan berkas cadangan lama belum punya kolom ini. NULL di
+      // sini berarti "pakai teks bawaan", bukan "kosong".
+      receiptFooter: map['receipt_footer'] as String?,
       createdAt: DateTime.parse(map['created_at'] as String),
     );
   }
@@ -146,12 +160,18 @@ class UserModel {
     String? bankName,
     String? bankAccountNumber,
     String? bankAccountName,
+    String? receiptFooter,
     DateTime? createdAt,
     bool clearAddress = false,
     bool clearPhone = false,
     bool clearLogo = false,
     bool clearQris = false,
     bool clearBank = false,
+    // `copyWith(receiptFooter: null)` berarti "pertahankan yang lama", bukan
+    // "kosongkan". Tanpa bendera ini, mengosongkan ucapan struk lewat copyWith
+    // akan diam-diam tidak berpengaruh — persis jebakan yang sama dengan
+    // `clearBank` di atasnya.
+    bool clearReceiptFooter = false,
   }) {
     return UserModel(
       id: id ?? this.id,
@@ -169,6 +189,8 @@ class UserModel {
           clearBank ? null : (bankAccountNumber ?? this.bankAccountNumber),
       bankAccountName:
           clearBank ? null : (bankAccountName ?? this.bankAccountName),
+      receiptFooter:
+          clearReceiptFooter ? null : (receiptFooter ?? this.receiptFooter),
       createdAt: createdAt ?? this.createdAt,
     );
   }

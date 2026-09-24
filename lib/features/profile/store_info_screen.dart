@@ -30,6 +30,7 @@ class _StoreInfoScreenState extends ConsumerState<StoreInfoScreen> {
   final _bankNameController = TextEditingController();
   final _bankNumberController = TextEditingController();
   final _bankHolderController = TextEditingController();
+  final _footerController = TextEditingController();
 
   String? _logoPath;
   String? _qrisPath;
@@ -51,6 +52,9 @@ class _StoreInfoScreenState extends ConsumerState<StoreInfoScreen> {
     _bankNameController.text = user.bankName ?? '';
     _bankNumberController.text = user.bankAccountNumber ?? '';
     _bankHolderController.text = user.bankAccountName ?? '';
+    // Kosong berarti pemilik belum pernah mengubahnya; struk memakai teks
+    // bawaan selama kolom ini kosong.
+    _footerController.text = user.receiptFooter ?? '';
     _logoPath = user.logoPath;
     _qrisPath = user.qrisPath;
     _initialized = true;
@@ -64,6 +68,7 @@ class _StoreInfoScreenState extends ConsumerState<StoreInfoScreen> {
     _bankNameController.dispose();
     _bankNumberController.dispose();
     _bankHolderController.dispose();
+    _footerController.dispose();
     super.dispose();
   }
 
@@ -162,6 +167,7 @@ class _StoreInfoScreenState extends ConsumerState<StoreInfoScreen> {
           bankName: _bankNameController.text,
           bankAccountNumber: _bankNumberController.text,
           bankAccountName: _bankHolderController.text,
+          receiptFooter: _footerController.text,
         );
 
     if (!mounted) return;
@@ -308,6 +314,26 @@ class _StoreInfoScreenState extends ConsumerState<StoreInfoScreen> {
                     color: AppColors.infoMid,
                     height: 1.5,
                   ),
+                ),
+              ),
+
+              // ------------------------------------------------ ucapan struk
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: _footerController,
+                // Struk termal 58mm hanya memuat sekitar 32 karakter per baris.
+                // Dibatasi 100 karakter supaya ucapan tetap terbaca utuh, bukan
+                // terpotong di tengah kalimat.
+                maxLength: 100,
+                textCapitalization: TextCapitalization.sentences,
+                decoration: const InputDecoration(
+                  labelText: 'Ucapan penutup di struk (opsional)',
+                  hintText: 'Contoh: Terima kasih, semoga puas!',
+                  helperText: 'Dicetak di bagian bawah struk. Biarkan kosong '
+                      'untuk memakai ucapan bawaan.',
+                  helperMaxLines: 3,
+                  prefixIcon: Icon(Icons.receipt_long_outlined,
+                      color: AppColors.textTertiary),
                 ),
               ),
 

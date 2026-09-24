@@ -33,7 +33,7 @@ class _RincianPenjualanScreenState
   late ReportPeriod _period;
   ReportSummary _summary = const ReportSummary();
   List<ReportItemDetail> _items = const [];
-  List<({String name, int qty, int revenue, int profit})> _rekap = const [];
+  List<({String name, double qty, int revenue, int profit})> _rekap = const [];
   bool _loading = true;
   bool _mengekspor = false;
 
@@ -677,7 +677,8 @@ class _RincianPenjualanScreenState
                         ),
                       ),
                       Text(
-                        '${r.qty} pcs · laba ${Formatters.rupiahCompact(r.profit)}',
+                        '${Formatters.jumlah(r.qty)} pcs · '
+                        'laba ${Formatters.rupiahCompact(r.profit)}',
                         style: const TextStyle(
                           fontSize: 10,
                           color: AppColors.successMid,

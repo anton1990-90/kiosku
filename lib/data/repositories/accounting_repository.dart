@@ -261,7 +261,7 @@ class AccountingRepository {
   }
 
   /// Ringkasan produk terjual per produk pada rentang waktu.
-  Future<List<({String name, int qty, int revenue, int profit})>>
+  Future<List<({String name, double qty, int revenue, int profit})>>
       getRekapProduk(DateTime start, DateTime end) async {
     final db = await _db.database;
     final rows = await db.rawQuery('''

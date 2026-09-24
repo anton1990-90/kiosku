@@ -14,7 +14,7 @@ class RincianPenjualanData {
   final ReportPeriod period;
   final ReportSummary summary;
   final List<ReportItemDetail> items;
-  final List<({String name, int qty, int revenue, int profit})> rekap;
+  final List<({String name, double qty, int revenue, int profit})> rekap;
 
   const RincianPenjualanData({
     required this.storeName,
@@ -85,7 +85,10 @@ class ReportExport {
     for (final r in data.rekap) {
       rows.add([
         r.name,
-        r.qty.toString(),
+        // Kuantitas bisa pecahan (0,5 kg), jadi jangan `toString()` mentah —
+        // itu mencetak "2.0" untuk bilangan bulat dan "0.5" bertitik.
+        // Pemisah CSV di sini titik koma, jadi koma desimal aman.
+        Formatters.jumlah(r.qty),
         r.revenue.toString(),
         r.profit.toString(),
       ]);
@@ -219,7 +222,7 @@ class ReportExport {
         pdf.row(
           [
             r.name,
-            '${r.qty} pcs',
+            '${Formatters.jumlah(r.qty)} pcs',
             Formatters.rupiah(r.revenue),
             Formatters.rupiah(r.profit),
           ],

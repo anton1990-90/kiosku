@@ -227,7 +227,9 @@ class _StokMenipisScreenState extends ConsumerState<StokMenipisScreen> {
   Widget _kartuProduk(ProductModel p) {
     final habis = p.stock == 0;
     final kurang = p.minStock - p.stock;
-    final saran = kurang > 0 ? kurang : 1;
+    // `1.0`, bukan `1`: kalau satu cabang `double` dan satu `int`, tipe hasil
+    // percabangan ini adalah `num` — dan `Formatters.jumlah` menuntut `double`.
+    final saran = kurang > 0 ? kurang : 1.0;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 10),

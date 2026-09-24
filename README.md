@@ -396,6 +396,13 @@ potongan. Kalau memakai harga label, laba yang dilaporkan lebih besar
 daripada uang yang benar-benar masuk. Aturan ini sudah ada sejak v1.13.0 dan
 tetap dipertahankan.
 
+**Kuantitas ditampilkan lewat satu formatter.** `Formatters.jumlah()` mencetak
+"2" untuk bilangan bulat (bukan "2,0") dan "0,5" untuk pecahan — koma, bukan
+titik. Dipakai keranjang, struk, laporan, rekap per produk, dan ekspor
+CSV/PDF. Menginterpolasi `double` mentah akan menampilkan "2.0" dan "0.5"
+bertitik ke pelanggan, dan itu tidak terlihat oleh pemeriksa mana pun karena
+bukan galat build — karena itu setiap tempat cetak dijaga asersinya.
+
 **Mengapa ini rilis tersendiri.** Angka pecahan menyentuh stok, keranjang,
 struk, laporan, cadangan, dan Buku Kas sekaligus. Setiap tempat yang membaca
 kuantitas dari database harus lewat `Angka`, karena `as int` meledak saat

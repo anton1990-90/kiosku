@@ -2,6 +2,7 @@ import 'package:crypto/crypto.dart';
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sqflite/sqflite.dart';
+import '../../shared/services/pin_service.dart';
 import '../database/database_helper.dart';
 import '../models/user_model.dart';
 
@@ -10,7 +11,9 @@ import '../models/user_model.dart';
 /// After initial registration, login works without internet.
 ///
 /// Sejak v1.16.0 berkas ini juga mengelola **akun** — pemilik toko dan kasir.
-/// Dua aturan menentukan bentuknya:
+/// Sejak v1.20.0 di sini juga tersimpan **PIN tiap akun** (`users.pin_hash`,
+/// skema v12) sebagai jalan pintas masuk harian. Tiga aturan menentukan
+/// bentuknya:
 ///
 ///   * **Akun tidak pernah dihapus.** `sales.user_id` menunjuk ke tabel
 ///     `users`, jadi nota lama harus tetap punya pemiliknya. Karena itu tidak
@@ -21,6 +24,13 @@ import '../models/user_model.dart';
 ///     peran atau menonaktifkan pemilik aktif yang tersisa akan mengunci
 ///     pengelolaan akun untuk selamanya — hanya pemilik yang bisa membukanya.
 ///     Kedua tindakan itu ditolak lewat [_tolakKalauPemilikTerakhir].
+///   * **Satu PIN hanya boleh menunjuk satu akun.** PIN dicari lewat cacah
+///     SHA-256 tanpa garam (lihat [PinService.hashPin]), jadi dua akun yang
+///     memasang PIN sama menghasilkan cacah yang sama — dan saat itu aplikasi
+///     tidak lagi tahu siapa yang sedang masuk. Karena itu [pasangPin]
+///     menolaknya, dan penolakan itu berlaku untuk SEMUA akun, termasuk yang
+///     sedang nonaktif: kalau tidak, PIN yang "terpesan" akan menabrak begitu
+///     akunnya diaktifkan kembali.
 class AuthRepository {
   final DatabaseHelper _db = DatabaseHelper.instance;
   static const _sessionKey = 'logged_in_user_id';
@@ -230,6 +240,158 @@ class AuthRepository {
     return terpengaruh > 0;
   }
 
+  // ------------------------------------------------------------- PIN akun
+
+  /// Apakah ada akun **aktif** yang sudah memasang PIN.
+  ///
+  /// Ini yang menentukan apakah layar PIN muncul saat aplikasi dibuka. Akun
+  /// yang dinonaktifkan tidak dihitung: PIN-nya tidak bisa dipakai masuk, jadi
+  /// mengunci aplikasi karenanya hanya membuat pemilik terkunci tanpa jalan
+  /// masuk.
+  Future<bool> adaAkunBerpin() async {
+    final db = await _db.database;
+    final jumlah = Sqflite.firstIntValue(await db.rawQuery(
+      'SELECT COUNT(*) FROM users '
+      'WHERE is_active = 1 AND pin_hash IS NOT NULL AND pin_hash <> ?',
+      [''],
+    ));
+    return (jumlah ?? 0) > 0;
+  }
+
+  /// Masuk dengan PIN akun, atau `null` kalau PIN-nya tidak cocok dengan akun
+  /// aktif mana pun.
+  ///
+  /// Seperti [login], sesinya ikut disimpan: PIN menggantikan email & kata
+  /// sandi, jadi seluruh akibat "masuk" harus sama persis.
+  ///
+  /// Hanya akun aktif yang dicari: akun yang dinonaktifkan tidak boleh bisa
+  /// masuk lagi, termasuk lewat PIN. Karena [pasangPin] menolak PIN kembar,
+  /// hasilnya paling banyak satu baris — tidak ada pilihan yang harus ditebak.
+  Future<UserModel?> loginDenganPin(String pin) async {
+    final db = await _db.database;
+    final rows = await db.query(
+      'users',
+      where: 'pin_hash = ? AND is_active = 1',
+      whereArgs: [PinService.hashPin(pin)],
+      limit: 1,
+    );
+    if (rows.isEmpty) return null;
+
+    final user = UserModel.fromMap(rows.first);
+    await _saveSession(user.id!);
+    return user;
+  }
+
+  /// Apakah akun ini sudah punya PIN.
+  Future<bool> punyaPin(int userId) async {
+    final db = await _db.database;
+    final rows = await db.query(
+      'users',
+      columns: ['pin_hash'],
+      where: 'id = ?',
+      whereArgs: [userId],
+      limit: 1,
+    );
+    if (rows.isEmpty) return false;
+    final hash = rows.first['pin_hash'] as String?;
+    return hash != null && hash.isNotEmpty;
+  }
+
+  /// Pasang atau ganti PIN sebuah akun.
+  ///
+  /// Menolak PIN yang sudah dipakai akun LAIN — aktif maupun tidak, dan itu
+  /// disengaja. Kalau dua akun boleh berbagi PIN, [loginDenganPin] harus
+  /// memilih salah satunya, dan pemilik toko bisa masuk sebagai kasir atau
+  /// sebaliknya. Akun nonaktif ikut dihitung supaya tidak ada PIN yang
+  /// "terpesan" lalu menabrak begitu akunnya diaktifkan kembali.
+  Future<void> pasangPin(int userId, String pin) async {
+    final masalah = PinService.periksa(pin);
+    if (masalah != null) throw Exception(masalah);
+
+    final hash = PinService.hashPin(pin);
+    final db = await _db.database;
+
+    final bentrok = await db.query(
+      'users',
+      columns: ['id'],
+      where: 'pin_hash = ? AND id <> ?',
+      whereArgs: [hash, userId],
+      limit: 1,
+    );
+    if (bentrok.isNotEmpty) {
+      throw Exception('PIN ini sudah dipakai akun lain. Pakai PIN lain.');
+    }
+
+    await db.update(
+      'users',
+      {'pin_hash': hash},
+      where: 'id = ?',
+      whereArgs: [userId],
+    );
+  }
+
+  /// Hapus PIN sebuah akun.
+  ///
+  /// Akunnya tetap bisa masuk lewat email dan kata sandi — PIN hanya jalan
+  /// pintas, bukan syarat masuk. Karena itu tidak ada penjagaan "harus selalu
+  /// ada yang ber-PIN" di sini, berbeda dengan pemilik aktif terakhir.
+  Future<void> hapusPin(int userId) async {
+    final db = await _db.database;
+    await db.update(
+      'users',
+      {'pin_hash': null},
+      where: 'id = ?',
+      whereArgs: [userId],
+    );
+  }
+
+  /// Pindahkan PIN perangkat versi lama (SharedPreferences) ke akun pemilik.
+  ///
+  /// Sebelum v1.20.0 hanya ada satu PIN untuk seluruh perangkat. Toko yang
+  /// memperbarui aplikasi akan kehilangan jalan pintas hariannya kalau cacah
+  /// itu tidak dipindahkan: PIN-nya masih tersimpan, tetapi tidak ada akun yang
+  /// mengenalinya. Pemilik aktif yang paling lama dipilih karena dialah pemilik
+  /// perangkat ini — akun pertama yang dibuat saat pemasangan.
+  ///
+  /// [hashLama] sudah berupa cacah SHA-256 dari skema lama, dan skema lama
+  /// memakai rumus yang sama persis ([PinService.hashPin]), jadi cacahnya
+  /// dipindahkan apa adanya — bukan dihitung ulang, karena PIN mentahnya memang
+  /// tidak pernah disimpan.
+  ///
+  /// Mengembalikan `true` kalau benar-benar dipindahkan. Aman dipanggil
+  /// berkali-kali: kalau sudah ada akun ber-PIN, atau belum ada pemilik aktif,
+  /// tidak ada yang berubah.
+  Future<bool> adopsiPinPerangkat(String hashLama) async {
+    if (hashLama.isEmpty) return false;
+
+    final db = await _db.database;
+
+    // Sudah ada yang memakai PIN di database — jangan menimpa apa pun.
+    final sudahAda = Sqflite.firstIntValue(await db.rawQuery(
+      'SELECT COUNT(*) FROM users WHERE pin_hash IS NOT NULL AND pin_hash <> ?',
+      [''],
+    ));
+    if ((sudahAda ?? 0) > 0) return false;
+
+    final pemilik = await db.query(
+      'users',
+      columns: ['id'],
+      where: 'role = ? AND is_active = 1',
+      whereArgs: [UserRole.owner],
+      orderBy: 'id ASC',
+      limit: 1,
+    );
+    if (pemilik.isEmpty) return false;
+
+    await db.update(
+      'users',
+      {'pin_hash': hashLama},
+      where: 'id = ?',
+      whereArgs: [pemilik.first['id']],
+    );
+    return true;
+  }
+
   // -------------------------------------------------------- daftar & masuk
 
   /// Register a new user with email & password.
@@ -392,6 +554,12 @@ class AuthRepository {
       // bukan teks berisi spasi. Mengosongkan kolomnya mengembalikan teks
       // bawaan di struk, bukan mencetak baris kosong.
       receiptFooter: bersih(receiptFooter),
+      // PIN juga bukan bagian dari info toko. Dibawa apa adanya dari baris yang
+      // sekarang supaya nilai kembalian method ini — yang langsung dipakai
+      // sebagai state auth — tidak membuat aplikasi mengira akunnya belum punya
+      // PIN padahal sudah. `pin_hash` sendiri TIDAK ikut ditulis oleh
+      // `db.update` di bawah: PIN hanya berubah lewat [pasangPin].
+      pinHash: current?.pinHash,
       createdAt: current?.createdAt ?? DateTime.now(),
     );
 

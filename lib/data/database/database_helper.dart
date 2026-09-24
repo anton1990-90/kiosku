@@ -64,16 +64,24 @@ import '../../core/utils/angka.dart';
 /// SQLite tidak punya `ALTER COLUMN` — dan satu-satunya cara lain adalah
 /// menulis ulang `CREATE TABLE products/sales/sale_items`, yang berarti
 /// membongkar tabel berisi seluruh riwayat penjualan pelanggan. Karena itu
-/// `_dbVersion` tetap 11 dan tidak ada `_upgradeV12`. Yang berubah hanya sisi
-/// Dart: setiap pembacaan angka dari database lewat `Angka`
+/// v1.19.0 **tidak menambah versi skema sama sekali**: `_dbVersion` masih 11
+/// sesudahnya. `_upgradeV12` baru muncul di v1.20.0, dan itu pun hanya untuk
+/// kolom PIN (`users.pin_hash`) — bukan untuk kolom kuantitas. Yang berubah
+/// hanya sisi Dart: setiap pembacaan angka dari database lewat `Angka`
 /// (`lib/core/utils/angka.dart`), supaya `as int` tidak meledak saat nilainya
 /// 0.5 dan `as double` tidak meledak saat nilainya 2.
+///
+/// **Versi 1.20.0 (PIN per akun) menaikkan skema ke 12** — satu kolom,
+/// `users.pin_hash`, ditambahkan lewat `_addColumnIfMissing` seperti versi 11
+/// (lihat `_upgradeV12`). `CREATE TABLE users` sengaja tidak diubah, mengikuti
+/// pola yang sama: kolom baru selalu masuk lewat jalur upgrade, sehingga
+/// definisi tabel di `_createBaseTables` tetap menggambarkan versi 1.
 class DatabaseHelper {
   DatabaseHelper._();
   static final DatabaseHelper instance = DatabaseHelper._();
 
   static const _dbName = 'tokoku.db';
-  static const _dbVersion = 11;
+  static const _dbVersion = 12;
 
   Database? _database;
 
@@ -109,6 +117,7 @@ class DatabaseHelper {
     await _upgradeV9(db);
     await _upgradeV10(db);
     await _upgradeV11(db);
+    await _upgradeV12(db);
     await _seedProducts(db);
     await _seedPaymentMethods(db);
   }
@@ -649,6 +658,26 @@ class DatabaseHelper {
     await _addColumnIfMissing(db, 'users', 'receipt_footer', 'TEXT');
   }
 
+  /// Versi 12 — PIN per akun.
+  ///
+  /// Satu kolom, ditambahkan lewat `_addColumnIfMissing` seperti versi 11, jadi
+  /// `CREATE TABLE users` tidak berubah dan data yang sudah ada tetap utuh.
+  ///
+  /// Tanpa `NOT NULL` dan tanpa `DEFAULT`: baris lama menjadi NULL, dan itu
+  /// memang yang diinginkan — NULL berarti "akun ini belum punya PIN". Kalau di
+  /// sini ditulis `DEFAULT ''`, kolomnya berisi cacah SHA-256 dari string
+  /// kosong, dan setiap akun lama tampak sudah punya PIN yang bisa ditebak.
+  ///
+  /// Isinya cacah SHA-256 dari PIN-nya (lihat `PinService`), bukan PIN mentah.
+  /// Cacahnya sengaja deterministik tanpa garam, karena aplikasi harus bisa
+  /// menjawab "PIN ini milik akun yang mana?" dengan satu query saat membuka
+  /// aplikasi. PIN hanya 4–6 angka, jadi cacahnya memang bukan pengamanan
+  /// setara kata sandi; yang dijaganya adalah agar PIN tidak terbaca mata
+  /// telanjang di berkas database maupun di berkas cadangan.
+  Future<void> _upgradeV12(Database db) async {
+    await _addColumnIfMissing(db, 'users', 'pin_hash', 'TEXT');
+  }
+
   /// Migrasi dari versi lama. Data yang sudah ada tidak boleh hilang.
   Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
     if (oldVersion < 2) {
@@ -683,6 +712,9 @@ class DatabaseHelper {
     }
     if (oldVersion < 11) {
       await _upgradeV11(db);
+    }
+    if (oldVersion < 12) {
+      await _upgradeV12(db);
     }
   }
 

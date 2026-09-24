@@ -5,7 +5,9 @@ import '../../core/constants/app_colors.dart';
 import '../../core/utils/formatters.dart';
 import '../../data/models/user_model.dart';
 import '../../providers/auth_provider.dart';
+import '../../providers/pin_provider.dart';
 import '../../providers/user_provider.dart';
+import '../../shared/services/pin_service.dart';
 
 /// Pengguna — pengelolaan akun toko: pemilik dan kasir.
 ///
@@ -130,6 +132,7 @@ class _UserScreenState extends ConsumerState<UserScreen> {
 
   Widget _kartuAkun(UserModel akun, int? sayaId) {
     final iniSaya = akun.id != null && akun.id == sayaId;
+    final punyaPin = akun.pinHash != null && akun.pinHash!.isNotEmpty;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
@@ -209,6 +212,14 @@ class _UserScreenState extends ConsumerState<UserScreen> {
                           ? AppColors.successMid
                           : AppColors.dangerMid,
                     ),
+                    // Status PIN ditampilkan di kartu, bukan hanya di menu:
+                    // pemilik toko perlu tahu akun mana yang belum punya PIN
+                    // tanpa membuka menunya satu per satu.
+                    _lencana(
+                      punyaPin ? 'PIN aktif' : 'Tanpa PIN',
+                      punyaPin ? AppColors.infoLight : AppColors.bgSoft,
+                      punyaPin ? AppColors.infoMid : AppColors.textTertiary,
+                    ),
                   ],
                 ),
                 const SizedBox(height: 6),
@@ -241,6 +252,18 @@ class _UserScreenState extends ConsumerState<UserScreen> {
                 value: 'password',
                 child: Text('Ganti password'),
               ),
+              // Pemilik toko mengatur PIN kasirnya: kasir yang baru dipasangkan
+              // biasanya belum sempat mengatur PIN sendiri, dan tanpa ini
+              // satu-satunya jalan adalah meminjamkan HP-nya.
+              PopupMenuItem(
+                value: 'pin',
+                child: Text(punyaPin ? 'Ganti PIN' : 'Atur PIN'),
+              ),
+              if (punyaPin)
+                const PopupMenuItem(
+                  value: 'hapus-pin',
+                  child: Text('Hapus PIN'),
+                ),
             ],
           ),
         ],
@@ -308,6 +331,25 @@ class _UserScreenState extends ConsumerState<UserScreen> {
 
       case 'password':
         await _bukaGantiPassword(akun);
+
+      case 'pin':
+        await _bukaAturPin(akun);
+
+      case 'hapus-pin':
+        final yakin = await _konfirmasi(
+          judul: 'Hapus PIN akun ini?',
+          isi: '"${akun.email}" tidak akan bisa masuk dengan PIN lagi.\n\n'
+              'Akun itu tetap bisa masuk memakai email dan password.',
+        );
+        if (yakin != true) return;
+        await ref.read(pinProvider.notifier).hapus(id);
+        if (!mounted) return;
+        // Daftar akun dibaca ulang supaya lencana PIN-nya ikut berubah —
+        // `pinHash` disalin saat daftar dimuat, jadi tanpa ini kartunya masih
+        // menampilkan "PIN aktif" untuk akun yang PIN-nya baru saja dihapus.
+        await ref.read(userProvider.notifier).muat();
+        if (!mounted) return;
+        _pesan('PIN ${akun.email} dihapus.');
     }
   }
 
@@ -528,5 +570,129 @@ class _UserScreenState extends ConsumerState<UserScreen> {
     );
 
     baru.dispose();
+  }
+
+  /// Atur atau ganti PIN milik sebuah akun.
+  ///
+  /// Pemilik toko boleh mengatur PIN kasirnya — kasir yang baru dipasangkan
+  /// biasanya belum sempat mengatur PIN-nya sendiri, dan tanpa ini satu-satunya
+  /// jalan adalah meminjamkan HP pemilik.
+  Future<void> _bukaAturPin(UserModel akun) async {
+    final id = akun.id;
+    if (id == null) return;
+
+    final controller = TextEditingController();
+    final ulangi = TextEditingController();
+    String? masalah;
+    String? pinSiap;
+
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (dialogContext, setDialogState) => AlertDialog(
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: Text('PIN untuk ${akun.email}'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'PIN dipakai akun ini untuk masuk ke aplikasi, jadi pemakainya '
+                'tidak perlu mengetik email dan password setiap hari.\n\n'
+                '4–6 angka, dan tidak boleh sama dengan PIN akun lain.',
+                style: TextStyle(
+                  fontSize: 12.5,
+                  height: 1.5,
+                  color: AppColors.textSecondary,
+                ),
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: controller,
+                autofocus: true,
+                obscureText: true,
+                keyboardType: TextInputType.number,
+                maxLength: PinService.panjangMaks,
+                decoration: const InputDecoration(
+                  labelText: 'PIN baru',
+                  counterText: '',
+                ),
+              ),
+              const SizedBox(height: 8),
+              TextField(
+                controller: ulangi,
+                obscureText: true,
+                keyboardType: TextInputType.number,
+                maxLength: PinService.panjangMaks,
+                decoration: const InputDecoration(
+                  labelText: 'Ulangi PIN',
+                  counterText: '',
+                ),
+              ),
+              if (masalah != null) ...[
+                const SizedBox(height: 10),
+                Text(
+                  masalah!,
+                  style: const TextStyle(
+                    fontSize: 12.5,
+                    color: AppColors.danger,
+                  ),
+                ),
+              ],
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('Batal'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                final pin = controller.text.trim();
+                final lagi = ulangi.text.trim();
+                final keluhan = PinService.periksa(pin) ??
+                    (pin != lagi ? 'Ulangi PIN tidak sama.' : null);
+                if (keluhan != null) {
+                  setDialogState(() => masalah = keluhan);
+                  return;
+                }
+                pinSiap = pin;
+                Navigator.pop(dialogContext);
+              },
+              child: const Text('Simpan'),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    controller.dispose();
+    ulangi.dispose();
+
+    if (pinSiap == null || !mounted) return;
+
+    final keluhan = await ref.read(pinProvider.notifier).pasang(id, pinSiap!);
+    if (!mounted) return;
+
+    if (keluhan != null) {
+      _pesan(keluhan, gagal: true);
+      return;
+    }
+    // Daftar akun dibaca ulang supaya lencana PIN-nya ikut berubah.
+    await ref.read(userProvider.notifier).muat();
+    if (!mounted) return;
+    _pesan('PIN ${akun.email} dipasang.');
+  }
+
+  /// Pesan singkat di bawah layar.
+  void _pesan(String teks, {bool gagal = false}) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(teks),
+        behavior: SnackBarBehavior.floating,
+        backgroundColor: gagal ? AppColors.danger : null,
+      ),
+    );
   }
 }

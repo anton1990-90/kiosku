@@ -496,6 +496,14 @@ class ProductIcon extends StatelessWidget {
   final double radius;
   final double emojiSize;
 
+  /// Warna garis tepi. Dipakai hanya kalau [borderWidth] lebih dari nol.
+  final Color? borderColor;
+
+  /// Tebal garis tepi. `0` berarti tanpa garis — dan itu bawaannya, supaya
+  /// pemanggil yang sudah ada (daftar barang, formulir produk) tidak berubah
+  /// tampilannya hanya karena widget ini diberi kemampuan baru.
+  final double borderWidth;
+
   const ProductIcon({
     super.key,
     required this.photoPath,
@@ -503,6 +511,8 @@ class ProductIcon extends StatelessWidget {
     this.size = 40,
     this.radius = 10,
     this.emojiSize = 20,
+    this.borderColor,
+    this.borderWidth = 0,
   });
 
   /// Benar hanya kalau path terisi dan berkasnya benar-benar ada.
@@ -521,12 +531,25 @@ class ProductIcon extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Garis tepi digambar oleh `decoration`, yaitu DI BELAKANG anaknya. Foto
+    // yang memenuhi seluruh kotak karena itu akan menutupi garisnya, jadi
+    // anaknya diberi jarak selebar garis itu. Tanpa jarak ini, garisnya tidak
+    // terlihat sama sekali meski sudah diminta — dan itu terbaca sebagai
+    // "garisnya tidak muncul", bukan sebagai "kurang padding".
+    final adaGaris = borderWidth > 0;
     return Container(
       width: size,
       height: size,
+      padding: adaGaris ? EdgeInsets.all(borderWidth) : null,
       decoration: BoxDecoration(
         color: AppColors.bgSoft,
         borderRadius: BorderRadius.circular(radius),
+        border: adaGaris
+            ? Border.all(
+                color: borderColor ?? AppColors.border,
+                width: borderWidth,
+              )
+            : null,
       ),
       clipBehavior: Clip.antiAlias,
       child: adaFoto

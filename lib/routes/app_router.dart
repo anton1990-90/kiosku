@@ -130,18 +130,32 @@ final routerProvider = Provider<GoRouter>((ref) {
       final isLoggedIn = authState.isAuthenticated;
       final isAuthRoute = location.startsWith('/auth');
 
-      // Gerbang PIN — hanya berlaku untuk pengguna yang sudah masuk.
-      // Kalau PIN dipasang, aplikasi mengunci diri saat dibuka, jadi layar
-      // PIN harus didahulukan daripada beranda.
-      if (isLoggedIn) {
-        if (pinState.perluDibuka && !isPinRoute) return '/auth/pin';
-        if (isPinRoute && !pinState.perluDibuka) return '/dashboard';
+      // Gerbang PIN — sejak v1.20.0 PIN adalah cara masuk harian, bukan lagi
+      // tambahan di atas sesi. Karena itu gerbangnya TIDAK lagi berada di dalam
+      // `if (isLoggedIn)`: orang yang belum masuk pun harus melewatinya, dan
+      // justru itulah yang membuat PIN menggantikan email & kata sandi.
+      //
+      // Sesi yang tersimpan sengaja tidak dipercaya sampai PIN diketik: di HP
+      // yang dipakai bergantian, sesi sisa dari kemarin bisa milik orang lain.
+      //
+      // Urutannya load-bearing. Gerbang PIN diperiksa SEBELUM hak akses peran
+      // (v1.16.0) — kalau terbalik, kasir yang belum membuka PIN diantar ke
+      // Beranda, dan dari sana ia bisa menekan apa saja yang terlihat tanpa
+      // pernah melewati kuncinya.
+      if (pinState.perluDibuka && !isPinRoute) return '/auth/pin';
+      if (isPinRoute && !pinState.perluDibuka) {
+        return isLoggedIn ? '/dashboard' : '/auth/login';
       }
 
       // Belum login → ke register (pertama kali) atau login.
-      // Layar PIN ikut diarahkan keluar: sesinya sudah tidak ada (misalnya
-      // sesudah menekan "Lupa PIN?"), jadi tidak ada gunanya menahan di sana.
-      if (!isLoggedIn && (!isAuthRoute || isPinRoute)) {
+      //
+      // Layar PIN tidak perlu disebut lagi di sini. Kalau gerbangnya menahan,
+      // pengguna sudah dikembalikan ke /auth/pin di atas; kalau tidak menahan,
+      // `isPinRoute` sudah dialihkan keluar tepat di atas baris ini. Menyebut
+      // `isPinRoute` lagi justru berbahaya: sejak PIN menjadi cara masuk,
+      // menahan pengguna di layar PIN yang gerbangnya sudah terbuka berarti
+      // menutup satu-satunya jalan masuk.
+      if (!isLoggedIn && !isAuthRoute) {
         return authState.isFirstRun ? '/auth/register' : '/auth/login';
       }
 

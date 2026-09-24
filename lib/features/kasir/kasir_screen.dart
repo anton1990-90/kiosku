@@ -427,14 +427,29 @@ class _KasirScreenState extends ConsumerState<KasirScreen> {
                           child: Container(
                             width: double.infinity,
                             color: AppColors.bgSoft,
-                            child: Center(
-                              child: ProductIcon(
-                                photoPath: product.photoPath,
-                                emoji: product.emoji,
-                                size: 64,
-                                radius: 0,
-                                emojiSize: 36,
-                              ),
+                            child: LayoutBuilder(
+                              builder: (context, batas) {
+                                // Foto dibuat sebesar ruang yang tersedia,
+                                // bukan angka tetap: lebar kartu berbeda antara
+                                // ponsel sempit dan tablet, dan angka tetap yang
+                                // pas di tablet akan melimpah keluar kartu di
+                                // ponsel. Sisa 16 dipakai sebagai napas tepi.
+                                final ruang = batas.maxWidth < batas.maxHeight
+                                    ? batas.maxWidth
+                                    : batas.maxHeight;
+                                final sisi = ruang > 24 ? ruang - 16 : ruang;
+                                return Center(
+                                  child: ProductIcon(
+                                    photoPath: product.photoPath,
+                                    emoji: product.emoji,
+                                    size: sisi,
+                                    radius: 10,
+                                    emojiSize: 36,
+                                    borderColor: AppColors.border,
+                                    borderWidth: 1.5,
+                                  ),
+                                );
+                              },
                             ),
                           ),
                         ),

@@ -593,7 +593,12 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       builder: (ctx) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: const Text('Keluar?'),
-        content: const Text('Anda akan keluar dari akun. Data tetap tersimpan di perangkat ini.'),
+        content: const Text(
+          'Anda akan keluar dari akun. Data tetap tersimpan di perangkat '
+          'ini.\n\n'
+          'Sesudah keluar, aplikasi kembali ke layar PIN — di situ Anda bisa '
+          'masuk sebagai akun lain, atau memakai email dan password.',
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
@@ -602,7 +607,12 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           ElevatedButton(
             onPressed: () async {
               Navigator.pop(ctx);
-              await ref.read(authProvider.notifier).logout();
+              // Bukan `logout()` saja: sesudah keluar, gerbang PIN ikut
+              // dikunci supaya pemakai berikutnya mendarat di layar PIN —
+              // itulah pintu masuk harian sekarang. Kalau tidak ada akun
+              // ber-PIN, gerbangnya memang dibiarkan terbuka dan pemakai
+              // berikutnya mendarat di layar masuk.
+              await ref.read(authProvider.notifier).gantiPengguna();
             },
             style: ElevatedButton.styleFrom(backgroundColor: AppColors.danger),
             child: const Text('Keluar'),
@@ -612,7 +622,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     );
   }
 
-  /// Pesan singkat di bawah layar.
   /// Coba lagi setelah cadangan otomatis gagal.
   ///
   /// Tidak membuka menu Bagikan: berkasnya sekarang sudah bisa dipulihkan
@@ -636,6 +645,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     _pesan('Cadangan berhasil dibuat.');
   }
 
+  /// Pesan singkat di bawah layar.
   void _pesan(String teks, {bool gagal = false}) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -646,14 +656,37 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     );
   }
 
-  /// Layar pengaturan "Kunci PIN".
+  /// Akun yang sedang masuk sudah punya PIN.
   ///
-  /// Kalau PIN belum dipasang → langsung tawarkan memasang.
-  /// Kalau sudah → tawarkan ganti atau matikan, keduanya setelah PIN lama
+  /// Dibaca dari `authProvider`, bukan dari `pinProvider.aktif`: yang ditanya di
+  /// sini "apakah SAYA punya PIN", sedangkan `aktif` menjawab "apakah ada
+  /// seseorang di perangkat ini yang punya PIN".
+  bool get _punyaPinSendiri {
+    final hash = ref.watch(authProvider).user?.pinHash;
+    return hash != null && hash.isNotEmpty;
+  }
+
+  /// Ganti pengguna: kembali ke layar PIN untuk masuk sebagai orang lain.
+  Future<void> _gantiPengguna() async {
+    await ref.read(authProvider.notifier).gantiPengguna();
+  }
+
+  /// Pengaturan "PIN akun" milik akun yang sedang masuk.
+  ///
+  /// Kalau akun ini belum punya PIN → langsung tawarkan memasang.
+  /// Kalau sudah → tawarkan ganti atau hapus, keduanya setelah PIN lama
   /// dimasukkan lebih dulu.
+  ///
+  /// PIN tidak lagi milik perangkat, jadi tidak ada lagi pilihan "matikan
+  /// untuk semua orang": yang dihapus hanya PIN akun ini, dan akun lain tetap
+  /// punya PIN-nya sendiri.
   Future<void> _aturPin() async {
-    if (!ref.read(pinProvider).aktif) {
-      await _pasangPin();
+    final saya = ref.read(authProvider).user;
+    if (saya == null || saya.id == null) return;
+    final id = saya.id!;
+
+    if (saya.pinHash == null || saya.pinHash!.isEmpty) {
+      await _pasangPin(id, punyaSendiri: true);
       return;
     }
 
@@ -669,10 +702,12 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               onTap: () => Navigator.pop(sheetContext, 'ganti'),
             ),
             ListTile(
-              leading: const Icon(Icons.lock_open, color: AppColors.warning),
-              title: const Text('Matikan PIN'),
-              subtitle: const Text('Aplikasi tidak terkunci lagi saat dibuka'),
-              onTap: () => Navigator.pop(sheetContext, 'matikan'),
+              leading: const Icon(Icons.delete_outline, color: AppColors.danger),
+              title: const Text('Hapus PIN'),
+              subtitle: const Text(
+                'Masuk berikutnya memakai email dan password',
+              ),
+              onTap: () => Navigator.pop(sheetContext, 'hapus'),
             ),
           ],
         ),
@@ -680,30 +715,34 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     );
 
     if (pilihan == 'ganti') {
-      if (await _mintaPinSekarang('Konfirmasi PIN lama') == null) return;
+      if (await _mintaPinSekarang() == null) return;
       if (!mounted) return;
-      await _pasangPin();
+      await _pasangPin(id, punyaSendiri: true);
       return;
     }
 
-    if (pilihan == 'matikan') {
-      if (await _mintaPinSekarang('Konfirmasi PIN lama') == null) return;
-      await ref.read(pinProvider.notifier).matikan();
+    if (pilihan == 'hapus') {
+      if (await _mintaPinSekarang() == null) return;
+      await ref.read(pinProvider.notifier).hapus(id);
       if (!mounted) return;
-      _pesan('Kunci PIN dimatikan.');
+      _pesan('PIN akun ini dihapus.');
     }
   }
 
-  /// Minta PIN yang sedang berlaku. Mengembalikan PIN-nya, atau `null` kalau
-  /// dibatalkan atau salah.
-  Future<String?> _mintaPinSekarang(String judul) async {
+  /// Minta PIN akun yang sedang masuk sebagai konfirmasi.
+  ///
+  /// Mengembalikan PIN-nya, atau `null` kalau dibatalkan atau salah.
+  Future<String?> _mintaPinSekarang() async {
+    final tersimpan = ref.read(authProvider).user?.pinHash;
+    if (tersimpan == null || tersimpan.isEmpty) return null;
+
     final controller = TextEditingController();
 
     final diketik = await showDialog<String>(
       context: context,
       builder: (dialogContext) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Text(judul),
+        title: const Text('Konfirmasi PIN'),
         content: TextField(
           controller: controller,
           autofocus: true,
@@ -732,7 +771,9 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     controller.dispose();
 
     if (diketik == null || diketik.isEmpty) return null;
-    if (!await PinService.instance.cocok(diketik)) {
+    // Dibandingkan lewat cacahnya, sama seperti saat masuk — PIN mentah tidak
+    // pernah tersimpan di mana pun.
+    if (PinService.hashPin(diketik) != tersimpan) {
       if (!mounted) return null;
       _pesan('PIN salah.', gagal: true);
       return null;
@@ -740,8 +781,12 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     return diketik;
   }
 
-  /// Dialog memasang PIN baru (diketik dua kali).
-  Future<void> _pasangPin() async {
+  /// Dialog memasang PIN baru (diketik dua kali) untuk sebuah akun.
+  ///
+  /// [punyaSendiri] hanya mengubah kalimat penjelas dan pesan akhirnya: pemilik
+  /// toko yang memasang PIN untuk kasirnya perlu tahu bahwa PIN itu milik orang
+  /// lain, bukan miliknya.
+  Future<void> _pasangPin(int userId, {required bool punyaSendiri}) async {
     final controller = TextEditingController();
     final ulangi = TextEditingController();
     String? masalah;
@@ -759,10 +804,15 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
-                'PIN dipakai untuk membuka aplikasi, jadi Anda tidak perlu '
-                'mengetik email dan password setiap hari. Minimal 4 angka.',
-                style: TextStyle(
+              Text(
+                punyaSendiri
+                    ? 'PIN dipakai untuk masuk ke aplikasi, jadi Anda tidak '
+                        'perlu mengetik email dan password setiap hari. '
+                        '4–6 angka.'
+                    : 'PIN ini menjadi milik akun tersebut, dan dipakai akun '
+                        'itu untuk masuk. 4–6 angka, dan tidak boleh sama '
+                        'dengan PIN akun lain.',
+                style: const TextStyle(
                   fontSize: 12.5,
                   height: 1.5,
                   color: AppColors.textSecondary,
@@ -833,14 +883,17 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
 
     if (pinSiap == null || !mounted) return;
 
-    final keluhan = await ref.read(pinProvider.notifier).pasang(pinSiap!);
+    final keluhan =
+        await ref.read(pinProvider.notifier).pasang(userId, pinSiap!);
     if (!mounted) return;
 
     if (keluhan != null) {
       _pesan(keluhan, gagal: true);
       return;
     }
-    _pesan('PIN aktif. Aplikasi akan meminta PIN setiap kali dibuka.');
+    _pesan(punyaSendiri
+        ? 'PIN aktif. Aplikasi akan meminta PIN ini saat dibuka.'
+        : 'PIN dipasang. Akun itu sekarang bisa masuk dengan PIN-nya.');
   }
 
   @override
@@ -1278,23 +1331,22 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                         _MenuItem(
                           icon: Icons.lock_outline,
                           color: AppColors.primary,
-                          title: 'Kunci PIN',
-                          subtitle: ref.watch(pinProvider).aktif
+                          title: 'PIN akun',
+                          subtitle: _punyaPinSendiri
                               ? 'Aktif — diminta tiap aplikasi dibuka'
                               : 'Belum dipasang',
                           trailing: Icons.chevron_right,
                           onTap: _aturPin,
                         ),
-                        if (ref.watch(pinProvider).aktif)
-                          _MenuItem(
-                            icon: Icons.lock_clock,
-                            color: AppColors.infoMid,
-                            title: 'Kunci sekarang',
-                            subtitle: 'Kunci layar tanpa menutup aplikasi',
-                            trailing: Icons.chevron_right,
-                            onTap: () =>
-                                ref.read(pinProvider.notifier).kunciSekarang(),
-                          ),
+                        _MenuItem(
+                          icon: Icons.switch_account_outlined,
+                          color: AppColors.infoMid,
+                          title: 'Ganti pengguna',
+                          subtitle: 'Kembali ke layar PIN untuk masuk sebagai '
+                              'orang lain',
+                          trailing: Icons.chevron_right,
+                          onTap: _gantiPengguna,
+                        ),
                       ],
                     ),
                     const SizedBox(height: 20),

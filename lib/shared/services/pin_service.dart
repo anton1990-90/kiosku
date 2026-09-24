@@ -3,79 +3,48 @@ import 'dart:convert';
 import 'package:crypto/crypto.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-/// Kunci PIN aplikasi — pengganti mengetik email & password setiap hari.
+/// Aturan PIN akun — jalan pintas harian pengganti mengetik email & kata sandi.
 ///
-/// PIN **tidak pernah disimpan mentah**. Yang disimpan hanya hash SHA-256,
-/// sama seperti password akun, jadi isi berkas preferensi tidak bisa dibaca
-/// orang lain untuk mengetahui PIN-nya.
+/// Sejak v1.20.0 PIN **milik akun**, bukan milik perangkat. Cacahnya disimpan
+/// di kolom `users.pin_hash` (skema v12), dan seluruh pembacaannya ada di
+/// `AuthRepository` bersama kolom `users` yang lain. Sebelumnya hanya ada satu
+/// PIN untuk seluruh HP, sehingga PIN yang sama membuka aplikasi untuk siapa
+/// pun yang memegangnya — itu yang diperbaiki.
 ///
-/// Disimpan di SharedPreferences, **bukan** di database, dengan dua alasan:
-/// 1. Tidak perlu menaikkan versi skema database.
-/// 2. Tidak ikut terhapus oleh "Reset semua data" — pemilik toko yang
-///    menghapus data usahanya tetap terkunci dari orang lain.
+/// Berkas ini sengaja hanya memuat hal yang **tidak menyentuh database**: cacah
+/// PIN, aturan kelayakannya, dan sisa PIN perangkat versi lama. Dengan begitu
+/// tidak ada dua tempat yang bisa berbeda pendapat soal "PIN apa yang sah", dan
+/// `AuthRepository` bisa memakainya tanpa saling mengimpor.
 class PinService {
   PinService._();
   static final PinService instance = PinService._();
 
-  static const String _kunciHash = 'pin_hash';
-  static const String _kunciAktif = 'pin_aktif';
-  static const String _kunciPanjang = 'pin_panjang';
+  /// Kunci PIN perangkat versi lama (sebelum v1.20.0).
+  ///
+  /// Hanya dibaca sekali untuk dipindahkan ke akun pemilik, lalu dibersihkan
+  /// lewat [lupakanLama]. Tidak ada lagi yang menulis ke sini.
+  static const String _kunciHashLama = 'pin_hash';
+  static const String _kunciAktifLama = 'pin_aktif';
+  static const String _kunciPanjangLama = 'pin_panjang';
 
   /// Panjang PIN yang diterima.
   static const int panjangMin = 4;
   static const int panjangMaks = 6;
 
-  String _hash(String pin) => sha256.convert(utf8.encode(pin)).toString();
-
-  /// Apakah PIN sudah dipasang dan sedang aktif.
+  /// Cacah SHA-256 sebuah PIN.
   ///
-  /// Butuh DUA syarat: penandanya aktif DAN hashnya masih ada. Kalau hashnya
-  /// hilang (misalnya preferensi dibersihkan sebagian), aplikasi tidak boleh
-  /// mengunci diri sendiri tanpa jalan masuk.
-  Future<bool> get aktif async {
-    final prefs = await SharedPreferences.getInstance();
-    final ditandai = prefs.getBool(_kunciAktif) ?? false;
-    final hash = prefs.getString(_kunciHash) ?? '';
-    return ditandai && hash.isNotEmpty;
-  }
-
-  /// Pasang PIN baru, atau ganti PIN lama.
-  Future<void> pasang(String pin) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_kunciHash, _hash(pin));
-    await prefs.setInt(_kunciPanjang, pin.length);
-    await prefs.setBool(_kunciAktif, true);
-  }
-
-  /// Panjang PIN yang dipasang (4–6).
+  /// Sengaja TANPA garam, dan itu load-bearing, bukan kelalaian:
+  /// `AuthRepository.pasangPin` memakainya untuk menolak PIN yang sudah dipakai
+  /// akun lain, dan `AuthRepository.loginDenganPin` memakainya untuk menemukan
+  /// pemilik sebuah PIN dengan satu query. Kalau diberi garam, dua akun yang
+  /// memasang PIN sama akan menghasilkan cacah berbeda, keduanya lolos
+  /// pemeriksaan keunikan, lalu PIN yang diketik di layar masuk tidak lagi
+  /// menunjuk tepat satu orang — kasir bisa masuk sebagai pemilik toko.
   ///
-  /// Dipakai layar PIN untuk membuka kunci **otomatis** begitu jumlah angka
-  /// yang diketik sudah pas — jadi pemilik toko tidak perlu menekan tombol
-  /// "Buka" setiap kali membuka aplikasi. Panjangnya sendiri bukan rahasia:
-  /// terlihat jelas saat mengetik.
-  Future<int> get panjang async {
-    final prefs = await SharedPreferences.getInstance();
-    final tersimpan = prefs.getInt(_kunciPanjang) ?? panjangMin;
-    if (tersimpan < panjangMin || tersimpan > panjangMaks) return panjangMin;
-    return tersimpan;
-  }
-
-  /// Cocokkan PIN yang diketik. Yang dibandingkan hashnya, bukan teksnya.
-  Future<bool> cocok(String pin) async {
-    final prefs = await SharedPreferences.getInstance();
-    final tersimpan = prefs.getString(_kunciHash) ?? '';
-    if (tersimpan.isEmpty) return false;
-    return tersimpan == _hash(pin);
-  }
-
-  /// Matikan PIN. Hashnya dihapus, bukan sekadar ditandai nonaktif — supaya
-  /// tidak ada sisa hash yang bisa dipakai kalau nanti diaktifkan lagi.
-  Future<void> matikan() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove(_kunciHash);
-    await prefs.remove(_kunciPanjang);
-    await prefs.setBool(_kunciAktif, false);
-  }
+  /// PIN hanya 4–6 angka, jadi cacahnya memang bukan pengamanan setara kata
+  /// sandi. Yang dijaganya: PIN tidak terbaca mata telanjang di berkas database.
+  static String hashPin(String pin) =>
+      sha256.convert(utf8.encode(pin)).toString();
 
   /// Periksa kelayakan PIN sebelum dipasang.
   ///
@@ -105,5 +74,33 @@ class PinService {
       return 'PIN terlalu mudah ditebak. Pakai angka lain.';
     }
     return null;
+  }
+
+  // ---------------------------------------------------- PIN perangkat lama
+
+  /// Cacah PIN perangkat versi lama, atau `null` kalau tidak ada.
+  ///
+  /// Butuh DUA syarat, sama seperti dulu: penandanya aktif DAN cacahnya masih
+  /// ada. Kalau cacahnya hilang — misalnya preferensi dibersihkan sebagian —
+  /// tidak ada yang bisa dipindahkan, dan aplikasi tidak boleh mengunci diri
+  /// sendiri tanpa jalan masuk.
+  Future<String?> hashLama() async {
+    final prefs = await SharedPreferences.getInstance();
+    if (!(prefs.getBool(_kunciAktifLama) ?? false)) return null;
+    final hash = prefs.getString(_kunciHashLama) ?? '';
+    return hash.isEmpty ? null : hash;
+  }
+
+  /// Buang seluruh jejak PIN perangkat versi lama.
+  ///
+  /// Dipanggil setelah cacahnya pindah ke akun pemilik — atau setelah database
+  /// jelas sudah punya PIN sendiri, sehingga PIN lama tidak berlaku lagi.
+  /// Ketiga kuncinya dihapus, bukan sekadar ditandai mati, supaya tidak ada
+  /// sisa yang bisa bangkit kembali.
+  Future<void> lupakanLama() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_kunciHashLama);
+    await prefs.remove(_kunciPanjangLama);
+    await prefs.remove(_kunciAktifLama);
   }
 }

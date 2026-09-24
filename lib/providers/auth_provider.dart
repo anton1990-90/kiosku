@@ -148,6 +148,44 @@ class AuthNotifier extends StateNotifier<AuthState> {
     }
   }
 
+  /// Masuk dengan PIN akun.
+  ///
+  /// Sejak v1.20.0 PIN adalah cara masuk harian, jadi method ini menyimpan sesi
+  /// persis seperti [login]; yang berbeda hanya pembuktiannya — PIN, bukan
+  /// password. Mengembalikan pesan kesalahan, atau `null` kalau berhasil.
+  ///
+  /// URUTANNYA SENGAJA TERBALIK dari [login], dan itu bukan kelalaian. Di sini
+  /// `pinState.perluDibuka`-lah yang mengarahkan orang ke layar PIN, jadi
+  /// gerbangnya harus dibuka SESUDAH sesinya ada: kalau dibuka lebih dulu,
+  /// router sempat melihat "belum masuk tanpa gerbang PIN" dan melempar
+  /// pengguna ke /auth/login — layar masuk berkedip tepat setelah PIN yang
+  /// benar diketik. Di [login] arahnya sebaliknya, karena di sana pengguna
+  /// datang dari layar masuk dan gerbang PIN-lah yang harus lebih dulu dibuka
+  /// supaya tidak disuruh mengisi PIN lagi.
+  Future<String?> masukDenganPin(String pin) async {
+    if (pin.isEmpty) return 'Masukkan PIN Anda.';
+
+    state = state.copyWith(sedangMasuk: true, error: null);
+    try {
+      final user = await _repo.loginDenganPin(pin);
+      if (user == null) {
+        state = state.copyWith(
+          sedangMasuk: false,
+          error: 'PIN salah. Coba lagi.',
+        );
+        return 'PIN salah. Coba lagi.';
+      }
+
+      // Sesi lebih dulu, gerbang sesudahnya — lihat catatan di atas.
+      state = AuthState(user: user, isLoading: false, isFirstRun: false);
+      _ref.read(pinProvider.notifier).bukaSetelahLogin();
+      return null;
+    } catch (e) {
+      state = state.copyWith(sedangMasuk: false, error: e.toString());
+      return 'Gagal membuka dengan PIN. Coba lagi.';
+    }
+  }
+
   /// Ganti password tanpa login — dipakai alur "Lupa password".
   ///
   /// Pemanggil WAJIB sudah memverifikasi bukti kepemilikan (kode aktivasi)
@@ -163,6 +201,22 @@ class AuthNotifier extends StateNotifier<AuthState> {
   Future<void> logout() async {
     await _repo.logout();
     state = const AuthState(isLoading: false);
+  }
+
+  /// Ganti pengguna: akhiri sesi lalu kembalikan ke layar PIN.
+  ///
+  /// Gerbang PIN dikunci LEBIH DULU, baru sesinya dihapus — bukan sebaliknya.
+  /// Kalau sesinya dihapus lebih dulu, router sempat melihat "belum masuk tanpa
+  /// gerbang PIN" dan mengalihkan ke layar masuk; layar itu berkedip sebelum
+  /// layar PIN muncul. Dengan urutan ini, kedua keadaan sementara sama-sama
+  /// mendarat di layar PIN.
+  ///
+  /// Kalau sudah tidak ada akun ber-PIN, mengunci tidak ada gunanya:
+  /// `kunciSekarang()` membaca ulang datanya dan membiarkan gerbang terbuka,
+  /// sehingga pemakai berikutnya mendarat di layar masuk.
+  Future<void> gantiPengguna() async {
+    await _ref.read(pinProvider.notifier).kunciSekarang();
+    await logout();
   }
 
   /// Simpan perubahan info toko dari layar "Info toko".

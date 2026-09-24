@@ -52,6 +52,22 @@ class UserModel {
   /// mencetak satu baris kosong tanpa alasan yang jelas.
   final String? receiptFooter;
 
+  /// Cacah SHA-256 PIN akun ini, atau `null` kalau akun belum punya PIN.
+  ///
+  /// PIN disimpan di baris akun, bukan di SharedPreferences seperti sebelumnya,
+  /// supaya PIN menjadi milik **orang**, bukan milik perangkat: di HP yang
+  /// dipakai bergantian, PIN yang sama tidak lagi membuka aplikasi untuk siapa
+  /// pun yang memegangnya.
+  ///
+  /// `null` berarti "belum diatur", dan itu berbeda dari PIN kosong. Akun tanpa
+  /// PIN tetap bisa masuk lewat email dan kata sandi; PIN hanya jalan pintas
+  /// harian bagi akun yang memasangnya.
+  ///
+  /// `resetBusinessData()` tidak menghapus tabel `users`, jadi PIN tetap hidup
+  /// setelah "Reset semua data" — sifat yang dulu menjadi alasan utama PIN
+  /// disimpan di luar database.
+  final String? pinHash;
+
   final DateTime createdAt;
 
   UserModel({
@@ -69,6 +85,7 @@ class UserModel {
     this.bankAccountNumber,
     this.bankAccountName,
     this.receiptFooter,
+    this.pinHash,
     required this.createdAt,
   });
 
@@ -117,6 +134,7 @@ class UserModel {
       'bank_account_number': bankAccountNumber,
       'bank_account_name': bankAccountName,
       'receipt_footer': receiptFooter,
+      'pin_hash': pinHash,
       'created_at': createdAt.toIso8601String(),
     };
   }
@@ -142,6 +160,9 @@ class UserModel {
       // Baris lama dan berkas cadangan lama belum punya kolom ini. NULL di
       // sini berarti "pakai teks bawaan", bukan "kosong".
       receiptFooter: map['receipt_footer'] as String?,
+      // Sama: berkas cadangan lama tidak punya kolom ini, dan NULL berarti
+      // "akun ini belum punya PIN" — bukan PIN kosong.
+      pinHash: map['pin_hash'] as String?,
       createdAt: DateTime.parse(map['created_at'] as String),
     );
   }
@@ -161,6 +182,7 @@ class UserModel {
     String? bankAccountNumber,
     String? bankAccountName,
     String? receiptFooter,
+    String? pinHash,
     DateTime? createdAt,
     bool clearAddress = false,
     bool clearPhone = false,
@@ -172,6 +194,9 @@ class UserModel {
     // akan diam-diam tidak berpengaruh — persis jebakan yang sama dengan
     // `clearBank` di atasnya.
     bool clearReceiptFooter = false,
+    // Alasannya sama: `copyWith(pinHash: null)` berarti "pertahankan", bukan
+    // "hapus PIN". Menghapus PIN harus disengaja lewat bendera ini.
+    bool clearPin = false,
   }) {
     return UserModel(
       id: id ?? this.id,
@@ -191,6 +216,7 @@ class UserModel {
           clearBank ? null : (bankAccountName ?? this.bankAccountName),
       receiptFooter:
           clearReceiptFooter ? null : (receiptFooter ?? this.receiptFooter),
+      pinHash: clearPin ? null : (pinHash ?? this.pinHash),
       createdAt: createdAt ?? this.createdAt,
     );
   }

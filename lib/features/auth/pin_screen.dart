@@ -7,11 +7,12 @@ import '../../providers/auth_provider.dart';
 import '../../providers/pin_provider.dart';
 import '../../shared/services/pin_service.dart';
 
-/// Layar kunci PIN.
+/// Layar PIN — pintu masuk harian aplikasi.
 ///
-/// Dipakai sebagai pengganti mengetik email & password setiap hari. Karena
-/// aplikasi mengunci diri saat dibuka (lihat [PinNotifier]), layar ini muncul
-/// lebih dulu daripada beranda.
+/// Sejak v1.20.0 PIN milik akun, jadi layar ini **menggantikan** layar masuk
+/// untuk pemakaian sehari-hari: PIN yang diketik menentukan siapa yang masuk,
+/// bukan sekadar membuka kunci perangkat. Akun yang belum memasang PIN tetap
+/// masuk lewat email & kata sandi, dan jalan itu disediakan tombol "Lupa PIN?".
 ///
 /// Papan angkanya dibuat sendiri, tidak memakai keyboard bawaan Android,
 /// supaya seluruh layar terlihat sekaligus dan tidak tertutup keyboard.
@@ -25,45 +26,60 @@ class PinScreen extends ConsumerStatefulWidget {
 class _PinScreenState extends ConsumerState<PinScreen> {
   String _pin = '';
   bool _sibuk = false;
+  String? _error;
 
-  /// Panjang PIN yang dipasang pemilik toko (4–6). Dipakai untuk membuka
-  /// kunci otomatis begitu jumlah angkanya sudah pas.
-  int _panjang = PinService.panjangMin;
-
-  @override
-  void initState() {
-    super.initState();
-    _muatPanjang();
+  /// Jumlah titik yang ditampilkan.
+  ///
+  /// PIN tiap akun bisa 4–6 angka, jadi jumlah titik TIDAK bisa dipakai untuk
+  /// menebak kapan PIN-nya selesai. Dulu panjangnya tersimpan di perangkat dan
+  /// layar ini membuka kuncinya sendiri begitu jumlah angkanya pas; sekarang
+  /// panjang itu milik masing-masing akun, dan membocorkannya lewat tampilan
+  /// berarti memberi tahu penebak berapa angka yang harus dia coba. Satu titik
+  /// kosong selalu disisakan sebagai "posisi berikutnya".
+  int get _jumlahTitik {
+    final perlu = _pin.length + 1;
+    if (perlu < PinService.panjangMin) return PinService.panjangMin;
+    if (perlu > PinService.panjangMaks) return PinService.panjangMaks;
+    return perlu;
   }
 
-  Future<void> _muatPanjang() async {
-    final p = await PinService.instance.panjang;
-    if (!mounted) return;
-    setState(() => _panjang = p);
-  }
+  /// Tombol "Buka" baru boleh ditekan kalau panjangnya sudah masuk akal.
+  bool get _bolehBuka => _pin.length >= PinService.panjangMin;
 
   void _ketik(String angka) {
-    if (_sibuk || _pin.length >= _panjang) return;
-    ref.read(pinProvider.notifier).bersihkanError();
-    setState(() => _pin += angka);
-    // Begitu jumlahnya pas, langsung dicoba — tidak perlu menekan tombol.
-    if (_pin.length == _panjang) _buka();
+    if (_sibuk || _pin.length >= PinService.panjangMaks) return;
+    setState(() {
+      _error = null;
+      _pin += angka;
+    });
   }
 
   void _hapus() {
     if (_sibuk || _pin.isEmpty) return;
-    ref.read(pinProvider.notifier).bersihkanError();
-    setState(() => _pin = _pin.substring(0, _pin.length - 1));
+    setState(() {
+      _error = null;
+      _pin = _pin.substring(0, _pin.length - 1);
+    });
   }
 
+  /// Coba buka dengan PIN yang sudah diketik.
+  ///
+  /// Tidak ada pembukaan otomatis: yang memutuskan kapan PIN selesai adalah
+  /// pemakainya, lewat tombol "Buka". Dengan PIN per akun, panjangnya berbeda
+  /// antar akun, jadi layar ini tidak punya cara tahu kapan berhenti — dan
+  /// menebak terlalu cepat akan mengirim PIN yang belum selesai.
   Future<void> _buka() async {
+    if (_sibuk || !_bolehBuka) return;
     setState(() => _sibuk = true);
-    final benar = await ref.read(pinProvider.notifier).buka(_pin);
+
+    final keluhan = await ref.read(authProvider.notifier).masukDenganPin(_pin);
     if (!mounted) return;
+
     setState(() {
       _sibuk = false;
+      _error = keluhan;
       // PIN salah: kosongkan supaya bisa dicoba lagi dari awal.
-      if (!benar) _pin = '';
+      if (keluhan != null) _pin = '';
     });
   }
 
@@ -74,10 +90,10 @@ class _PinScreenState extends ConsumerState<PinScreen> {
       builder: (dialogContext) => AlertDialog(
         title: const Text('Lupa PIN?'),
         content: const Text(
-          'Untuk membuka, Anda perlu masuk dengan email dan password akun toko.\n\n'
-          'Setelah berhasil masuk, Anda langsung dibawa ke beranda — PIN tidak '
-          'ditanyakan lagi. PIN-nya sendiri tidak berubah; ganti di menu '
-          'Profil → Kunci PIN.\n\n'
+          'Masuk dengan email dan password akun Anda.\n\n'
+          'Setelah berhasil masuk, PIN tidak ditanyakan lagi. PIN akun Anda '
+          'sendiri tidak berubah; atur atau gantinya di menu Profil → PIN '
+          'akun.\n\n'
           'Kalau passwordnya juga lupa, pilih "Lupa password?" di layar masuk.',
         ),
         actions: [
@@ -95,14 +111,17 @@ class _PinScreenState extends ConsumerState<PinScreen> {
 
     if (lanjut != true || !mounted) return;
 
+    // Sesinya diputus LEBIH DULU, baru gerbangnya dibuka. Urutan ini yang
+    // menjaga: membuka gerbang tanpa memutus sesi akan melempar pengguna
+    // langsung ke beranda — melewati email & kata sandi sama sekali.
     await ref.read(authProvider.notifier).logout();
     if (!mounted) return;
+    ref.read(pinProvider.notifier).bukaUntukMasukManual();
     context.go('/auth/login');
   }
 
   @override
   Widget build(BuildContext context) {
-    final pinState = ref.watch(pinProvider);
     final namaToko = ref.watch(authProvider).user?.storeName ?? '';
 
     return Scaffold(
@@ -136,26 +155,24 @@ class _PinScreenState extends ConsumerState<PinScreen> {
                   letterSpacing: -0.3,
                 ),
               ),
-              if (namaToko.isNotEmpty) ...[
-                const SizedBox(height: 6),
-                Text(
-                  namaToko,
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(
-                    fontSize: 14,
-                    color: AppColors.textSecondary,
-                  ),
+              const SizedBox(height: 6),
+              Text(
+                namaToko.isNotEmpty ? namaToko : 'PIN akun Anda',
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  fontSize: 14,
+                  color: AppColors.textSecondary,
                 ),
-              ],
+              ),
               const SizedBox(height: 28),
               _titikPin(),
               const SizedBox(height: 14),
               SizedBox(
                 height: 20,
-                child: pinState.error == null
+                child: _error == null
                     ? null
                     : Text(
-                        pinState.error!,
+                        _error!,
                         style: const TextStyle(
                           fontSize: 13,
                           color: AppColors.danger,
@@ -165,7 +182,24 @@ class _PinScreenState extends ConsumerState<PinScreen> {
               ),
               const SizedBox(height: 18),
               _papanAngka(),
-              const SizedBox(height: 10),
+              const SizedBox(height: 18),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: (_sibuk || !_bolehBuka) ? null : _buka,
+                  child: _sibuk
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
+                      : const Text('Buka'),
+                ),
+              ),
+              const SizedBox(height: 6),
               TextButton(
                 onPressed: _sibuk ? null : _lupaPin,
                 child: const Text(
@@ -185,11 +219,12 @@ class _PinScreenState extends ConsumerState<PinScreen> {
     );
   }
 
-  /// Deretan titik: satu titik per angka PIN, terisi seiring diketik.
+  /// Deretan titik: satu titik per angka yang sudah diketik, plus satu titik
+  /// kosong sebagai posisi berikutnya.
   Widget _titikPin() {
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
-      children: List.generate(_panjang, (i) {
+      children: List.generate(_jumlahTitik, (i) {
         final terisi = i < _pin.length;
         return Container(
           width: 15,

@@ -26,15 +26,15 @@ Dokumen ini **hanya memuat yang belum ada**. Semua fitur di bagian
 | 5 | Data pelanggan tetap — **selesai v1.15.0** | Sedang | Piutang sekarang pakai teks bebas |
 | 6 | Tutup kasir / hitung uang — **selesai v1.17.0** | Sedang | Kontrol harian kalau ada karyawan |
 | 7 | Pembelian ke supplier | Besar | Menyambung stok masuk ↔ hutang |
-| 8 | Akun kasir + hak akses — **selesai v1.16.0** | Besar | Dua peran: pemilik & kasir |
+| 8 | Akun kasir + hak akses — **selesai v1.16.0 + v1.20.0** | Besar | Dua peran, dan PIN milik tiap akun |
 | — | Cetak label barcode | Besar | Hanya perlu kalau repack barang |
 | — | Poin loyalitas | Sedang | Nilai kecil untuk toko sembako |
 | — | Sinkronisasi multi-HP | Besar | **Bertentangan** dengan model 1 lisensi = 1 HP |
 
 > Tabel di atas dan penanda **SELESAI** di judul tiap bagian sudah
-> disamakan. Yang masih terbuka: bagian 7 (pembelian ke supplier),
-> sedangkan bagian 8 sengaja disisakan untuk izin per pengguna yang lebih
-> rinci.
+> disamakan. Yang masih terbuka: bagian 7 (pembelian ke supplier).
+> Bagian 8 sudah selesai sampai PIN per akun; yang tersisa di sana hanya izin
+> per pengguna yang lebih rinci daripada pemilik/kasir.
 
 ---
 
@@ -199,11 +199,12 @@ dicatat terpisah, jadi rawan tidak sinkron.
 
 ---
 
-## 8. Akun kasir + hak akses — **SELESAI di v1.16.0**
+## 8. Akun kasir + hak akses — **SELESAI di v1.16.0, PIN per akun di v1.20.0**
 
 **Kondisi sekarang.** Tabel `users` menyimpan banyak akun, masing-masing
-dengan peran **Pemilik** atau **Kasir** dan penanda aktif. Pemilik mengelola
-akun karyawannya dari **Profil → Pengguna**.
+dengan peran **Pemilik** atau **Kasir**, penanda aktif, dan **PIN sendiri**.
+Pemilik mengelola akun karyawannya — termasuk PIN-nya — dari **Profil →
+Pengguna**.
 
 **Masalah yang dulu ada.** Pemilik mungkin ingin karyawan bisa menjual tetapi
 **tidak** bisa melihat laba, neraca, atau prive. Dulu tidak ada pilihan
@@ -215,15 +216,35 @@ rute laporan atau pengaturan dikembalikan ke Beranda. Akun **tidak pernah
 dihapus** (nota lama harus tetap punya pemiliknya), hanya dinonaktifkan, dan
 toko selalu dipaksa menyisakan satu pemilik aktif.
 
+**PIN per akun (v1.20.0).** Kolom `users.pin_hash` (skema v12) memindahkan PIN
+dari perangkat ke akun. Sebelumnya hanya ada satu PIN untuk seluruh HP,
+sehingga PIN yang sama membuka aplikasi untuk siapa pun yang memegangnya —
+pemisahan kasir hanya mencegah salah lihat dan salah ubah, bukan menahan orang
+yang sengaja ingin membuka. Sekarang PIN menjadi **cara masuk harian**: PIN
+yang diketik menentukan siapa yang masuk, dan akun yang belum punya PIN tetap
+masuk lewat email & kata sandi. Satu PIN hanya boleh menunjuk satu akun — dua
+akun ber-PIN sama akan membuat aplikasi menebak siapa yang sedang masuk. PIN
+perangkat versi lama dipindahkan otomatis ke akun pemilik saat aplikasi
+pertama kali dibuka sesudah pembaruan.
+
+**Ikut di rilis yang sama — foto barang di kartu kasir.** Fotonya tidak lagi
+berukuran tetap 64 px, melainkan sebesar ruang yang tersedia di kartu, dan
+diberi garis tepi tipis supaya batas gambarnya jelas. Ukurannya dihitung dari
+sisi **pendek** kartu, jadi ponsel sempit dan tablet sama-sama pas: angka tetap
+yang muat di tablet akan melimpah keluar kartu di ponsel, dan angka tetap yang
+muat di ponsel akan terlihat mungil di tablet. Garis tepinya dipasang lewat
+`ProductIcon` yang sama — bawaannya tetap tanpa garis, supaya daftar barang
+(48 px) dan formulir produk (72 px) tidak ikut berubah hanya karena widget itu
+diberi kemampuan baru. Satu jebakan yang perlu diingat: `BoxDecoration.border`
+digambar **di belakang** anaknya, jadi foto yang memenuhi kotak akan
+menutupinya — garisnya harus diiringi jarak di dalam selebar garis itu.
+
 **Yang sengaja belum.** Izin per pengguna yang lebih rinci daripada
-pemilik/kasir, dan PIN per akun — PIN masih milik perangkat, jadi PIN yang
-sama membuka aplikasi untuk siapa pun yang memegang HP itu. Selama itu
-belum berubah, pemisahan kasir berguna untuk mencegah **salah lihat dan
-salah ubah** oleh orang yang memegang HP, bukan untuk menahan orang yang
-sengaja ingin membuka.
+pemilik/kasir — misalnya kasir yang boleh melihat laba tetapi tidak boleh
+mengubah harga. Perannya masih dua, dan itu memang cukup untuk toko sembako.
 
 **Usaha:** besar. **Risiko:** tinggi — menyentuh autentikasi. **Skema:**
-versi 9 (selesai).
+versi 9 (peran) dan versi 12 (PIN per akun).
 
 ---
 

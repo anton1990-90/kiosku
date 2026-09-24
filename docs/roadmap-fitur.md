@@ -239,6 +239,21 @@ diberi kemampuan baru. Satu jebakan yang perlu diingat: `BoxDecoration.border`
 digambar **di belakang** anaknya, jadi foto yang memenuhi kotak akan
 menutupinya — garisnya harus diiringi jarak di dalam selebar garis itu.
 
+**Diperbesar lagi (v1.21.0).** Menghitung ukuran dari ruang yang tersedia
+ternyata belum cukup, dan laporan pemilik toko — "fotonya masih kecil" — benar.
+Tinggi kartu ditetapkan `childAspectRatio` grid, lalu dibagi dengan blok teks di
+bawahnya (nama, harga, stok); pada kartu selebar 158 px hanya sekitar 99 px yang
+tersisa untuk foto, jadi mengubah *cara menghitung* tidak menambah ruang.
+Ruangnya ditambah lewat tiga angka: rasio kartu `0.78` → `0.66` (titik terpendek
+yang masih membuat sisi pendek area foto selebar kartu — menaikkannya lagi
+membuat kartu lebih pendek dan foto langsung mengecil), napas tepi `16` → `8` px,
+dan padding blok teks `10` di semua sisi → `fromLTRB(10, 6, 10, 8)`. Hasilnya
+foto selebar kartu — sekitar 150 px di ponsel 360 dp, dari 64 px sebelum
+v1.20.0. Ongkosnya kartu jadi sekitar 18% lebih tinggi, sehingga satu baris
+produk lebih sedikit terlihat sekaligus; itu ditukar sengaja karena yang diminta
+adalah foto yang lebih besar. Ketiga angka itu kini dijaga asersi, karena
+masing-masing bisa berubah tanpa satu pun asersi lama menjadi merah.
+
 **Yang sengaja belum.** Izin per pengguna yang lebih rinci daripada
 pemilik/kasir — misalnya kasir yang boleh melihat laba tetapi tidak boleh
 mengubah harga. Perannya masih dua, dan itu memang cukup untuk toko sembako.

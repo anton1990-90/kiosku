@@ -395,7 +395,15 @@ class _KasirScreenState extends ConsumerState<KasirScreen> {
                 crossAxisCount: Responsive.gridColumns(context),
                 mainAxisSpacing: 12,
                 crossAxisSpacing: 12,
-                childAspectRatio: 0.78,
+                // Tinggi kartu menentukan besar foto, dan angka inilah
+                // penentunya. Sisi pendek area foto adalah lebarnya kalau
+                // kartunya cukup tinggi — jadi ada satu rasio paling pendek
+                // yang membuat foto selebar kartu. Rasio 0.66 itu titiknya:
+                // dengan blok teks di bawah, area foto tepat selebar kartu.
+                // Menaikkan angka ini membuat kartu lebih pendek dan fotonya
+                // langsung mengecil, jadi jangan diubah tanpa memangkas teks
+                // di bawahnya lebih dulu.
+                childAspectRatio: 0.66,
               ),
               itemCount: filteredProducts.length,
               itemBuilder: (context, index) {
@@ -433,11 +441,14 @@ class _KasirScreenState extends ConsumerState<KasirScreen> {
                                 // bukan angka tetap: lebar kartu berbeda antara
                                 // ponsel sempit dan tablet, dan angka tetap yang
                                 // pas di tablet akan melimpah keluar kartu di
-                                // ponsel. Sisa 16 dipakai sebagai napas tepi.
+                                // ponsel. Sisa 8 dipakai sebagai napas tepi —
+                                // cukup untuk memisahkan foto dari garis tepi
+                                // kartu, tetapi tidak lagi memakan ukurannya
+                                // seperti sisa 16 yang dipakai sebelumnya.
                                 final ruang = batas.maxWidth < batas.maxHeight
                                     ? batas.maxWidth
                                     : batas.maxHeight;
-                                final sisi = ruang > 24 ? ruang - 16 : ruang;
+                                final sisi = ruang > 24 ? ruang - 8 : ruang;
                                 return Center(
                                   child: ProductIcon(
                                     photoPath: product.photoPath,
@@ -453,8 +464,13 @@ class _KasirScreenState extends ConsumerState<KasirScreen> {
                             ),
                           ),
                         ),
+                        // Blok teks di bawah foto ikut menentukan besar foto:
+                        // tinggi kartu sudah ditetapkan grid, jadi tiap piksel
+                        // yang dipakai teks diambil dari foto. Paddingnya karena
+                        // itu dipadatkan — 6 di atas dan 8 di bawah, bukan 10 di
+                        // semua sisi.
                         Padding(
-                          padding: const EdgeInsets.all(10),
+                          padding: const EdgeInsets.fromLTRB(10, 6, 10, 8),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [

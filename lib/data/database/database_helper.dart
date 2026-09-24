@@ -1,5 +1,6 @@
 import 'package:path/path.dart';
 import 'package:sqflite/sqflite.dart';
+import '../../core/utils/angka.dart';
 
 /// SQLite database helper — the backbone of offline-first architecture.
 /// All data is stored locally: users, products, sales, debts, notes,
@@ -53,6 +54,20 @@ import 'package:sqflite/sqflite.dart';
 ///       dengan `users.role` (versi 9) dan `cash_sessions.status` (versi 10),
 ///       di sini nilai awal tidak bisa salah: NULL berarti "pakai bawaan",
 ///       bukan "pakai teks kosong".
+///
+/// **Versi 1.19.0 (kuantitas pecahan) sengaja TIDAK menambah versi skema.**
+/// SQLite memakai tipe kolom sebagai *affinity*, bukan batasan: di kolom
+/// `quantity INTEGER` nilai `2` disimpan sebagai integer dan `0.5` sebagai
+/// real, jadi `products.stock`, `products.min_stock`, `sale_items.quantity`,
+/// `sales.total_items`, dan `stock_movements.quantity` sudah menampung
+/// pecahan apa adanya. Mengubah tipe kolomnya bukan pilihan yang tersedia —
+/// SQLite tidak punya `ALTER COLUMN` — dan satu-satunya cara lain adalah
+/// menulis ulang `CREATE TABLE products/sales/sale_items`, yang berarti
+/// membongkar tabel berisi seluruh riwayat penjualan pelanggan. Karena itu
+/// `_dbVersion` tetap 11 dan tidak ada `_upgradeV12`. Yang berubah hanya sisi
+/// Dart: setiap pembacaan angka dari database lewat `Angka`
+/// (`lib/core/utils/angka.dart`), supaya `as int` tidak meledak saat nilainya
+/// 0.5 dan `as double` tidak meledak saat nilainya 2.
 class DatabaseHelper {
   DatabaseHelper._();
   static final DatabaseHelper instance = DatabaseHelper._();
@@ -782,8 +797,8 @@ class DatabaseHelper {
         'category': p[1] as String,
         'cost_price': p[2] as int,
         'sell_price': p[3] as int,
-        'stock': p[4] as int,
-        'min_stock': p[5] as int,
+        'stock': Angka.jumlah(p[4]),
+        'min_stock': Angka.jumlah(p[5]),
         'supplier': p[6],
         'emoji': p[7] as String,
         'barcode': p[8] as String,

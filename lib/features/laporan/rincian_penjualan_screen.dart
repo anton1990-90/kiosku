@@ -448,7 +448,8 @@ class _RincianPenjualanScreenState
                 child: _angka('${_summary.transactions}', 'Transaksi'),
               ),
               Expanded(
-                child: _angka('${_summary.itemsSold}', 'Barang terjual'),
+                child: _angka(
+                    Formatters.jumlah(_summary.itemsSold), 'Barang terjual'),
               ),
               Expanded(
                 child: _angka('${_items.length}', 'Baris rincian'),
@@ -737,7 +738,8 @@ class _RincianPenjualanScreenState
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  '${item.quantity} x ${Formatters.rupiah(item.sellPrice)}'
+                  '${Formatters.jumlah(item.quantity)} x '
+                  '${Formatters.rupiah(item.sellPrice)}'
                   '${item.customerName != null && item.customerName!.isNotEmpty ? ' · ${item.customerName}' : ''}',
                   style: const TextStyle(
                     fontSize: 11,

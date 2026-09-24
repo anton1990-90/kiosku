@@ -1,3 +1,5 @@
+import '../../core/utils/angka.dart';
+
 /// Model laporan keuangan standar akuntansi.
 ///
 /// Semua angka dihitung dari transaksi yang sudah tercatat (penjualan, beban,
@@ -146,7 +148,7 @@ class SaleWithItems {
   final String paymentMethod;
   final int totalAmount;
   final int totalProfit;
-  final int totalItems;
+  final double totalItems;
   final int paidAmount;
   final int changeAmount;
   final bool isDebt;
@@ -185,7 +187,7 @@ class SaleWithItems {
 /// Satu baris item di dalam transaksi.
 class SaleLine {
   final String productName;
-  final int quantity;
+  final double quantity;
   final int sellPrice;
   final int costPrice;
   /// Harga baris setelah potongan baris dikurangi.
@@ -203,5 +205,5 @@ class SaleLine {
   });
 
   /// Laba baris ini, dihitung dari uang yang benar-benar dibayar.
-  int get profit => subtotal - costPrice * quantity;
+  int get profit => subtotal - (costPrice * quantity).round();
 }

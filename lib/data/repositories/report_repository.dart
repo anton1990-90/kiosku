@@ -1,5 +1,6 @@
 import 'package:sqflite/sqflite.dart';
 import '../database/database_helper.dart';
+import '../../core/utils/angka.dart';
 import '../models/report_models.dart';
 
 /// Repositori laporan penjualan.
@@ -25,10 +26,10 @@ class ReportRepository {
     if (rows.isEmpty) return const ReportSummary();
     final r = rows.first;
     return ReportSummary(
-      totalSales: (r['total_sales'] as int?) ?? 0,
-      totalProfit: (r['total_profit'] as int?) ?? 0,
+      totalSales: Angka.uang(r['total_sales']),
+      totalProfit: Angka.uang(r['total_profit']),
       transactions: (r['transactions'] as int?) ?? 0,
-      itemsSold: (r['items_sold'] as int?) ?? 0,
+      itemsSold: Angka.jumlah(r['items_sold']),
     );
   }
 
@@ -86,9 +87,9 @@ class ReportRepository {
     return rows
         .map((r) => TopProduct(
               productName: r['product_name'] as String,
-              quantity: (r['qty'] as int?) ?? 0,
-              revenue: (r['revenue'] as int?) ?? 0,
-              profit: (r['profit'] as int?) ?? 0,
+              quantity: Angka.jumlah(r['qty']),
+              revenue: Angka.uang(r['revenue']),
+              profit: Angka.uang(r['profit']),
             ))
         .toList();
   }
@@ -139,9 +140,9 @@ class ReportRepository {
     return rows
         .map((r) => TopProduct(
               productName: r['product_name'] as String,
-              quantity: (r['qty'] as int?) ?? 0,
-              revenue: (r['revenue'] as int?) ?? 0,
-              profit: (r['profit'] as int?) ?? 0,
+              quantity: Angka.jumlah(r['qty']),
+              revenue: Angka.uang(r['revenue']),
+              profit: Angka.uang(r['profit']),
             ))
         .toList();
   }
@@ -206,7 +207,7 @@ class ReportRepository {
     for (final r in rows) {
       final parsed = DateTime.tryParse(r['d'] as String? ?? '');
       if (parsed == null) continue;
-      result.add((date: parsed, total: (r['total'] as int?) ?? 0));
+      result.add((date: parsed, total: Angka.uang(r['total'])));
     }
     return result;
   }
@@ -229,7 +230,7 @@ class ReportRepository {
     for (final r in rows) {
       final month = int.tryParse(r['m'] as String? ?? '');
       if (month == null) continue;
-      result.add((month: month, total: (r['total'] as int?) ?? 0));
+      result.add((month: month, total: Angka.uang(r['total'])));
     }
     return result;
   }
@@ -247,9 +248,9 @@ class ReportRepository {
     var hutang = 0;
     for (final r in rows) {
       if (r['type'] == 'piutang') {
-        piutang = (r['sisa'] as int?) ?? 0;
+        piutang = Angka.uang(r['sisa']);
       } else {
-        hutang = (r['sisa'] as int?) ?? 0;
+        hutang = Angka.uang(r['sisa']);
       }
     }
     return (piutang: piutang, hutang: hutang);

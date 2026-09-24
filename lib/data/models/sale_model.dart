@@ -1,3 +1,5 @@
+import '../../core/utils/angka.dart';
+
 /// Status transaksi penjualan.
 ///
 /// Transaksi yang dibatalkan tidak dihapus, hanya berubah statusnya. Seluruh
@@ -19,7 +21,7 @@ class SaleModel {
   final String? customerName;
   final int totalAmount;
   final int totalProfit;
-  final int totalItems;
+  final double totalItems;
   final String paymentMethod; // 'tunai', 'qris', 'ewallet'
   final int paidAmount;
   final int changeAmount;
@@ -103,7 +105,7 @@ class SaleModel {
       customerName: map['customer_name'] as String?,
       totalAmount: map['total_amount'] as int,
       totalProfit: map['total_profit'] as int,
-      totalItems: map['total_items'] as int,
+      totalItems: Angka.jumlah(map['total_items']),
       paymentMethod: map['payment_method'] as String,
       paidAmount: map['paid_amount'] as int,
       changeAmount: map['change_amount'] as int,

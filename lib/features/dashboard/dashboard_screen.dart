@@ -577,7 +577,8 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                                   ? '${p.name} habis'
                                   : '${p.name} menipis',
                               subtitle:
-                                  'Sisa ${p.stock} ${p.unit} dari minimum ${p.minStock}',
+                                  'Sisa ${Formatters.jumlah(p.stock)} ${p.unit} '
+                                  'dari minimum ${Formatters.jumlah(p.minStock)}',
                               color: p.stock == 0
                                   ? AppColors.danger
                                   : AppColors.warning,

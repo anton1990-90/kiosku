@@ -5,9 +5,10 @@ Disusun 23 September 2026, berdasarkan pembacaan langsung kode di `lib/`
 
 > **Catatan pemutakhiran.** Nomor skema di tiap usulan di bawah ditulis saat
 > dokumen ini disusun, ketika versi skema masih 4 — jadi semuanya berbunyi
-> "versi 5". Versi skema sekarang **11** (v1.18.0), dan usulan yang belum
-> dikerjakan akan memakai versi berikutnya, bukan 5. Bagian yang sudah
-> dikerjakan ditandai di judulnya.
+> "versi 5". Versi skema sekarang **11** dan tetap 11 setelah v1.19.0
+> (jumlah pecahan tidak menambah versi skema — lihat bagian 4), dan
+> usulan yang belum dikerjakan akan memakai versi berikutnya, bukan 5.
+> Bagian yang sudah dikerjakan ditandai di judulnya.
 
 Dokumen ini **hanya memuat yang belum ada**. Semua fitur di bagian
 "Sudah ada — jangan diusulkan lagi" sudah terverifikasi ada di kode.
@@ -21,7 +22,7 @@ Dokumen ini **hanya memuat yang belum ada**. Semua fitur di bagian
 | 1 | Cetak ulang struk — **selesai v1.12.0** | Kecil | Datanya sudah ada, tinggal tombolnya |
 | 2 | Batal / retur transaksi — **selesai v1.14.0** | Sedang | Sekarang salah input = permanen |
 | 3 | Diskon per item / per nota — **selesai v1.13.0** | Sedang | Kebiasaan jualan sembako, belum bisa dicatat |
-| 4 | Satuan produk (kg, liter, ikat) — **tahap A selesai v1.12.0** | Kecil | Struk "2" tidak jelas; salah tafsir |
+| 4 | Satuan produk (kg, liter, ikat) — **selesai v1.12.0 + v1.19.0** | Kecil | Struk "2" tidak jelas; salah tafsir |
 | 5 | Data pelanggan tetap — **selesai v1.15.0** | Sedang | Piutang sekarang pakai teks bebas |
 | 6 | Tutup kasir / hitung uang — **selesai v1.17.0** | Sedang | Kontrol harian kalau ada karyawan |
 | 7 | Pembelian ke supplier | Besar | Menyambung stok masuk ↔ hutang |
@@ -31,8 +32,9 @@ Dokumen ini **hanya memuat yang belum ada**. Semua fitur di bagian
 | — | Sinkronisasi multi-HP | Besar | **Bertentangan** dengan model 1 lisensi = 1 HP |
 
 > Tabel di atas dan penanda **SELESAI** di judul tiap bagian sudah
-> disamakan. Yang masih terbuka: bagian 4 tahap B dan bagian 7, sedangkan
-> bagian 8 sengaja disisakan untuk izin per pengguna yang lebih rinci.
+> disamakan. Yang masih terbuka: bagian 7 (pembelian ke supplier),
+> sedangkan bagian 8 sengaja disisakan untuk izin per pengguna yang lebih
+> rinci.
 
 ---
 
@@ -99,7 +101,7 @@ setelah potongan. Tampilkan potongan di struk dan di laporan.
 
 ---
 
-## 4. Satuan produk (kg, liter, ikat, pcs) — **Tahap A SELESAI di v1.12.0; Tahap B belum**
+## 4. Satuan produk (kg, liter, ikat, pcs) — **SELESAI: Tahap A di v1.12.0, Tahap B di v1.19.0**
 
 **Kondisi sekarang.** Tabel `products` tidak punya kolom satuan, dan
 `produk_form_screen.dart` tidak punya isian satuan. Jumlah hanya angka.
@@ -113,16 +115,26 @@ per ikat. Struk bertuliskan "2" tidak memberi tahu apa-apa.
 form produk, dan tampilkan di struk/laporan sebagai "2 kg" bukan "2".
 Hanya label; perhitungan tidak berubah.
 
-*Tahap B (besar, pisah rilis).* Izinkan jumlah pecahan (0,5 kg). Ini
-mengubah `quantity INTEGER` menjadi `REAL` di `sales`, `sale_items`, dan
-`stock_movements`, plus seluruh aritmetika stok dan laporan. **Kerjakan
-sebagai rilis tersendiri**, jangan digabung dengan fitur lain, karena
-kesalahan pembulatan di sini langsung merusak laporan.
+*Tahap B (selesai di v1.19.0).* Jumlah pecahan (0,5 kg) diizinkan,
+**sebagai rilis tersendiri** seperti yang diminta — angka pecahan
+menyentuh stok, keranjang, struk, laporan, cadangan, dan Buku Kas
+sekaligus.
 
-**Usaha:** A kecil, B besar. **Skema:** Tahap A versi 5 (selesai).
-Tahap B menunggu versi 12 dan mengubah `quantity INTEGER` menjadi `REAL`
-di `sales`, `sale_items`, dan `stock_movements` — kerjakan sebagai rilis
-tersendiri, seperti catatan di atas.
+**Koreksi rancangan: `quantity INTEGER` TIDAK perlu diubah menjadi
+`REAL`, dan versi skema TIDAK naik.** Usulan di atas keliru. SQLite
+memakai tipe kolom sebagai *affinity*, bukan batasan: di kolom
+`quantity INTEGER` nilai `2` disimpan sebagai integer dan `0,5` sebagai
+real. Kelima kolom kuantitas (`products.stock`, `products.min_stock`,
+`sale_items.quantity`, `sales.total_items`, `stock_movements.quantity`)
+karena itu sudah menampung pecahan apa adanya. Mengubah tipe kolom juga
+bukan pilihan yang tersedia — SQLite tidak punya `ALTER COLUMN` — dan
+satu-satunya cara lain adalah menulis ulang tabel `products`/`sales`/
+`sale_items`, yang berarti membongkar tabel berisi seluruh riwayat
+penjualan pelanggan. Skema tetap **11**; yang berubah hanya sisi Dart.
+
+**Usaha:** A kecil, B sedang (lebih kecil dari perkiraan, karena tidak
+ada migrasi). **Skema:** Tahap A versi 5 (selesai). Tahap B **tidak
+menambah versi skema** (tetap 11).
 
 ---
 

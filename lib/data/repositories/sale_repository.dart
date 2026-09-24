@@ -62,7 +62,7 @@ class SaleRepository {
     final labaBarang = items.fold(0, (sum, i) => sum + i.profit);
     final totalProfit = labaBarang - potonganNota;
 
-    final totalItems = items.fold(0, (sum, i) => sum + i.quantity);
+    final totalItems = items.fold(0.0, (sum, i) => sum + i.quantity);
 
     // Pembayaran tidak boleh negatif atau melebihi total.
     final dibayar = paidAmount < 0
@@ -125,7 +125,7 @@ class SaleRepository {
           'product_name': item.productName,
           'type': 'out',
           'quantity': item.quantity,
-          'total_cost': item.costPrice * item.quantity,
+          'total_cost': (item.costPrice * item.quantity).round(),
           'note': 'Penjualan $invoiceNumber',
           'ref_type': 'sale',
           'ref_id': saleId,
@@ -215,7 +215,7 @@ class SaleRepository {
   /// `ON DELETE CASCADE`, menghapus piutangnya akan ikut menghapus riwayat
   /// pembayaran tanpa peringatan — jadi penolakan ini yang menjaga, bukan kunci
   /// asingnya.
-  Future<({bool berhasil, String pesan, int itemKembali, int uangKeluar})>
+  Future<({bool berhasil, String pesan, double itemKembali, int uangKeluar})>
       batalkan({required int saleId, String? reason}) async {
     final db = await _db.database;
 
@@ -226,7 +226,7 @@ class SaleRepository {
       return (
         berhasil: false,
         pesan: 'Transaksi tidak ditemukan',
-        itemKembali: 0,
+        itemKembali: 0.0,
         uangKeluar: 0,
       );
     }
@@ -234,7 +234,7 @@ class SaleRepository {
       return (
         berhasil: false,
         pesan: 'Transaksi ${sale.invoiceNumber} sudah dibatalkan',
-        itemKembali: 0,
+        itemKembali: 0.0,
         uangKeluar: 0,
       );
     }
@@ -251,7 +251,7 @@ class SaleRepository {
         berhasil: false,
         pesan: 'Piutang dari transaksi ini sudah ada pembayarannya. '
             'Batalkan pembayarannya dulu di menu Hutang & Piutang.',
-        itemKembali: 0,
+        itemKembali: 0.0,
         uangKeluar: 0,
       );
     }
@@ -263,7 +263,7 @@ class SaleRepository {
         ? 'Pembatalan ${sale.invoiceNumber}'
         : 'Pembatalan ${sale.invoiceNumber} — $alasan';
 
-    var itemKembali = 0;
+    var itemKembali = 0.0;
     var uangKeluar = 0;
 
     await db.transaction((txn) async {
@@ -287,7 +287,7 @@ class SaleRepository {
           'product_name': item.productName,
           'type': 'in',
           'quantity': item.quantity,
-          'total_cost': item.costPrice * item.quantity,
+          'total_cost': (item.costPrice * item.quantity).round(),
           'note': catatan,
           'ref_type': 'sale_cancel',
           'ref_id': saleId,

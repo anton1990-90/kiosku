@@ -2,6 +2,7 @@ import 'package:sqflite/sqflite.dart';
 import '../database/database_helper.dart';
 import '../models/cash_model.dart';
 import '../models/debt_model.dart';
+import '../../core/utils/formatters.dart';
 import '../models/product_model.dart';
 
 /// Product repository — CRUD operations for products, all offline.
@@ -77,7 +78,7 @@ class ProductRepository {
   }
 
   /// Reduce stock after a sale.
-  Future<void> reduceStock(int productId, int quantity) async {
+  Future<void> reduceStock(int productId, double quantity) async {
     final db = await _db.database;
     await db.rawUpdate(
       'UPDATE products SET stock = stock - ?, updated_at = ? WHERE id = ?',
@@ -86,7 +87,7 @@ class ProductRepository {
   }
 
   /// Add stock (restock).
-  Future<void> addStock(int productId, int quantity) async {
+  Future<void> addStock(int productId, double quantity) async {
     final db = await _db.database;
     await db.rawUpdate(
       'UPDATE products SET stock = stock + ?, updated_at = ? WHERE id = ?',
@@ -101,7 +102,7 @@ class ProductRepository {
   /// melihat data setengah jadi.
   Future<void> restockProduct({
     required ProductModel product,
-    required int quantity,
+    required double quantity,
     int? costPerUnit,
     int paidNow = 0,
     String? supplierName,
@@ -116,7 +117,7 @@ class ProductRepository {
     final hargaModal = (costPerUnit != null && costPerUnit > 0)
         ? costPerUnit
         : product.costPrice;
-    final totalCost = hargaModal * quantity;
+    final totalCost = (hargaModal * quantity).round();
     final dibayar = paidNow < 0
         ? 0
         : (paidNow > totalCost ? totalCost : paidNow);
@@ -164,7 +165,7 @@ class ProductRepository {
           'type': DebtType.hutang,
           'amount': totalCost,
           'paid_amount': dibayar,
-          'note': 'Belanja ${quantity}x ${product.name}',
+          'note': 'Belanja ${Formatters.jumlah(quantity)}x ${product.name}',
           'due_date': dueDate?.toIso8601String(),
           'status': DebtStatus.belumLunas,
           'product_id': product.id,
@@ -183,8 +184,8 @@ class ProductRepository {
     return products
         .map((p) => (
               product: p,
-              nilaiModal: p.stock * p.costPrice,
-              nilaiJual: p.stock * p.sellPrice,
+              nilaiModal: (p.stock * p.costPrice).round(),
+              nilaiJual: (p.stock * p.sellPrice).round(),
             ))
         .toList();
   }

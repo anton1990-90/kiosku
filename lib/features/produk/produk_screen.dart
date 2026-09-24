@@ -258,7 +258,7 @@ class _ProductCard extends StatelessWidget {
                     const Text(' · ',
                         style: TextStyle(color: AppColors.textTertiary, fontSize: 12)),
                     Text(
-                      'Stok ${product.stock} ${product.unit}',
+                      'Stok ${Formatters.jumlah(product.stock)} ${product.unit}',
                       style: TextStyle(
                         fontSize: 12,
                         color: product.stock <= product.minStock

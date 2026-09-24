@@ -92,7 +92,7 @@ class ProductNotifier extends StateNotifier<ProductState> {
     await loadProducts();
   }
 
-  Future<void> restock(int productId, int quantity) async {
+  Future<void> restock(int productId, double quantity) async {
     await _repo.addStock(productId, quantity);
     await loadProducts();
   }
@@ -101,7 +101,7 @@ class ProductNotifier extends StateNotifier<ProductState> {
   /// kalau belanjanya belum dibayar penuh.
   Future<void> restockProduct({
     required ProductModel product,
-    required int quantity,
+    required double quantity,
     int? costPerUnit,
     int paidNow = 0,
     String? supplierName,

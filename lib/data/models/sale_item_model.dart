@@ -1,3 +1,5 @@
+import '../../core/utils/angka.dart';
+
 /// Sale item model — a line item in a sale transaction.
 class SaleItemModel {
   final int? id;
@@ -6,7 +8,7 @@ class SaleItemModel {
   final String productName;
   final int costPrice;   // Captured at time of sale
   final int sellPrice;   // Captured at time of sale
-  final int quantity;
+  final double quantity;
   /// Harga baris ini **setelah** potongan barisnya dikurangi.
   final int subtotal;
   /// Potongan untuk baris ini, dalam rupiah. Nol kalau tidak ada potongan.
@@ -40,7 +42,7 @@ class SaleItemModel {
   /// Sengaja dihitung dari [subtotal], bukan dari `sellPrice - costPrice`,
   /// supaya potongan harga ikut mengurangi laba. Kalau tidak, laba yang
   /// dilaporkan lebih besar daripada uang yang benar-benar masuk.
-  int get profit => subtotal - costPrice * quantity;
+  int get profit => subtotal - (costPrice * quantity).round();
 
   Map<String, dynamic> toMap() {
     return {
@@ -65,7 +67,7 @@ class SaleItemModel {
       productName: map['product_name'] as String,
       costPrice: map['cost_price'] as int,
       sellPrice: map['sell_price'] as int,
-      quantity: map['quantity'] as int,
+      quantity: Angka.jumlah(map['quantity']),
       subtotal: map['subtotal'] as int,
       discount: (map['discount'] as int?) ?? 0,
       // Baris lama belum punya kolom ini, jadi harus punya nilai cadangan.

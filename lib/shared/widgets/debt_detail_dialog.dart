@@ -261,7 +261,8 @@ Widget _barisBarang(DebtGoods barang) {
               ),
               const SizedBox(height: 2),
               Text(
-                '${barang.quantity} × ${Formatters.rupiah(barang.price)}',
+                '${Formatters.jumlah(barang.quantity)} × '
+                '${Formatters.rupiah(barang.price)}',
                 style: const TextStyle(
                   fontSize: 11,
                   color: AppColors.textTertiary,

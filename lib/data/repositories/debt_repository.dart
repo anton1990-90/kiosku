@@ -1,6 +1,7 @@
 import 'package:sqflite/sqflite.dart';
 import '../database/database_helper.dart';
 import '../models/cash_model.dart';
+import '../../core/utils/angka.dart';
 import '../models/debt_model.dart';
 import 'cash_repository.dart';
 import 'customer_repository.dart';
@@ -304,7 +305,7 @@ class DebtRepository {
       for (final item in items) {
         goods.add(DebtGoods(
           name: (item['product_name'] as String?) ?? '-',
-          quantity: (item['quantity'] as int?) ?? 0,
+          quantity: Angka.jumlah(item['quantity']),
           price: (item['sell_price'] as int?) ?? 0,
         ));
       }
@@ -321,7 +322,7 @@ class DebtRepository {
       if (produk.isNotEmpty) {
         goods.add(DebtGoods(
           name: (produk.first['name'] as String?) ?? '-',
-          quantity: 1,
+          quantity: 1.0,
           price: (produk.first['sell_price'] as int?) ?? 0,
         ));
       }

@@ -292,8 +292,8 @@ class BackupService {
             _teks(p['category']),
             _int(p['cost_price']) ?? 0,
             _int(p['sell_price']) ?? 0,
-            _int(p['stock']) ?? 0,
-            _int(p['min_stock']) ?? 0,
+            _angka(p['stock']),
+            _angka(p['min_stock']),
             _teks(p['supplier']),
             _teks(p['barcode']),
             _teks(p['emoji']),
@@ -319,7 +319,7 @@ class BackupService {
             _teks(s['customer_name']),
             _int(s['total_amount']) ?? 0,
             _int(s['total_profit']) ?? 0,
-            _int(s['total_items']) ?? 0,
+            _angka(s['total_items']),
             _teks(s['payment_method']),
             _int(s['paid_amount']) ?? 0,
             _int(s['change_amount']) ?? 0,
@@ -348,10 +348,13 @@ class BackupService {
             _teks(i['product_name']),
             _int(i['cost_price']) ?? 0,
             _int(i['sell_price']) ?? 0,
-            _int(i['quantity']) ?? 0,
+            _angka(i['quantity']),
             _int(i['subtotal']) ?? 0,
-            ((_int(i['sell_price']) ?? 0) - (_int(i['cost_price']) ?? 0)) *
-                (_int(i['quantity']) ?? 0),
+            // Laba dihitung dari `subtotal` — harga setelah potongan baris —
+            // sama seperti laporan lain. Dari harga label, potongan kasir tidak
+            // ikut mengurangi laba dan angkanya jadi lebih besar dari uang masuk.
+            (_int(i['subtotal']) ?? 0) -
+                ((_int(i['cost_price']) ?? 0) * _angka(i['quantity'])).round(),
           ],
       ],
     );
@@ -477,7 +480,7 @@ class BackupService {
             _teks(m['date']),
             _teks(m['product_name']),
             _teks(m['type']),
-            _int(m['quantity']) ?? 0,
+            _angka(m['quantity']),
             _int(m['total_cost']) ?? 0,
             _teks(m['note']),
             _teks(m['ref_type']),
@@ -592,5 +595,16 @@ class BackupService {
     if (nilai is num) return nilai.toInt();
     if (nilai is String) return int.tryParse(nilai);
     return null;
+  }
+
+  /// Seperti [_int], tetapi mempertahankan pecahan.
+  ///
+  /// Kolom kuantitas boleh berisi 0,5 sejak barang bisa dijual sebagian.
+  /// Memakai [_int] di sana membulatkannya jadi 0, sehingga berkas cadangan
+  /// tidak lagi cocok dengan data yang benar-benar tersimpan.
+  static double _angka(Object? nilai) {
+    if (nilai is num) return nilai.toDouble();
+    if (nilai is String) return double.tryParse(nilai) ?? 0.0;
+    return 0;
   }
 }

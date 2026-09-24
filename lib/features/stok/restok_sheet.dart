@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/utils/formatters.dart';
+import '../../core/utils/satuan.dart';
 import '../../data/models/cash_model.dart';
 import '../../data/models/product_model.dart';
 import '../../data/repositories/cash_repository.dart';
@@ -73,9 +74,9 @@ class _RestokSheetState extends ConsumerState<RestokSheet> {
     super.dispose();
   }
 
-  int get _qty => int.tryParse(_qtyController.text.trim()) ?? 0;
+  double get _qty => Satuan.baca(_qtyController.text) ?? 0.0;
   int get _cost => int.tryParse(_costController.text.trim()) ?? 0;
-  int get _total => _qty * _cost;
+  int get _total => (_qty * _cost).round();
   int get _dibayar {
     if (!_catatHutang) return _total;
     final v = int.tryParse(_paidController.text.trim()) ?? 0;
@@ -132,7 +133,8 @@ class _RestokSheetState extends ConsumerState<RestokSheet> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(
-          'Stok ${product.name} bertambah $_qty pcs'
+          'Stok ${product.name} bertambah ${Formatters.jumlah(_qty)} '
+          '${product.unit}'
           '${_sisa > 0 ? ' · hutang ${Formatters.rupiah(_sisa)}' : ''}',
         ),
         backgroundColor: AppColors.success,
@@ -204,8 +206,9 @@ class _RestokSheetState extends ConsumerState<RestokSheet> {
               ),
               const SizedBox(height: 6),
               Text(
-                'Stok sekarang ${product.stock} pcs · minimum '
-                '${product.minStock} pcs',
+                'Stok sekarang ${Formatters.jumlah(product.stock)} '
+                '${product.unit} · minimum '
+                '${Formatters.jumlah(product.minStock)} ${product.unit}',
                 style: const TextStyle(
                   fontSize: 12,
                   color: AppColors.textSecondary,
@@ -218,15 +221,16 @@ class _RestokSheetState extends ConsumerState<RestokSheet> {
                   Expanded(
                     child: TextFormField(
                       controller: _qtyController,
-                      keyboardType: TextInputType.number,
+                      keyboardType: const TextInputType.numberWithOptions(
+                          decimal: true),
                       autofocus: true,
-                      decoration: const InputDecoration(
+                      decoration: InputDecoration(
                         labelText: 'Jumlah masuk',
-                        suffixText: 'pcs',
+                        suffixText: product.unit,
                       ),
                       onChanged: (_) => setState(_syncPaid),
                       validator: (v) {
-                        final n = int.tryParse((v ?? '').trim());
+                        final n = Satuan.baca(v);
                         if (n == null || n <= 0) return 'Isi jumlah';
                         return null;
                       },
@@ -460,10 +464,15 @@ class RiwayatStokList extends StatelessWidget {
   final int productId;
   final int limit;
 
+  /// Satuan barang, supaya riwayatnya menulis "0,25 kg" dan bukan
+  /// "0.25 pcs". Pemanggil yang tahu produknya.
+  final String unit;
+
   const RiwayatStokList({
     super.key,
     required this.productId,
     this.limit = 8,
+    this.unit = 'pcs',
   });
 
   @override
@@ -521,7 +530,8 @@ class RiwayatStokList extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          '${masuk ? '+' : '-'}${m.quantity} pcs',
+                          '${masuk ? '+' : '-'}${Formatters.jumlah(m.quantity)} '
+                          '$unit',
                           style: const TextStyle(
                             fontSize: 13,
                             fontWeight: FontWeight.w600,

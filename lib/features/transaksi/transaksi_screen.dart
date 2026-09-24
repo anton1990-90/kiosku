@@ -134,7 +134,8 @@ class _TransaksiScreenState extends ConsumerState<TransaksiScreen> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(hasil.berhasil
-            ? '${hasil.pesan} · ${hasil.itemKembali} barang kembali ke stok'
+            ? '${hasil.pesan} · '
+                '${Formatters.jumlah(hasil.itemKembali)} barang kembali ke stok'
                 '${hasil.uangKeluar > 0 ? ' · ${Formatters.rupiah(hasil.uangKeluar)} keluar dari kas' : ''}'
             : hasil.pesan),
         backgroundColor: hasil.berhasil ? AppColors.success : AppColors.danger,
@@ -149,7 +150,7 @@ class _TransaksiScreenState extends ConsumerState<TransaksiScreen> {
 
   int get _totalLaba => _data.fold(0, (s, t) => s + t.totalProfit);
 
-  int get _totalItem => _data.fold(0, (s, t) => s + t.totalItems);
+  double get _totalItem => _data.fold(0.0, (s, t) => s + t.totalItems);
 
   @override
   Widget build(BuildContext context) {
@@ -355,7 +356,7 @@ class _TransaksiScreenState extends ConsumerState<TransaksiScreen> {
                 child: _angka('${_data.length}', 'Transaksi'),
               ),
               Expanded(
-                child: _angka('$_totalItem', 'Barang terjual'),
+                child: _angka(Formatters.jumlah(_totalItem), 'Barang terjual'),
               ),
             ],
           ),
@@ -512,7 +513,8 @@ class _TransaksiScreenState extends ConsumerState<TransaksiScreen> {
                     ),
                   ),
                   Text(
-                    '${l.quantity} x ${Formatters.rupiahCompact(l.sellPrice)}',
+                    '${Formatters.jumlah(l.quantity)} x '
+                    '${Formatters.rupiahCompact(l.sellPrice)}',
                     style: const TextStyle(
                       fontSize: 11,
                       color: AppColors.textTertiary,
@@ -626,7 +628,8 @@ class _DialogBatalState extends State<_DialogBatal> {
               ),
             ),
             const SizedBox(height: 12),
-            _akibat('Stok ${trx.totalItems} barang dikembalikan'),
+            _akibat('Stok ${Formatters.jumlah(trx.totalItems)} '
+                'barang dikembalikan'),
             if (trx.paidAmount > 0)
               _akibat('${Formatters.rupiah(trx.paidAmount)} keluar dari kas'),
             if (trx.isDebt)

@@ -1,4 +1,4 @@
-# TokoKu — Aplikasi UMKM Toko Sembako & Penjualan (v1.18.0)
+# TokoKu — Aplikasi UMKM Toko Sembako & Penjualan (v1.19.0)
 
 Aplikasi mobile cross-platform (Android & iOS) untuk toko sembako UMKM. Dibuat dengan Flutter, bekerja **offline-first** dengan autentikasi email.
 
@@ -16,6 +16,7 @@ Aplikasi mobile cross-platform (Android & iOS) untuk toko sembako UMKM. Dibuat d
 - **Beranda**: Tombol aksi cepat berikon untuk hal yang paling sering dipakai — Transaksi, Tambah Stok, Laporan, Laporan Keuangan, Hutang & Piutang, Cetak Ulang Struk, Buku Kas, **Buka/Tutup Kasir**, dan Catatan. Tombol kasir itu berubah sendiri mengikuti keadaan: menulis "Buka Kasir" kalau belum ada sesi, dan "Tutup Kasir" kalau sesi sedang berjalan.
 - **Manajemen produk**: Tambah, edit, hapus produk dengan kategori, harga modal & jual, barcode, dan stok. Supplier dipilih dari daftar yang bisa diedit. **Ikon produk bisa memakai foto dari galeri HP**, dan setiap produk punya **satuan** (pcs, kg, liter, ikat) supaya struk menulis "2 kg" dan bukan sekadar "2".
 - **Manajemen stok**: Visual progress bar, peringatan stok menipis & habis, restok mudah. Daftar produk bisa langsung diklik untuk restok, dan kartu "stok menipis" di beranda membuka rincian produk yang perlu ditambah.
+- **Jumlah pecahan (jual sebagian)**: Barang yang satuannya bukan bijian — kg, liter, ikat, gram, ml — boleh dijual sebagian: ¼ kg gula, ½ liter minyak. Di layar kasir muncul tombol cepat ¼ dan ½, dan jumlahnya juga bisa diketik manual (menerima koma maupun titik). Barang yang dijual per pcs, dus, atau bungkus tetap dihitung bulat, jadi stok tidak terbelah tanpa sengaja. Stok, keranjang, struk, laporan, dan Buku Kas semuanya mengikuti angka pecahan itu.
 - **Laporan berkala**: Laporan **harian, mingguan, dan bulanan** dengan grafik, ringkasan laba, **grafik batang barang terlaris dan barang kurang laku**, **grafik batang penjualan tujuh hari terakhir**, produk terlaris, dan **detail produk per item** lengkap dengan tanggal, waktu, harga, dan laba per transaksi.
 - **Rincian produk terjual**: Maksimal 5 baris di layar Laporan, lalu "Lihat semua" membuka rincian lengkap yang bisa difilter harian/mingguan/bulanan, menampilkan total pendapatan beserta labanya, dan bisa **diekspor ke PDF & CSV**.
 - **Kas**: Satu buku kas untuk semua uang masuk & keluar. Beranda menampilkan saldo kas di tengah, uang keluar di kiri bawah, uang masuk di kanan bawah. Setiap penjualan, pembayaran hutang/piutang, restok, beban, dan prive tercatat otomatis — plus riwayat lengkap dan pencatatan manual.
@@ -156,6 +157,17 @@ cloudflare/                          # Server aktivasi lisensi (Worker + D1)
 ## Skema Database (SQLite)
 
 Versi skema: **11**. Migrasi berjalan otomatis dan tidak menghapus data yang sudah ada — kolom baru selalu ditambahkan lewat `ALTER TABLE`, sedangkan tabel lama tidak pernah ditulis ulang.
+
+Versi 1.19.0 (jumlah pecahan) **tidak menaikkan versi skema**, dan itu
+disengaja. SQLite memakai tipe kolom sebagai *affinity*, bukan batasan: di
+kolom `quantity INTEGER` nilai `2` disimpan sebagai bilangan bulat dan `0,5`
+sebagai bilangan pecahan. Jadi kelima kolom kuantitas (`products.stock`,
+`products.min_stock`, `sale_items.quantity`, `sales.total_items`, dan
+`stock_movements.quantity`) sudah menampung pecahan apa adanya. Mengubah
+tipe kolomnya bukan pilihan yang tersedia — SQLite tidak punya
+`ALTER COLUMN` — dan satu-satunya cara lain adalah menulis ulang tabel
+`products`/`sales`/`sale_items`, yang berarti membongkar tabel berisi
+seluruh riwayat penjualan pelanggan. Yang berubah hanya sisi Dart.
 
 | Table | Purpose |
 |-------|---------|
@@ -358,46 +370,37 @@ menjaga pembagian dengan nol: penyebutnya adalah nilai terbanyak, jadi kalau
 semua nilainya nol setiap batang akan menjadi `NaN`, dan yang muncul di layar
 bukan galat melainkan grafik dengan tinggi yang tidak masuk akal.
 
-### Catatan ucapan struk dan grafik penjualan
+### Catatan jumlah pecahan (jual sebagian)
 
-**Ucapan penutup struk.** Sebelum v1.18.0 teks "Terima kasih atas kunjungan
-Anda!" tertulis tetap di dua tempat di `receipt_service.dart`. Sekarang teks itu
-satu konstanta (`ReceiptService.footerBawaan`) yang dipakai dua jalur cetak
-lewat satu fungsi (`ReceiptService.footerStruk`), dan pemilik toko bisa
-menggantinya dari **Profil → Info Toko**.
+**Aturannya diturunkan dari satuan, bukan disimpan per barang.** Tidak ada
+kolom baru dan tidak ada saklar per produk: `Satuan.bolehPecahan()`
+menganggap semua satuan boleh dipecah **kecuali** yang ada di daftar
+`satuanBulat` (pcs, buah, biji, butir, lembar, batang, bungkus, sachet,
+dus, karton, pak, box, botol, kaleng, papan). Sengaja "boleh kalau tidak
+terdaftar", karena satuan buatan pemilik toko ("ember", "karung") tidak
+mungkin didaftar semuanya. Satu tempat itu dipakai keranjang, tombol cepat
+kasir, dan formulir produk, jadi tidak ada layar yang memutuskan sendiri.
 
-Skema v11 menambahkan `users.receipt_footer`. Kolom itu sengaja **nullable dan
-tanpa nilai awal** — dan itu kebalikan dari `users.role` (v9) maupun
-`cash_sessions.status` (v10). Di dua rilis itu nilai awal yang salah membuat
-data lama salah **dibaca**; di sini nilai awal yang salah akan **menghapus** teks
-yang sudah ada. Kalau kolomnya diberi `DEFAULT ''`, setiap toko yang memperbarui
-aplikasi langsung mencetak struk tanpa ucapan penutup sama sekali, dan
-pemiliknya tidak punya cara tahu bahwa dulu ada teks di sana. NULL-lah yang
-menyimpan perbedaan antara "belum diatur" dan "sengaja dikosongkan". Mengosongkan
-kolomnya di Info Toko karena itu berarti **kembali ke teks bawaan**, bukan
-mencetak struk tanpa penutup.
+**Uang tetap bilangan bulat.** Kuantitas menjadi pecahan, jadi setiap rumus
+yang mengalikannya dengan harga sekarang menghasilkan bilangan pecahan dan
+wajib dibulatkan. Sepuluh tempat melakukannya (`round()`), dan
+`Angka.uang()` mengumpulkan pembulatan hasil query SQL. Yang **tidak**
+berubah adalah rumus uang yang menjadi dasar seluruh laporan:
+`sales.total_amount = SUM(sale_items.subtotal) - sales.discount` dan
+`total_profit = SUM(sale_items.profit) - sales.discount`. Keduanya tetap
+bilangan bulat, jadi laporan lama tidak perlu diubah sama sekali.
 
-**Grafik batang.** Layar Laporan menambah tiga grafik, semuanya digambar
-langsung dari `Row` dan `Container` — proyek ini tidak memakai paket grafik, dan
-itu disengaja: satu dependensi lebih sedikit yang bisa rusak saat Flutter naik
-versi.
+**Laba tidak boleh dihitung dari harga label.** Untuk baris yang kena
+potongan, laba = `subtotal - (harga_modal × jumlah)` — yaitu harga setelah
+potongan. Kalau memakai harga label, laba yang dilaporkan lebih besar
+daripada uang yang benar-benar masuk. Aturan ini sudah ada sejak v1.13.0 dan
+tetap dipertahankan.
 
-Dua di antaranya berbagi satu widget, `_productBarChart`: yang satu menampilkan
-barang **terlaris**, yang satu barang **kurang laku**. Yang kurang laku dibaca
-dari tabel `products` dengan subquery `LEFT JOIN`, bukan dari `sale_items`.
-Perbedaannya bukan soal gaya penulisan: kalau query-nya berangkat dari
-`sale_items`, barang yang tidak terjual sama sekali tidak punya satu pun baris di
-sana, jadi ia hilang dari daftar — dan justru barang itulah yang paling perlu
-diketahui pemilik toko. Syarat tanggalnya juga harus ada **di dalam** subquery;
-kalau dinaikkan ke `WHERE` luar, `LEFT JOIN`-nya berubah menjadi `INNER JOIN`
-dan efeknya sama.
-
-Grafik ketiga menampilkan **tujuh hari terakhir**. Repositori selalu
-mengembalikan tepat tujuh baris — hari tanpa penjualan diisi nol — supaya
-grafiknya tidak pernah tampil sebagai dua batang untuk "seminggu". Ketiga grafik
-menjaga pembagian dengan nol: penyebutnya adalah nilai terbanyak, jadi kalau
-semua nilainya nol setiap batang akan menjadi `NaN`, dan yang muncul di layar
-bukan galat melainkan grafik dengan tinggi yang tidak masuk akal.
+**Mengapa ini rilis tersendiri.** Angka pecahan menyentuh stok, keranjang,
+struk, laporan, cadangan, dan Buku Kas sekaligus. Setiap tempat yang membaca
+kuantitas dari database harus lewat `Angka`, karena `as int` meledak saat
+nilainya 0,5 dan `as double` meledak saat nilainya 2 — keduanya galat saat
+aplikasi dipakai, bukan saat dibangun.
 
 ### Akun kasir dan hak akses
 

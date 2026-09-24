@@ -1,3 +1,5 @@
+import '../../core/utils/angka.dart';
+
 /// Product model for grocery store items.
 /// Includes cost price (modal) and sell price for profit calculation.
 class ProductModel {
@@ -6,8 +8,8 @@ class ProductModel {
   final String category;
   final int costPrice;   // Harga modal (beli)
   final int sellPrice;  // Harga jual
-  final int stock;
-  final int minStock;    // Threshold for low-stock alert
+  final double stock;
+  final double minStock;    // Threshold for low-stock alert
   final String? supplier;
   final String? emoji;   // Visual placeholder for product image
   final String? barcode; // EAN-13 / UPC barcode for scanning
@@ -73,8 +75,8 @@ class ProductModel {
       category: map['category'] as String,
       costPrice: map['cost_price'] as int,
       sellPrice: map['sell_price'] as int,
-      stock: map['stock'] as int,
-      minStock: (map['min_stock'] as int?) ?? 5,
+      stock: Angka.jumlah(map['stock']),
+      minStock: Angka.jumlahAtau(map['min_stock'], 5),
       supplier: map['supplier'] as String?,
       emoji: (map['emoji'] as String?) ?? '📦',
       barcode: map['barcode'] as String?,
@@ -91,8 +93,8 @@ class ProductModel {
     String? category,
     int? costPrice,
     int? sellPrice,
-    int? stock,
-    int? minStock,
+    double? stock,
+    double? minStock,
     String? supplier,
     String? emoji,
     String? barcode,

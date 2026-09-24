@@ -1,5 +1,6 @@
 import 'package:sqflite/sqflite.dart';
 import '../database/database_helper.dart';
+import '../../core/utils/angka.dart';
 import '../models/accounting_models.dart';
 import '../models/cash_model.dart';
 import 'cash_repository.dart';
@@ -29,7 +30,7 @@ class AccountingRepository {
       FROM sales_aktif
       WHERE created_at >= ? AND created_at < ?
     ''', [start.toIso8601String(), end.toIso8601String()]);
-    return (rows.first['total'] as int?) ?? 0;
+    return Angka.uang(rows.first['total']);
   }
 
   /// Harga Pokok Penjualan = modal barang yang terjual.
@@ -41,7 +42,7 @@ class AccountingRepository {
       INNER JOIN sales_aktif s ON s.id = si.sale_id
       WHERE s.created_at >= ? AND s.created_at < ?
     ''', [start.toIso8601String(), end.toIso8601String()]);
-    return (rows.first['total'] as int?) ?? 0;
+    return Angka.uang(rows.first['total']);
   }
 
   /// Laporan laba rugi lengkap satu periode.
@@ -87,10 +88,10 @@ class AccountingRepository {
     ''', [iso]);
 
     final labaKumulatif =
-        ((penjualan.first['total'] as int?) ?? 0) -
-            ((hpp.first['total'] as int?) ?? 0) -
-            ((beban.first['total'] as int?) ?? 0);
-    final priveKumulatif = (prive.first['total'] as int?) ?? 0;
+        Angka.uang(penjualan.first['total']) -
+            Angka.uang(hpp.first['total']) -
+            Angka.uang(beban.first['total']);
+    final priveKumulatif = Angka.uang(prive.first['total']);
 
     return labaKumulatif - priveKumulatif;
   }
@@ -103,7 +104,7 @@ class AccountingRepository {
       FROM cash_transactions
       WHERE type = ? AND category = ? AND date < ?
     ''', [CashType.masuk, CashCategory.modal, start.toIso8601String()]);
-    return (rows.first['total'] as int?) ?? 0;
+    return Angka.uang(rows.first['total']);
   }
 
   /// Laporan perubahan ekuitas satu periode.
@@ -131,7 +132,7 @@ class AccountingRepository {
       modalAwal: modalAwal,
       labaBersih: laba.labaBersih,
       prive: prive,
-      modalDisetor: (modalRows.first['total'] as int?) ?? 0,
+      modalDisetor: Angka.uang(modalRows.first['total']),
     );
   }
 
@@ -171,17 +172,17 @@ class AccountingRepository {
     );
 
     final labaDitahan =
-        ((penjualan.first['total'] as int?) ?? 0) -
-            ((hpp.first['total'] as int?) ?? 0) -
-            ((beban.first['total'] as int?) ?? 0) -
-            ((prive.first['total'] as int?) ?? 0);
+        Angka.uang(penjualan.first['total']) -
+            Angka.uang(hpp.first['total']) -
+            Angka.uang(beban.first['total']) -
+            Angka.uang(prive.first['total']);
 
     return Neraca(
       kas: kas,
       persediaan: persediaan,
       piutang: debtSummary.piutang,
       hutangUsaha: debtSummary.hutang,
-      modalDisetor: (modalRows.first['total'] as int?) ?? 0,
+      modalDisetor: Angka.uang(modalRows.first['total']),
       labaDitahan: labaDitahan,
     );
   }
@@ -228,7 +229,7 @@ class AccountingRepository {
       bySale.putIfAbsent(saleId, () => []).add(
             SaleLine(
               productName: (r['product_name'] as String?) ?? '-',
-              quantity: (r['quantity'] as int?) ?? 0,
+              quantity: Angka.jumlah(r['quantity']),
               sellPrice: (r['sell_price'] as int?) ?? 0,
               costPrice: (r['cost_price'] as int?) ?? 0,
               subtotal: (r['subtotal'] as int?) ?? 0,
@@ -246,7 +247,7 @@ class AccountingRepository {
         paymentMethod: (r['payment_method'] as String?) ?? 'tunai',
         totalAmount: (r['total_amount'] as int?) ?? 0,
         totalProfit: (r['total_profit'] as int?) ?? 0,
-        totalItems: (r['total_items'] as int?) ?? 0,
+        totalItems: Angka.jumlah(r['total_items']),
         paidAmount: (r['paid_amount'] as int?) ?? 0,
         changeAmount: (r['change_amount'] as int?) ?? 0,
         isDebt: ((r['is_debt'] as int?) ?? 0) == 1,
@@ -280,9 +281,9 @@ class AccountingRepository {
     return rows
         .map((r) => (
               name: (r['name'] as String?) ?? '-',
-              qty: (r['qty'] as int?) ?? 0,
-              revenue: (r['revenue'] as int?) ?? 0,
-              profit: (r['profit'] as int?) ?? 0,
+              qty: Angka.jumlah(r['qty']),
+              revenue: Angka.uang(r['revenue']),
+              profit: Angka.uang(r['profit']),
             ))
         .toList();
   }

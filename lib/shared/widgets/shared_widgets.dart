@@ -281,10 +281,10 @@ class QuickAction extends StatelessWidget {
 
 /// Stock status badge.
 class StockBadge extends StatelessWidget {
-  final int stock;
-  final int minStock;
+  final double stock;
+  final double minStock;
 
-  const StockBadge({super.key, required this.stock, this.minStock = 5});
+  const StockBadge({super.key, required this.stock, this.minStock = 5.0});
 
   @override
   Widget build(BuildContext context) {
@@ -297,11 +297,11 @@ class StockBadge extends StatelessWidget {
       bg = AppColors.dangerLight;
       fg = AppColors.dangerMid;
     } else if (stock <= minStock) {
-      label = 'Stok $stock';
+      label = 'Stok ${Formatters.jumlah(stock)}';
       bg = AppColors.warningLight;
       fg = AppColors.warningMid;
     } else {
-      label = 'Stok $stock';
+      label = 'Stok ${Formatters.jumlah(stock)}';
       bg = AppColors.successLight;
       fg = AppColors.successMid;
     }

@@ -268,7 +268,7 @@ class _LaporanScreenState extends ConsumerState<LaporanScreen> {
       ),
       (
         'Produk terjual',
-        '${summary.itemsSold}',
+        '${Formatters.jumlah(summary.itemsSold)}',
         Icons.inventory_2_outlined,
         AppColors.accentMid,
         AppColors.accentLight,
@@ -468,7 +468,7 @@ class _LaporanScreenState extends ConsumerState<LaporanScreen> {
     // lebih dulu: kalau semua produk terjual nol, nilai ini 0 dan setiap
     // pembagian di bawah menghasilkan NaN.
     final maxQty =
-        produk.fold<int>(0, (maks, p) => p.quantity > maks ? p.quantity : maks);
+        produk.fold<double>(0, (maks, p) => p.quantity > maks ? p.quantity : maks);
 
     return _ChartCard(
       title: judul,
@@ -511,7 +511,7 @@ class _LaporanScreenState extends ConsumerState<LaporanScreen> {
                           ),
                           const SizedBox(width: 8),
                           Text(
-                            '${p.quantity} terjual',
+                            '${Formatters.jumlah(p.quantity)} terjual',
                             style: const TextStyle(
                               fontSize: 11,
                               fontWeight: FontWeight.w600,
@@ -867,7 +867,8 @@ class _LaporanScreenState extends ConsumerState<LaporanScreen> {
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  '${item.quantity} x ${Formatters.rupiah(item.sellPrice)}'
+                  '${Formatters.jumlah(item.quantity)} x '
+                  '${Formatters.rupiah(item.sellPrice)}'
                   ' · ${Formatters.time(item.soldAt)}'
                   '${item.customerName != null && item.customerName!.isNotEmpty ? ' · ${item.customerName}' : ''}',
                   style: const TextStyle(

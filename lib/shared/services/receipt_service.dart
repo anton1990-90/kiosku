@@ -123,7 +123,8 @@ class ReceiptService {
       bytes += generator.text(item.productName);
       bytes += generator.row([
         PosColumn(
-          text: '${item.quantity} ${item.unit} x ${Formatters.rupiah(item.sellPrice)}',
+          text: '${Formatters.jumlah(item.quantity)} ${item.unit} x '
+              '${Formatters.rupiah(item.sellPrice)}',
           width: 7,
         ),
         PosColumn(
@@ -184,7 +185,7 @@ class ReceiptService {
     bytes += generator.text('Tunai: ${Formatters.rupiah(sale.paidAmount)}');
     bytes += generator.text('Kembali: ${Formatters.rupiah(sale.changeAmount)}');
     bytes += generator.text('Bayar: ${sale.paymentMethod.toUpperCase()}');
-    bytes += generator.text('Item: ${sale.totalItems}');
+    bytes += generator.text('Item: ${Formatters.jumlah(sale.totalItems)}');
 
     // Sisa piutang — supaya pelanggan tahu masih ada tanggungan.
     if (sale.isDebt && sale.unpaidAmount > 0) {
@@ -373,7 +374,8 @@ class ReceiptService {
     for (final item in items) {
       buffer.writeln(item.productName);
       buffer.writeln(
-          '  ${item.quantity} ${item.unit} x ${Formatters.rupiah(item.sellPrice)} = ${Formatters.rupiah(item.subtotal)}');
+          '  ${Formatters.jumlah(item.quantity)} ${item.unit} x '
+          '${Formatters.rupiah(item.sellPrice)} = ${Formatters.rupiah(item.subtotal)}');
       if (item.discount > 0) {
         buffer.writeln('  Potongan        : -${Formatters.rupiah(item.discount)}');
       }

@@ -48,8 +48,10 @@ class _StokMenipisScreenState extends ConsumerState<StokMenipisScreen> {
       _ => semua,
     };
 
-    final nilaiBelanja =
-        semua.fold<int>(0, (s, p) => s + (p.minStock * 3 - p.stock) * p.costPrice);
+    // Uang selalu bulat: selisih stok boleh pecahan, rupiahnya tidak.
+    final nilaiBelanja = semua
+        .fold<double>(0, (s, p) => s + (p.minStock * 3 - p.stock) * p.costPrice)
+        .round();
 
     return Scaffold(
       backgroundColor: AppColors.bgPage,
@@ -293,7 +295,7 @@ class _StokMenipisScreenState extends ConsumerState<StokMenipisScreen> {
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: Text(
-                  habis ? 'HABIS' : 'SISA ${p.stock}',
+                  habis ? 'HABIS' : 'SISA ${Formatters.jumlah(p.stock)}',
                   style: TextStyle(
                     fontSize: 10,
                     fontWeight: FontWeight.w700,
@@ -304,12 +306,14 @@ class _StokMenipisScreenState extends ConsumerState<StokMenipisScreen> {
             ],
           ),
           const SizedBox(height: 12),
-          _baris('Stok sekarang', '${p.stock} pcs'),
-          _baris('Batas minimum', '${p.minStock} pcs'),
+          _baris('Stok sekarang',
+              '${Formatters.jumlah(p.stock)} ${p.unit}'),
+          _baris('Batas minimum',
+              '${Formatters.jumlah(p.minStock)} ${p.unit}'),
           _baris('Harga modal', Formatters.rupiah(p.costPrice)),
           _baris('Harga jual', Formatters.rupiah(p.sellPrice)),
           _baris('Nilai stok tersisa',
-              Formatters.rupiah(p.stock * p.costPrice)),
+              Formatters.rupiah((p.stock * p.costPrice).round())),
           if (p.barcode != null && p.barcode!.isNotEmpty)
             _baris('Barcode', p.barcode!),
           const SizedBox(height: 12),
@@ -330,8 +334,8 @@ class _StokMenipisScreenState extends ConsumerState<StokMenipisScreen> {
                       const SizedBox(width: 6),
                       Expanded(
                         child: Text(
-                          'Saran restok $saran pcs '
-                          '(${Formatters.rupiahCompact(saran * p.costPrice)})',
+                          'Saran restok ${Formatters.jumlah(saran)} ${p.unit} '
+                          '(${Formatters.rupiahCompact((saran * p.costPrice).round())})',
                           style: const TextStyle(
                             fontSize: 11,
                             fontWeight: FontWeight.w600,

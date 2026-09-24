@@ -70,7 +70,7 @@ class ReportExport {
       ['Total penjualan', data.summary.totalSales.toString()],
       ['Laba kotor', data.summary.totalProfit.toString()],
       ['Jumlah transaksi', data.summary.transactions.toString()],
-      ['Produk terjual (pcs)', data.summary.itemsSold.toString()],
+      ['Produk terjual', Formatters.jumlah(data.summary.itemsSold)],
       [],
       ['STATUS PEMBAYARAN'],
       ['Transaksi tunai (cash)', status.tunai.toString()],
@@ -113,7 +113,7 @@ class ReportExport {
         Formatters.date(item.soldAt),
         Formatters.time(item.soldAt),
         item.productName,
-        item.quantity.toString(),
+        Formatters.jumlah(item.quantity),
         item.sellPrice.toString(),
         item.subtotal.toString(),
         item.profit.toString(),
@@ -174,7 +174,7 @@ class ReportExport {
     pdf.keyValue('Total penjualan', Formatters.rupiah(data.summary.totalSales), bold: true);
     pdf.keyValue('Laba kotor', Formatters.rupiah(data.summary.totalProfit));
     pdf.keyValue('Jumlah transaksi', '${data.summary.transactions}');
-    pdf.keyValue('Produk terjual', '${data.summary.itemsSold} pcs');
+    pdf.keyValue('Produk terjual', '${Formatters.jumlah(data.summary.itemsSold)} pcs');
     pdf.keyValue(
       'Rata-rata per transaksi',
       Formatters.rupiah(data.summary.averagePerTransaction),
@@ -247,7 +247,7 @@ class ReportExport {
             Formatters.date(item.soldAt),
             Formatters.time(item.soldAt),
             item.productName,
-            '${item.quantity}',
+            Formatters.jumlah(item.quantity),
             Formatters.rupiah(item.sellPrice),
             Formatters.rupiah(item.subtotal),
             Formatters.rupiah(item.profit),

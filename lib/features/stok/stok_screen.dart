@@ -312,7 +312,8 @@ class _PilihProdukSheetState extends State<_PilihProdukSheet> {
                             overflow: TextOverflow.ellipsis,
                           ),
                           subtitle: Text(
-                            'Stok ${p.stock} pcs · min ${p.minStock}',
+                            'Stok ${Formatters.jumlah(p.stock)} ${p.unit} · '
+                            'min ${Formatters.jumlah(p.minStock)}',
                             style: const TextStyle(fontSize: 12),
                           ),
                           trailing: const Icon(Icons.add_circle_outline,
@@ -497,7 +498,9 @@ class _StokItem extends StatelessWidget {
                   SizedBox(
                     width: 80,
                     child: Text(
-                      '${product.stock} / ${(product.minStock * 3)} pcs',
+                      '${Formatters.jumlah(product.stock)} / '
+                      '${Formatters.jumlah(product.minStock * 3)} '
+                      '${product.unit}',
                       style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w600,

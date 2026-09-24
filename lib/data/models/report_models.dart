@@ -1,15 +1,17 @@
+import '../../core/utils/angka.dart';
+
 /// Ringkasan angka untuk satu periode laporan.
 class ReportSummary {
   final int totalSales;
   final int totalProfit;
   final int transactions;
-  final int itemsSold;
+  final double itemsSold;
 
   const ReportSummary({
     this.totalSales = 0,
     this.totalProfit = 0,
     this.transactions = 0,
-    this.itemsSold = 0,
+    this.itemsSold = 0.0,
   });
 
   /// Rata-rata nilai per transaksi.
@@ -25,7 +27,7 @@ class ReportSummary {
 /// transaksi itu dibayar tunai atau jadi piutang.
 class ReportItemDetail {
   final String productName;
-  final int quantity;
+  final double quantity;
   final int costPrice;
   final int sellPrice;
   final int subtotal;
@@ -62,7 +64,7 @@ class ReportItemDetail {
     this.paidAmount = 0,
   });
 
-  int get profit => (sellPrice - costPrice) * quantity;
+  int get profit => ((sellPrice - costPrice) * quantity).round();
 
   /// Status pembayaran transaksi, siap ditampilkan ke pengguna.
   ///   Cash          — dibayar penuh saat transaksi
@@ -85,7 +87,7 @@ class ReportItemDetail {
   factory ReportItemDetail.fromMap(Map<String, dynamic> map) {
     return ReportItemDetail(
       productName: map['product_name'] as String,
-      quantity: map['quantity'] as int,
+      quantity: Angka.jumlah(map['quantity']),
       costPrice: map['cost_price'] as int,
       sellPrice: map['sell_price'] as int,
       subtotal: map['subtotal'] as int,
@@ -104,7 +106,7 @@ class ReportItemDetail {
 /// Produk terlaris dalam satu periode.
 class TopProduct {
   final String productName;
-  final int quantity;
+  final double quantity;
   final int revenue;
   final int profit;
 

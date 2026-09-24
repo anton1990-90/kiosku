@@ -1,3 +1,5 @@
+import '../../core/utils/angka.dart';
+
 /// Jenis catatan hutang.
 ///   piutang — pelanggan berhutang ke toko (uang masuk nanti)
 ///   hutang  — toko berhutang ke supplier (uang keluar nanti)
@@ -247,7 +249,7 @@ class DebtDetail {
 /// Satu barang yang terkait dengan catatan hutang.
 class DebtGoods {
   final String name;
-  final int quantity;
+  final double quantity;
   final int price;
 
   const DebtGoods({
@@ -256,5 +258,5 @@ class DebtGoods {
     required this.price,
   });
 
-  int get subtotal => quantity * price;
+  int get subtotal => (quantity * price).round();
 }

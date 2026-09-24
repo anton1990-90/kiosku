@@ -55,6 +55,22 @@ class Formatters {
     return rupiah(amount);
   }
 
+  /// Format kuantitas barang: `2.0` -> "2", `2.5` -> "2,5".
+  ///
+  /// Kuantitas disimpan sebagai pecahan sejak barang boleh dijual sebagian
+  /// (mis. ¼ kg gula), jadi menulis `$quantity` langsung akan mencetak
+  /// "2.0 kg" di struk dan di laporan. Pemisah desimalnya koma karena yang
+  /// membacanya orang Indonesia.
+  static String jumlah(double qty) {
+    if (qty == qty.roundToDouble()) return qty.toStringAsFixed(0);
+    var teks = qty.toStringAsFixed(2);
+    while (teks.endsWith('0')) {
+      teks = teks.substring(0, teks.length - 1);
+    }
+    if (teks.endsWith('.')) teks = teks.substring(0, teks.length - 1);
+    return teks.replaceAll('.', ',');
+  }
+
   /// Format date: "21 Sep 2026"
   static String date(DateTime dt) {
     return '${dt.day} ${_months[dt.month - 1]} ${dt.year}';

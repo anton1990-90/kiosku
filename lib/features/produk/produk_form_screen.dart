@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/utils/formatters.dart';
+import '../../core/utils/satuan.dart';
 import '../../core/utils/responsive.dart';
 import '../../data/models/product_model.dart';
 import '../../data/models/supplier_model.dart';
@@ -73,8 +74,8 @@ class _ProdukFormScreenState extends ConsumerState<ProdukFormScreen> {
       _category = p.category;
       _costPriceController.text = p.costPrice.toString();
       _sellPriceController.text = p.sellPrice.toString();
-      _stockController.text = p.stock.toString();
-      _minStockController.text = p.minStock.toString();
+      _stockController.text = Formatters.jumlah(p.stock);
+      _minStockController.text = Formatters.jumlah(p.minStock);
       _barcodeController.text = p.barcode ?? '';
       _emoji = p.emoji ?? '📦';
       _unit = p.unit;
@@ -218,12 +219,8 @@ class _ProdukFormScreenState extends ConsumerState<ProdukFormScreen> {
       category: _category,
       costPrice: int.parse(_costPriceController.text.trim()),
       sellPrice: int.parse(_sellPriceController.text.trim()),
-      stock: int.parse(_stockController.text.trim()),
-      minStock: int.parse(
-        _minStockController.text.trim().isEmpty
-            ? '5'
-            : _minStockController.text.trim(),
-      ),
+      stock: Satuan.baca(_stockController.text) ?? 0.0,
+      minStock: Satuan.baca(_minStockController.text) ?? 5.0,
       supplier: _supplier.isEmpty ? null : _supplier,
       barcode: barcode.isEmpty ? null : barcode,
       emoji: _emoji,
@@ -456,10 +453,12 @@ class _ProdukFormScreenState extends ConsumerState<ProdukFormScreen> {
                 ],
               ),
               const SizedBox(height: 6),
-              const Text(
+              Text(
                 'Satuan dipakai di struk dan laporan — misalnya "2 kg" '
-                'alih-alih sekadar "2".',
-                style: TextStyle(
+                'alih-alih sekadar "2".'
+                '${Satuan.bolehPecahan(_unit) ? ' Satuan ini boleh dijual '
+                    'sebagian (mis. ¼ kg).' : ' Satuan ini dihitung bulat.'}',
+                style: const TextStyle(
                   fontSize: 11,
                   color: AppColors.textTertiary,
                   height: 1.4,
@@ -524,17 +523,23 @@ class _ProdukFormScreenState extends ConsumerState<ProdukFormScreen> {
                   Expanded(
                     child: TextFormField(
                       controller: _stockController,
-                      keyboardType: TextInputType.number,
+                      keyboardType: const TextInputType.numberWithOptions(
+                          decimal: true),
                       decoration: const InputDecoration(labelText: 'Stok awal'),
-                      validator: (v) =>
-                          v == null || v.trim().isEmpty ? 'Wajib diisi' : null,
+                      validator: (v) {
+                        final n = Satuan.baca(v);
+                        if (n == null) return 'Wajib diisi';
+                        if (n < 0) return 'Tidak boleh negatif';
+                        return null;
+                      },
                     ),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
                     child: TextFormField(
                       controller: _minStockController,
-                      keyboardType: TextInputType.number,
+                      keyboardType: const TextInputType.numberWithOptions(
+                          decimal: true),
                       decoration: const InputDecoration(
                         labelText: 'Min. stok',
                         hintText: '5',

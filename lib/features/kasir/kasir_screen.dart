@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/utils/formatters.dart';
+import '../../core/utils/satuan.dart';
 import '../../core/utils/responsive.dart';
 import '../../data/models/product_model.dart';
 import '../../data/models/sale_item_model.dart';
@@ -93,13 +94,31 @@ class _KasirScreenState extends ConsumerState<KasirScreen> {
     final hasil = await _tanyaRupiah(
       context: context,
       judul: 'Potongan ${item.product.name}',
-      keterangan: '${item.quantity} x ${Formatters.rupiah(item.product.sellPrice)} '
+      keterangan: '${Formatters.jumlah(item.quantity)} x '
+          '${Formatters.rupiah(item.product.sellPrice)} '
           '= ${Formatters.rupiah(item.grossSubtotal)}',
       nilaiAwal: item.potongan,
       maksimum: item.grossSubtotal,
     );
     if (hasil == null || !mounted) return;
     ref.read(cartProvider.notifier).setItemDiscount(item.product.id!, hasil);
+  }
+
+  /// Atur jumlah satu baris keranjang.
+  ///
+  /// Untuk barang yang dijual sebagian (kg, liter, ikat) kasir butuh ¼ atau
+  /// ½ tanpa mengetik; untuk satuan bulat tombol cepatnya tetap bilangan
+  /// bulat. Isian manualnya menerima koma maupun titik.
+  Future<void> _aturJumlah(CartItem item) async {
+    final hasil = await _tanyaJumlah(
+      context: context,
+      nama: item.product.name,
+      unit: item.product.unit,
+      nilaiAwal: item.quantity,
+      maksimum: item.product.stock,
+    );
+    if (hasil == null || !mounted) return;
+    ref.read(cartProvider.notifier).setQuantity(item.product.id!, hasil);
   }
 
   /// Atur potongan untuk seluruh nota.
@@ -198,8 +217,11 @@ class _KasirScreenState extends ConsumerState<KasirScreen> {
               ),
             ),
             const SizedBox(height: 4),
-            Text('${sale.totalItems} item · ${sale.paymentMethod.toUpperCase()}',
-                style: const TextStyle(fontSize: 13, color: AppColors.textSecondary)),
+            Text(
+              '${Formatters.jumlah(sale.totalItems)} item · '
+              '${sale.paymentMethod.toUpperCase()}',
+              style: const TextStyle(
+                  fontSize: 13, color: AppColors.textSecondary)),
             // Kasir perlu melihat potongan yang benar-benar tersimpan, bukan
             // hanya mengandalkan yang diketik di keranjang tadi.
             if (sale.discount > 0) ...[
@@ -442,7 +464,8 @@ class _KasirScreenState extends ConsumerState<KasirScreen> {
                               ),
                               const SizedBox(height: 2),
                               Text(
-                                'Stok: ${product.stock} pcs',
+                                'Stok: ${Formatters.jumlah(product.stock)} '
+                                '${product.unit}',
                                 style: TextStyle(fontSize: 11, color: product.stock == 0
                                       ? AppColors.dangerMid
                                       : AppColors.textTertiary,
@@ -509,6 +532,18 @@ class _KasirScreenState extends ConsumerState<KasirScreen> {
                         ),
                       ],
                     ),
+                    if (cart.items
+                        .any((i) => Satuan.bolehPecahan(i.product.unit)))
+                      const Padding(
+                        padding: EdgeInsets.only(top: 6),
+                        child: Text(
+                          'Ketuk angka jumlah untuk mengisi ¼ atau ½.',
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: AppColors.textTertiary,
+                          ),
+                        ),
+                      ),
                     const SizedBox(height: 14),
                     ConstrainedBox(
                       // Dinaikkan dari 100 sejak tiap baris bisa memuat dua
@@ -546,14 +581,28 @@ class _KasirScreenState extends ConsumerState<KasirScreen> {
                                             .read(cartProvider.notifier)
                                             .decrementQuantity(item.product.id!),
                                       ),
-                                      Padding(
-                                        padding: const EdgeInsets.symmetric(horizontal: 8),
-                                        child: Text(
-                                          '${item.quantity}',
-                                          style: const TextStyle(
-                                            fontSize: 13,
-                                            fontWeight: FontWeight.w700,
-                                            color: AppColors.textMain,
+                                      GestureDetector(
+                                        behavior: HitTestBehavior.opaque,
+                                        onTap: () => _aturJumlah(item),
+                                        child: Container(
+                                          padding: const EdgeInsets.symmetric(
+                                              horizontal: 8, vertical: 4),
+                                          decoration: BoxDecoration(
+                                            color: AppColors.bgSoft,
+                                            borderRadius:
+                                                BorderRadius.circular(6),
+                                            border: Border.all(
+                                              color: AppColors.border,
+                                              width: 0.5,
+                                            ),
+                                          ),
+                                          child: Text(
+                                            Formatters.jumlah(item.quantity),
+                                            style: const TextStyle(
+                                              fontSize: 13,
+                                              fontWeight: FontWeight.w700,
+                                              color: AppColors.textMain,
+                                            ),
                                           ),
                                         ),
                                       ),
@@ -810,6 +859,99 @@ Future<int?> _tanyaRupiah({
             child: const Text('Simpan'),
           ),
         ],
+      );
+    },
+  );
+  controller.dispose();
+  return hasil;
+}
+
+/// Tanya jumlah barang lewat dialog: tombol cepat pecahan + isian manual.
+///
+/// Mengembalikan `null` kalau dibatalkan. Nilainya **tidak** dipotong di sini
+/// — pembatasan sesungguhnya ada di keranjang ([Satuan.batasi]), supaya angka
+/// yang diketik kasir tidak berubah diam-diam. Dialog hanya memberi tahu stok
+/// yang tersedia supaya kasir tahu batasnya sebelum menekan Simpan.
+Future<double?> _tanyaJumlah({
+  required BuildContext context,
+  required String nama,
+  required String unit,
+  required double nilaiAwal,
+  required double maksimum,
+}) async {
+  final pecahan = Satuan.bolehPecahan(unit);
+  final controller = TextEditingController(
+    text: nilaiAwal == 0 ? '' : Formatters.jumlah(nilaiAwal),
+  );
+  var nilai = nilaiAwal;
+
+  final hasil = await showDialog<double>(
+    context: context,
+    builder: (ctx) {
+      return StatefulBuilder(
+        builder: (ctx, setState) {
+          return AlertDialog(
+            title: Text('Jumlah $nama'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Tersedia ${Formatters.jumlah(maksimum)} $unit',
+                  style: const TextStyle(
+                    fontSize: 13,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    for (final v in Satuan.tombolCepat(unit))
+                      ChoiceChip(
+                        label: Text(Satuan.labelTombol(v)),
+                        selected: nilai == v,
+                        onSelected: (_) => setState(() {
+                          nilai = v;
+                          controller.text = Formatters.jumlah(v);
+                        }),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 14),
+                TextField(
+                  controller: controller,
+                  autofocus: true,
+                  keyboardType:
+                      const TextInputType.numberWithOptions(decimal: true),
+                  decoration: InputDecoration(
+                    suffixText: unit,
+                    hintText: pecahan ? 'mis. 0,5' : 'mis. 2',
+                    border: const OutlineInputBorder(),
+                  ),
+                  onChanged: (teks) {
+                    final n = Satuan.baca(teks);
+                    if (n != null) setState(() => nilai = n);
+                  },
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('Batal'),
+              ),
+              ElevatedButton(
+                onPressed: () {
+                  final n = Satuan.baca(controller.text);
+                  Navigator.pop(ctx, n ?? nilai);
+                },
+                child: const Text('Simpan'),
+              ),
+            ],
+          );
+        },
       );
     },
   );

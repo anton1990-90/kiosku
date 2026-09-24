@@ -1,3 +1,5 @@
+import '../../core/utils/angka.dart';
+
 /// Arah mutasi kas.
 class CashType {
   static const masuk = 'in';
@@ -212,7 +214,7 @@ class StockMovement {
   final int productId;
   final String productName;
   final String type; // in | out | adjust
-  final int quantity;
+  final double quantity;
   final int totalCost;
   final String? note;
   final String? refType;
@@ -258,7 +260,7 @@ class StockMovement {
       productId: (map['product_id'] as int?) ?? 0,
       productName: (map['product_name'] as String?) ?? '-',
       type: (map['type'] as String?) ?? 'in',
-      quantity: (map['quantity'] as int?) ?? 0,
+      quantity: Angka.jumlah(map['quantity']),
       totalCost: (map['total_cost'] as int?) ?? 0,
       note: map['note'] as String?,
       refType: map['ref_type'] as String?,

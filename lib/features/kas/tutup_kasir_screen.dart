@@ -146,10 +146,15 @@ class _TutupKasirScreenState extends ConsumerState<TutupKasirScreen> {
                 ListView(
                   padding: const EdgeInsets.fromLTRB(16, 16, 16, 40),
                   children: [
+                    // Kedua cabang WAJIB sama-sama menyebar (`...`). Kalau
+                    // yang satu menyebar dan yang lain tidak, `flutter
+                    // analyze` menolaknya: `List<Widget>` tidak bisa masuk ke
+                    // daftar yang isinya `Widget`. Ini menggagalkan build
+                    // v1.17.0 pertama.
                     if (state.adaSesiTerbuka)
                       ..._sesiBerjalan(state)
                     else
-                      _belumDibuka(state),
+                      ..._belumDibuka(state),
                     const SizedBox(height: 24),
                     const SectionTitle(
                       title: 'Riwayat hitung uang',

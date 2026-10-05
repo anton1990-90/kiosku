@@ -330,6 +330,54 @@ dikerjakan di sisi kode sebelum domain siap.
 
 ---
 
+## Perbaikan v1.22.0 — pemindai barcode menutup sebelum sempat memindai
+
+**Keluhan.** "Kamera terbuka pada saat scan langsung tertutup dan tidak ada data
+yang terscan" — di layar **Tambah Produk**.
+
+**Yang diperiksa lebih dulu, dan ternyata bukan penyebabnya.** Izin
+`android.permission.CAMERA` ada di manifest APK; pustaka `mobile_scanner`,
+`com.google.mlkit`, dan native lib untuk empat arsitektur ikut masuk ke APK;
+tombol scan di Kasir maupun di Tambah Produk tersambung; kolom `barcode` di
+tabel, model, dan repositori benar. Jadi tidak ada cacat di tingkat build — dan
+memeriksa itu lebih dulu mencegah perbaikan di tempat yang salah.
+
+**Penyebabnya urutan keputusan di layar itu sendiri.**
+`barcode_scanner_screen.dart` menutup layar pada deteksi **PERTAMA**, tanpa jeda
+sama sekali. Kamera hampir selalu melaporkan sesuatu dari frame-frame awal —
+barcode di rak sebelah, label di meja, atau pantulan layar sendiri — sehingga
+layarnya menutup sebelum pengguna sempat mengarahkan kamera. Ditambah tiga cacat
+lain yang ditemukan sekalian:
+
+- **Jeda tenang + syarat "baca dua kali".** Deteksi diabaikan selama 800 ms
+  sesudah kamera menyala, dan sebuah kode baru dipercaya kalau terbaca **dua kali
+  berturut-turut**. Ini mengikat satu hal yang mudah dilupakan:
+  `detectionSpeed` **harus** `normal`. Dengan `noDuplicates` bacaan yang sama
+  tidak akan pernah datang dua kali, sehingga tidak ada satu pun barcode yang
+  bisa lolos dan layarnya diam selamanya — tanpa galat, tanpa peringatan.
+- **`start()` ganda ditolak.** Dialog izin kamera membuat aplikasi ke latar lalu
+  kembali, dan penanganan "resumed" menyalakan kamera untuk kedua kali selagi
+  permintaan pertama masih berjalan; percobaan kedua itu mematikan kamera yang
+  baru menyala. Penjaganya membandingkan **controller**, bukan penanda
+  benar/salah, supaya penjaga milik controller lama tidak menghalangi yang baru
+  sesudah "Coba lagi".
+- **"Coba lagi" menyalakan kamera sesudah widget barunya terpasang.** Versi lama
+  memanggilnya langsung dari tombol, jadi controller baru menyala tanpa widget
+  yang memakainya — tombol penyelamat itu justru mengulang galat yang sama.
+- **Kegagalan saat memakai hasil scan ditampilkan.** `_serahkan` dulu dipanggil
+  tanpa penjaga, jadi satu galat apa pun membuat layarnya diam saja sesudah
+  barcode terbaca. Kode yang barusan gagal juga tidak dicoba ulang terus, supaya
+  pesan galatnya tidak berputar di layar.
+
+**Umpan balik yang tadinya tidak ada.** Kode yang sedang terbaca sekarang
+ditampilkan di layar (`Terbaca: 899…`), jadi terlihat apakah barcodenya terbaca,
+salah baca, atau tidak terbaca sama sekali.
+
+**Skema database tidak berubah** (tetap v12). Dijaga 22 asersi baru di
+`check_phase_e.py` bagian 30 dan 21 mutasi di `negatif_30.py`.
+
+---
+
 ## Catatan teknis untuk pengerjaan nanti
 
 Semua usulan di atas menambah tabel/kolom. Saat dokumen ini disusun semuanya

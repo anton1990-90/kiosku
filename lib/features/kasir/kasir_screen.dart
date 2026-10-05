@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -11,11 +12,13 @@ import '../../data/models/product_model.dart';
 import '../../data/models/sale_item_model.dart';
 import '../../data/models/sale_model.dart';
 import '../../data/models/user_model.dart';
+import '../../data/repositories/product_repository.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/cart_provider.dart';
 import '../../providers/payment_method_provider.dart';
 import '../../providers/product_provider.dart';
 import '../../providers/sale_provider.dart';
+import '../../shared/services/barcode_wedge.dart';
 import '../../shared/services/receipt_printer.dart';
 import '../../shared/widgets/shared_widgets.dart';
 import 'barcode_scanner_screen.dart';
@@ -32,16 +35,25 @@ class KasirScreen extends ConsumerStatefulWidget {
 class _KasirScreenState extends ConsumerState<KasirScreen> {
   final _searchController = TextEditingController();
 
+  /// Langganan hasil scanner barcode Bluetooth. Dibatalkan di [dispose] supaya
+  /// layar yang sudah ditutup tidak ikut menambahkan barang.
+  StreamSubscription<String>? _langgananScan;
+
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ref.read(productProvider.notifier).loadProducts();
     });
+
+    // Scanner barcode Bluetooth (mode HID) mengirim hasilnya lewat aliran ini,
+    // jadi kasir tidak perlu menekan tombol apa pun.
+    _langgananScan = BarcodeWedgeScanner.instance.hasil.listen(_terimaScan);
   }
 
   @override
   void dispose() {
+    _langgananScan?.cancel();
     _searchController.dispose();
     super.dispose();
   }
@@ -135,7 +147,7 @@ class _KasirScreenState extends ConsumerState<KasirScreen> {
     ref.read(cartProvider.notifier).setDiscount(hasil);
   }
 
-  /// Scan a product barcode and add it to the cart.
+  /// Scan a product barcode with the camera and add it to the cart.
   Future<void> _handleScan() async {
     final result = await Navigator.push<ProductModel>(
       context,
@@ -143,12 +155,52 @@ class _KasirScreenState extends ConsumerState<KasirScreen> {
     );
 
     if (result == null || !mounted) return;
+    _tambahkanKeKeranjang(result);
+  }
 
-    if (result.stock > 0) {
-      ref.read(cartProvider.notifier).addToCart(result);
+  /// Terima barcode dari scanner Bluetooth (mode HID).
+  ///
+  /// Kasir tinggal menembak, tanpa membuka kamera dan tanpa menyentuh layar.
+  /// Kolom pencarian dikosongkan karena penyaring ini sengaja tidak menelan
+  /// ketikan — kolom yang sedang difokuskan tetap menerimanya, jadi barcode
+  /// itu akan tertinggal di layar kalau tidak dibersihkan.
+  Future<void> _terimaScan(String kode) async {
+    if (!mounted) return;
+    // Layar ini bisa sudah tertutup lapisan lain (mis. dialog pembayaran);
+    // hanya layar yang sedang tampil yang boleh menambahkan barang.
+    if (ModalRoute.of(context)?.isCurrent != true) return;
+
+    _searchController.clear();
+    setState(() {});
+
+    final product = await ProductRepository().findByBarcode(kode);
+    if (!mounted) return;
+
+    if (product == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('${result.name} ditambahkan'),
+          content: Text('Barcode $kode belum terdaftar sebagai produk'),
+          backgroundColor: AppColors.warningMid,
+          behavior: SnackBarBehavior.floating,
+          duration: const Duration(seconds: 3),
+        ),
+      );
+      return;
+    }
+
+    _tambahkanKeKeranjang(product);
+  }
+
+  /// Masukkan produk ke keranjang, atau beri tahu kalau stoknya habis.
+  ///
+  /// Dipakai bersama oleh hasil kamera, hasil scanner Bluetooth, dan ketukan
+  /// pada kartu produk — dulu ketiganya menyalin aturan yang sama persis.
+  void _tambahkanKeKeranjang(ProductModel product) {
+    if (product.stock > 0) {
+      ref.read(cartProvider.notifier).addToCart(product);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('${product.name} ditambahkan'),
           backgroundColor: AppColors.success,
           behavior: SnackBarBehavior.floating,
           duration: const Duration(seconds: 1),
@@ -157,7 +209,7 @@ class _KasirScreenState extends ConsumerState<KasirScreen> {
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('${result.name} stok habis'),
+          content: Text('${product.name} stok habis'),
           backgroundColor: AppColors.danger,
           behavior: SnackBarBehavior.floating,
         ),
@@ -409,19 +461,7 @@ class _KasirScreenState extends ConsumerState<KasirScreen> {
               itemBuilder: (context, index) {
                 final product = filteredProducts[index];
                 return GestureDetector(
-                  onTap: () {
-                    if (product.stock > 0) {
-                      ref.read(cartProvider.notifier).addToCart(product);
-                    } else {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text('${product.name} stok habis'),
-                          backgroundColor: AppColors.danger,
-                          behavior: SnackBarBehavior.floating,
-                        ),
-                      );
-                    }
-                  },
+                  onTap: () => _tambahkanKeKeranjang(product),
                   child: Container(
                     decoration: BoxDecoration(
                       color: AppColors.bgCard,

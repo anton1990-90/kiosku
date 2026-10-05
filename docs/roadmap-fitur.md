@@ -378,6 +378,64 @@ salah baca, atau tidak terbaca sama sekali.
 
 ---
 
+## Fitur v1.23.0 — scanner barcode Bluetooth (mode HID)
+
+**Yang diminta.** "Bisa pakai alat scanner barcode yang Bluetooth" — untuk
+mengisi kolom barcode di **Tambah Produk** sekaligus memindai barang yang dijual
+di **Kasir**.
+
+**Kabar baiknya: tidak perlu pustaka baru sama sekali.** Scanner Bluetooth yang
+paling banyak dijual bekerja dalam mode **HID**: ke Android ia tampil sebagai
+keyboard fisik — alat itu "mengetik" digit barcode sangat cepat (biasanya
+5–30 ms antar karakter) lalu menutup dengan Enter. Jadi aplikasinya tidak
+memerlukan Bluetooth API apa pun, tidak ada izin baru, dan tidak ada layar
+penyambungan.
+
+Yang perlu ditegaskan, karena mudah salah arah: `flutter_blue_plus` yang sudah
+dipakai untuk printer termal **tidak bisa** dipakai di sini. Pustaka itu BLE
+(Bluetooth Low Energy), sedangkan scanner HID memakai Bluetooth Classic
+(BR/EDR). Karena itu tidak ada layar "cari alat scanner" — dan memang tidak
+seharusnya ada: alatnya dipasangkan sekali di Pengaturan Bluetooth Android, lalu
+berlaku untuk aplikasi apa pun.
+
+**Cara kerjanya.** Satu penyaring dipasang di `app.dart` untuk seluruh
+aplikasi. Pembedanya bukan isi tombol yang dikirim, melainkan **jeda antar
+karakter**: manusia mengetik dengan jeda ratusan milidetik, scanner jauh lebih
+rapat. Kumpulan karakter yang tersusun terlalu lambat dibuang, sehingga angka
+yang diketik manual tidak pernah terbaca sebagai hasil scan. Sebuah kode
+diterima kalau diakhiri Enter/Tab, atau — untuk scanner yang tidak dikonfigurasi
+mengirim Enter — kalau seluruhnya terbaca di bawah 300 ms dengan panjang
+sekurang-kurangnya 6 karakter. Syarat kedua sengaja jauh lebih ketat, karena
+tanpa penanda akhir tidak ada yang bisa dipercaya.
+
+Dua hal yang mudah terlewat, dan keduanya sudah dijaga asersi:
+
+- **Penanda akhir harus diperiksa sebelum karakter dibaca.** Karakter untuk
+  Enter adalah baris baru; kalau urutannya terbalik, baris baru itu ikut masuk
+  ke dalam barcode dan kodenya selalu ditolak — tanpa galat apa pun.
+- **Penerimanya tidak boleh merebut fokus.** Simpul fokus yang dipasang di atas
+  Navigator harus `canRequestFocus: false` dan `skipTraversal: true`; tanpa itu
+  kolom teks kehilangan fokus di **seluruh** aplikasi begitu app dibuka.
+
+**Perilaku di layar.** Di Tambah Produk, hasil scan mengisi kolom barcode dan
+memakai peringatan barcode ganda yang sama dengan jalur kamera — satu salinan
+aturan untuk kedua jalur, supaya keduanya tidak bisa menyimpang. Di Kasir, hasil
+scan langsung mencari produknya dan memasukkannya ke keranjang; kalau barcode
+belum terdaftar, **hanya muncul pesan** (tidak ada tawaran menambah barang baru,
+sesuai permintaan pemilik toko). Tombol kamera tetap ada di kedua layar sebagai
+cadangan kalau alatnya tidak dibawa.
+
+**Catatan pemasangan.** Alatnya dipasangkan di Pengaturan Bluetooth Android,
+bukan di dalam aplikasi. Kalau setelah dipasangkan scanner-nya tetap tidak
+membaca apa pun, kemungkinan besar alatnya disetel mode SPP (serial), bukan HID
+— dan itu pendekatan yang sama sekali berbeda karena memerlukan kode Bluetooth
+Classic native yang tidak tersedia di sini.
+
+**Skema database tidak berubah** (tetap v12). Dijaga 38 asersi baru di
+`check_phase_e.py` bagian 31 dan 39 mutasi di `negatif_31.py`.
+
+---
+
 ## Catatan teknis untuk pengerjaan nanti
 
 Semua usulan di atas menambah tabel/kolom. Saat dokumen ini disusun semuanya

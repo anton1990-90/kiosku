@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/constants/app_colors.dart';
@@ -9,6 +11,7 @@ import '../../data/models/supplier_model.dart';
 import '../../data/repositories/product_repository.dart';
 import '../../providers/product_provider.dart';
 import '../../providers/supplier_provider.dart';
+import '../../shared/services/barcode_wedge.dart';
 import '../../shared/services/product_photo_service.dart';
 import '../../shared/widgets/shared_widgets.dart';
 import '../kasir/barcode_scanner_screen.dart';
@@ -48,6 +51,10 @@ class _ProdukFormScreenState extends ConsumerState<ProdukFormScreen> {
   String _supplier = '';
   bool _saving = false;
 
+  /// Langganan hasil scanner barcode Bluetooth. Dibatalkan di [dispose] supaya
+  /// layar yang sudah ditutup tidak ikut menanggapi scan.
+  StreamSubscription<String>? _langgananScan;
+
   final _categories = ['Sembako', 'Minuman', 'Snack', 'Kebutuhan', 'Lainnya'];
   final _emojis = ['📦', '🍚', '🛢️', '🧂', '🥚', '🍜', '☕', '🥛', '🧴', '🧈', '🌾', '💧'];
   final _units = [
@@ -86,10 +93,15 @@ class _ProdukFormScreenState extends ConsumerState<ProdukFormScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ref.read(supplierProvider.notifier).loadSuppliers();
     });
+
+    // Scanner barcode Bluetooth (mode HID) mengisi kolom barcode yang sama
+    // seperti tombol kamera.
+    _langgananScan = BarcodeWedgeScanner.instance.hasil.listen(_terimaScan);
   }
 
   @override
   void dispose() {
+    _langgananScan?.cancel();
     _nameController.dispose();
     _costPriceController.dispose();
     _sellPriceController.dispose();
@@ -103,7 +115,28 @@ class _ProdukFormScreenState extends ConsumerState<ProdukFormScreen> {
   Future<void> _scanBarcode() async {
     final code = await BarcodeScannerScreen.scanRaw(context);
     if (code == null || !mounted) return;
+    await _pakaiBarcode(code);
+  }
 
+  /// Terima barcode dari scanner Bluetooth (mode HID).
+  ///
+  /// Hasilnya diperlakukan sama persis dengan hasil kamera — termasuk
+  /// peringatan barcode ganda — supaya kedua jalur tidak bisa berbeda aturan.
+  Future<void> _terimaScan(String kode) async {
+    if (!mounted) return;
+    // Layar ini bisa sudah tertutup lapisan lain; hanya layar yang sedang
+    // tampil yang boleh mengisi kolomnya.
+    if (ModalRoute.of(context)?.isCurrent != true) return;
+    await _pakaiBarcode(kode);
+  }
+
+  /// Isi kolom barcode, lalu ingatkan kalau barcode itu sudah dipakai.
+  ///
+  /// Dipakai bersama oleh jalur kamera dan jalur scanner Bluetooth: menyalin
+  /// logikanya ke dua tempat berarti keduanya bisa menyimpang tanpa ada yang
+  /// menandainya.
+  Future<void> _pakaiBarcode(String code) async {
+    if (!mounted) return;
     _barcodeController.text = code;
     setState(() {});
 

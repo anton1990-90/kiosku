@@ -25,6 +25,11 @@ import '../../data/repositories/product_repository.dart';
 ///     menutup pada deteksi PERTAMA, dan deteksi pertama sering datang sebelum
 ///     pengguna sempat mengarahkan kamera — gejalanya persis "kamera terbuka
 ///     lalu langsung tertutup, tidak ada yang terbaca".
+///   * Hasil yang sudah diserahkan menutup layar ini **sekali saja**. Kamera
+///     baru dilepas setelah animasi penutupannya selesai, jadi tanpa penjaga
+///     ini deteksi berikutnya memanggil `Navigator.pop` untuk kedua kalinya —
+///     dan yang tertutup adalah layar pemanggilnya. Gejalanya: "scan lalu
+///     langsung keluar dan kembali ke daftar produk", tanpa barcode terisi.
 ///   * `start()` tidak pernah dipanggil dua kali untuk controller yang sama.
 ///     Dialog izin kamera membuat aplikasi ke latar lalu kembali, dan penanganan
 ///     "resumed" bisa memanggil `start()` lagi tepat saat permintaan pertama
@@ -102,6 +107,18 @@ class _BarcodeScannerScreenState extends State<BarcodeScannerScreen>
   /// Kode yang barusan gagal dipakai. Diabaikan sampai kamera membaca kode
   /// lain, supaya pesan galatnya tidak berputar terus di layar.
   String? _kodeGagal;
+
+  /// Hasil sudah diserahkan ke layar pemanggil; layar ini sedang menutup.
+  ///
+  /// Kamera tidak langsung mati saat `Navigator.pop` dipanggil — ia baru
+  /// dilepas setelah animasi penutupannya selesai. Selama itu deteksi yang
+  /// sama terus berdatangan, dan karena penjaga "baca dua kali" sudah
+  /// terpenuhi, setiap deteksi berikutnya memanggil `Navigator.pop` SEKALI
+  /// LAGI. Yang tertutup saat itu bukan lagi layar ini, melainkan layar
+  /// pemanggilnya. Gejalanya: menekan "Scan" di Tambah Produk, memindai satu
+  /// barcode, lalu form-nya ikut tertutup dan kembali ke daftar produk tanpa
+  /// barcode terisi.
+  bool _selesai = false;
 
   @override
   void initState() {
@@ -215,7 +232,9 @@ class _BarcodeScannerScreenState extends State<BarcodeScannerScreen>
   // ------------------------------------------------------------ hasil scan
 
   Future<void> _onDetect(BarcodeCapture capture) async {
-    if (_isProcessing || !mounted) return;
+    // `_selesai` diperiksa paling awal: begitu hasilnya diserahkan, layar ini
+    // sedang menutup dan tidak boleh lagi memproses apa pun. Lihat [_selesai].
+    if (_isProcessing || _selesai || !mounted) return;
 
     final barcodes = capture.barcodes;
     if (barcodes.isEmpty) return;
@@ -269,11 +288,16 @@ class _BarcodeScannerScreenState extends State<BarcodeScannerScreen>
   }
 
   /// Satu pintu untuk hasil kamera maupun ketikan manual.
+  ///
+  /// `_selesai` dinyalakan SEBELUM `Navigator.pop`, bukan sesudahnya: sesudah
+  /// pop, kendali belum tentu kembali ke sini, dan sisa detik animasi penutupan
+  /// sudah cukup untuk satu deteksi lagi yang memanggil pop kedua.
   Future<void> _serahkan(String kode) async {
     if (!mounted) return;
 
     // Mode isi form: kembalikan barcode apa adanya, tanpa cari produk.
     if (widget.rawMode) {
+      _selesai = true;
       Navigator.pop(context, kode);
       return;
     }
@@ -281,6 +305,7 @@ class _BarcodeScannerScreenState extends State<BarcodeScannerScreen>
     final product = await _repo.findByBarcode(kode);
     if (!mounted) return;
     if (product != null) {
+      _selesai = true;
       Navigator.pop(context, product);
       return;
     }

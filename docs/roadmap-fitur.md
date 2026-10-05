@@ -436,6 +436,46 @@ Classic native yang tidak tersedia di sini.
 
 ---
 
+## Perbaikan v1.24.0 — hasil scan menutup form produknya sendiri
+
+**Gejala yang dilaporkan.** "Scan barang untuk input tidak bisa. Ketika scan,
+kamera HP terbuka lalu scan barcode, langsung keluar dan ke halaman utama
+produk." Barcodenya tidak pernah sampai ke kolom isian.
+
+**Sebabnya: `Navigator.pop` dipanggil dua kali, dan yang kedua mengenai form.**
+
+Layar pemindai tidak langsung dilepas saat `Navigator.pop` dipanggil — kamera
+baru dimatikan setelah animasi penutupannya selesai, sekitar 0,3 detik. Selama
+itu deteksi yang sama terus berdatangan, dan penjaga "kode harus terbaca dua
+kali" dari v1.22.0 **sudah terpenuhi**; karena itu setiap deteksi berikutnya
+lolos penjaga tersebut dan memanggil `Navigator.pop` sekali lagi.
+
+Pop kedua tidak mengenai layar pemindai, sebab `NavigatorState.pop` memilih
+rute dengan `_history.lastWhere(isPresentPredicate)` — dan rute yang sedang
+menutup sudah tidak lagi dihitung "hadir". Jadi yang tertutup adalah **form
+produknya**. Itu juga sebabnya barcode-nya tidak pernah terisi: `await` di
+`_scanBarcode()` memang selesai dengan barcode yang benar, tetapi layarnya sudah
+tidak terpasang lagi, sehingga penjaga `!mounted` membuang hasilnya.
+
+Perhatikan bahwa v1.22.0-lah yang membuat ini hampir pasti terjadi. Sebelum
+penjaga "baca dua kali" ada, layar menutup pada deteksi pertama dan tidak ada
+keadaan penjaga yang tertinggal. Sesudahnya, `_kodeTerakhir` dan `_berapaKali`
+**tidak pernah direset setelah berhasil** — jadi begitu satu kode diterima,
+setiap frame berikutnya dengan kode yang sama langsung memicu penyerahan ulang.
+
+**Perbaikan.** Penanda `_selesai` dinyalakan **sebelum** `Navigator.pop`
+dipanggil, dan `_onDetect` berhenti lebih awal begitu penanda itu menyala.
+Dipasang sebelum pop, bukan sesudah, karena sesudah pop kendali belum tentu
+kembali ke baris berikutnya. Penandanya juga tidak boleh dimatikan lagi.
+
+Perbaikannya berlaku untuk kedua mode sekaligus: di Kasir pop kedua akan
+menutup layar Kasir, jadi gejalanya sama-sama muncul di sana.
+
+**Skema database tidak berubah** (tetap v12). Dijaga 9 asersi baru di
+`check_phase_e.py` bagian 32 dan 9 mutasi di `negatif_32.py`.
+
+---
+
 ## Catatan teknis untuk pengerjaan nanti
 
 Semua usulan di atas menambah tabel/kolom. Saat dokumen ini disusun semuanya

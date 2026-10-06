@@ -417,13 +417,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                     mainAxisExtent: 108,
                   ),
                   children: [
-                    QuickAction(
-                      icon: Icons.receipt_long,
-                      iconColor: AppColors.primary,
-                      iconBgColor: AppColors.primaryLight,
-                      label: 'Transaksi',
-                      onTap: () => context.go('/kasir'),
-                    ),
+
                     // Menambah stok dan membuka laporan adalah pekerjaan
                     // pemilik toko, bukan kasir. Rutenya juga ditolak router.
                     if (authState.isOwner)

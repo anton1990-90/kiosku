@@ -10,6 +10,7 @@ masih generik, jadi skrip ini merapikannya untuk TokoKu:
   * mengganti applicationId dari com.example.tokoku menjadi applicationId asli
   * memindahkan MainActivity ke package yang sesuai
   * memasang release signing dari variabel lingkungan KEYSTORE_*
+  * menyalin ikon kustom dari tools/icon/ ke folder android/app/src/main/res/mipmap-*
 
 Jalankan tanpa argumen dari akar repo. Kalau variabel KEYSTORE_PASSWORD tidak
 ada, langkah signing dilewati dan APK ditandatangani debug key (hanya untuk uji).
@@ -286,6 +287,75 @@ def move_main_activity():
         notes.append("MainActivity: folder java/com/example dihapus")
 
 
+# Pemetaan nama file ikon (tanpa .png) ke subfolder mipmap Android.
+# Ikon disimpan di tools/icon/ dan disalin saat CI ke res/mipmap-*/ic_launcher.png.
+ICON_SIZES = [
+    ("mipmap-mdpi",     "mipmap-mdpi"),
+    ("mipmap-hdpi",     "mipmap-hdpi"),
+    ("mipmap-xhdpi",    "mipmap-xhdpi"),
+    ("mipmap-xxhdpi",   "mipmap-xxhdpi"),
+    ("mipmap-xxxhdpi",  "mipmap-xxxhdpi"),
+]
+
+
+def install_icon():
+    """Salin ikon kustom TokoKu ke folder android/app/src/main/res/mipmap-*.
+
+    flutter create menghasilkan ikon Flutter bawaan (kupu-kupu biru). Fungsi
+    ini menggantinya dengan logo TokoKu dari tools/icon/ supaya APK yang
+    dihasilkan CI sudah memakai ikon yang benar tanpa langkah manual.
+
+    Kalau folder tools/icon/ tidak ada (mis. repo di-clone baru dan belum ada
+    gambar), langkah ini dilewati dan bukan dianggap fatal — ikon bawaan Flutter
+    tidak rusak, hanya kurang pas tampilannya.
+    """
+    icon_src_dir = Path("tools") / "icon"
+    if not icon_src_dir.exists():
+        notes.append("icon: folder tools/icon/ tidak ditemukan, dilewati")
+        return
+
+    res_dir = Path("android/app/src/main/res")
+    dipasang = 0
+    for size_name, mipmap_folder in ICON_SIZES:
+        # Cari file sumber: lebih dulu _launcher variant, lalu generic.
+        src_launcher = icon_src_dir / (size_name + "_launcher.png")
+        src_generic  = icon_src_dir / (size_name + ".png")
+        src = src_launcher if src_launcher.exists() else (src_generic if src_generic.exists() else None)
+        if src is None:
+            notes.append(f"icon: {size_name}.png tidak ditemukan, dilewati")
+            continue
+
+        dest_dir = res_dir / mipmap_folder
+        dest_dir.mkdir(parents=True, exist_ok=True)
+
+        # ic_launcher.png
+        shutil.copy2(src, dest_dir / "ic_launcher.png")
+
+        # ic_launcher_round.png — cari versi round khusus, fallback ke yang sama
+        src_round = icon_src_dir / (size_name + "_launcher_round.png")
+        shutil.copy2(src_round if src_round.exists() else src, dest_dir / "ic_launcher_round.png")
+
+        dipasang += 1
+
+    notes.append(f"icon: {dipasang} ukuran ic_launcher dipasang dari tools/icon/")
+
+    # Pastikan android:roundIcon terdaftar di AndroidManifest — template lama
+    # terkadang melewatinya dan launcher Android menampilkan ikon persegi.
+    manifest_path = "android/app/src/main/AndroidManifest.xml"
+    if Path(manifest_path).exists():
+        content = read(manifest_path)
+        if 'android:roundIcon' not in content:
+            content = content.replace(
+                'android:icon="@mipmap/ic_launcher"',
+                'android:icon="@mipmap/ic_launcher" android:roundIcon="@mipmap/ic_launcher_round"',
+                1,
+            )
+            write(manifest_path, content)
+            notes.append("icon: android:roundIcon ditambahkan ke AndroidManifest")
+        else:
+            notes.append("icon: android:roundIcon sudah ada, dilewati")
+
+
 def main():
     if not Path("android").exists():
         print("ERROR: folder android/ belum ada. Jalankan `flutter create . --platforms android` dulu.")
@@ -294,6 +364,7 @@ def main():
     patch_manifest()
     patch_gradle()
     move_main_activity()
+    install_icon()
 
     print("=" * 60)
     for n in notes:

@@ -1,4 +1,4 @@
-# TokoKu — Aplikasi UMKM Toko Sembako & Penjualan (v1.19.0)
+# TokoKu — Aplikasi UMKM Toko Sembako & Penjualan (v1.25.0)
 
 Aplikasi mobile cross-platform (Android & iOS) untuk toko sembako UMKM. Dibuat dengan Flutter, bekerja **offline-first** dengan autentikasi email.
 
@@ -26,6 +26,11 @@ Aplikasi mobile cross-platform (Android & iOS) untuk toko sembako UMKM. Dibuat d
 - **Data pelanggan**: Buku pelanggan yang bisa ditambah, diedit, dan dihapus — nama, nomor HP, alamat, dan catatan. Tiap pelanggan menampilkan **sisa piutang** dan **total belanjanya**, dan nomor HP-nya bisa langsung dibuka di WhatsApp. Piutang dari nota kasir maupun yang dicatat manual otomatis terhubung ke pelanggannya, dan nama yang belum ada di buku akan ditambahkan sendiri. Nama pelanggan tetap terekam apa adanya di setiap nota, jadi mengganti namanya **tidak mengubah struk dan laporan yang sudah terbit** — dan menghapus pelanggan **tidak menghapus riwayat transaksinya**.
 - **Catatan**: Catatan bebas berwarna untuk pemilik toko, bisa disematkan (pin).
 - **Profile**: Logo usaha bisa diganti dari galeri, info toko, metode pembayaran yang bisa diaktifkan/dinonaktifkan, daftar supplier dan **daftar pelanggan** yang bisa diedit, serta pintasan ke **Kas** dan **Laporan Keuangan**.
+- **Kategori & satuan produk bisa diketik bebas**: Tidak terbatas pilihan bawaan — pemilik toko bisa mengetik kategori atau satuan baru langsung di form produk. Satuan yang sudah pernah dipakai muncul sebagai saran otomatis.
+- **Produk & Jasa dipisah**: Tombol Tambah menampilkan pilihan "Barang Fisik" atau "Jasa/Layanan". Jasa tidak punya stok fisik dan tidak membutuhkan satuan bijian. Opsi ini bisa disembunyikan dari menu ⋮ kalau toko tidak menjual jasa. Setelah menyimpan barang fisik, form langsung kosong siap input barang berikutnya.
+- **Kalkulator HPP**: Ikon kalkulator di kolom Harga Modal membuka layar Kalkulator HPP — masukkan biaya bahan, tenaga kerja, dan overhead beserta jumlah produk yang dihasilkan, lalu tekan "Gunakan Nilai Ini" untuk mengisi harga modal otomatis.
+- **Harga Grosir otomatis**: Setiap produk bisa punya harga grosir dan minimum pembelian grosir. Di kasir, begitu jumlah barang dalam keranjang mencapai atau melebihi minimum grosir, harga langsung beralih ke harga grosir secara otomatis dan badge **"Harga Grosir"** muncul di item keranjang. Harga efektif (bukan harga label) yang masuk ke nota, laporan, dan laba.
+- **Tanggal kedaluwarsa**: Setiap produk fisik bisa diisi tanggal kedaluwarsa lewat date picker. Di daftar produk muncul badge **"Akan Kedaluwarsa"** (kuning, ≤ 30 hari) atau **"Sudah Kedaluwarsa"** (merah) supaya pemilik toko tidak lupa barang yang hampir atau sudah kadaluarsa. Kolom kedaluwarsa ikut masuk ke ekspor CSV/backup.
 - **Lisensi & pembaruan**: Aktivasi satu perangkat, plus notifikasi otomatis saat ada versi baru.
 
 ## Prasyarat

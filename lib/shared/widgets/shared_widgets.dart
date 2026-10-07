@@ -557,7 +557,7 @@ class ProductIcon extends StatelessWidget {
               File(photoPath!),
               width: size,
               height: size,
-              fit: BoxFit.cover,
+              fit: BoxFit.contain,
               // Berkas rusak di tengah jalan tidak boleh memunculkan kotak
               // galat di tengah daftar barang.
               errorBuilder: (context, error, stackTrace) => Center(

@@ -28,9 +28,9 @@ class ProductPhotoService {
   /// Mengembalikan path berkas baru, atau `null` kalau pemilik membatalkan
   /// pilihan. Resolusi dikecilkan ke 720 px supaya tidak memakan ruang
   /// penyimpanan dan tetap tajam di daftar barang maupun di kasir.
-  Future<String?> pilihDanSimpan() async {
+  Future<String?> pilihDanSimpan({ImageSource source = ImageSource.gallery}) async {
     final picked = await _picker.pickImage(
-      source: ImageSource.gallery,
+      source: source,
       maxWidth: 720,
       maxHeight: 720,
       imageQuality: 85,

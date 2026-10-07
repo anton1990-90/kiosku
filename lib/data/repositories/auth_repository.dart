@@ -240,6 +240,30 @@ class AuthRepository {
     return terpengaruh > 0;
   }
 
+  /// Menghapus akun secara permanen.
+  /// 
+  /// Akan ditolak jika akun sudah memiliki riwayat transaksi (terhalang kunci asing).
+  /// Dalam kasus itu, solusi yang diizinkan hanya menonaktifkan akun.
+  Future<void> deleteUser(int userId) async {
+    await _tolakKalauPemilikTerakhir(
+      userId,
+      aksi: 'menghapus akun ini',
+    );
+
+    final db = await _db.database;
+    try {
+      await db.delete('users', where: 'id = ?', whereArgs: [userId]);
+    } catch (e) {
+      if (e.toString().contains('FOREIGN KEY')) {
+        throw Exception(
+          'Tidak bisa dihapus karena akun ini sudah membuat transaksi penjualan '
+          'di masa lalu. Silakan gunakan opsi "Nonaktifkan" saja.',
+        );
+      }
+      throw Exception('Gagal menghapus pengguna.');
+    }
+  }
+
   // ------------------------------------------------------------- PIN akun
 
   /// Apakah ada akun **aktif** yang sudah memasang PIN.

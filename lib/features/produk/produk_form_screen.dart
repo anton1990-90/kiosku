@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:image_picker/image_picker.dart';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -201,8 +202,10 @@ class _ProdukFormScreenState extends ConsumerState<ProdukFormScreen> {
   /// Foto lama dihapus setelah foto baru berhasil dipilih, supaya berkas tidak
   /// menumpuk di penyimpanan. Kalau pemilik membatalkan pilihan, tidak ada
   /// yang berubah.
-  Future<void> _pilihFoto() async {
-    final baru = await ProductPhotoService.instance.pilihDanSimpan();
+  Future<void> _pilihFoto(bool fromCamera) async {
+    final baru = await ProductPhotoService.instance.pilihDanSimpan(
+      source: fromCamera ? ImageSource.camera : ImageSource.gallery,
+    );
     if (baru == null || !mounted) return;
 
     final lama = _photoPath;
@@ -377,28 +380,22 @@ class _ProdukFormScreenState extends ConsumerState<ProdukFormScreen> {
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
                         OutlinedButton.icon(
-                          onPressed: _pilihFoto,
-                          icon: const Icon(Icons.photo_library_outlined,
-                              size: 18),
-                          label: Text(
-                            _photoPath == null
-                                ? 'Pilih dari galeri'
-                                : 'Ganti foto',
-                          ),
+                          onPressed: () => _pilihFoto(false),
+                          icon: const Icon(Icons.photo_library_outlined, size: 18),
+                          label: const Text('Pilih dari galeri'),
+                        ),
+                        const SizedBox(height: 6),
+                        OutlinedButton.icon(
+                          onPressed: () => _pilihFoto(true),
+                          icon: const Icon(Icons.camera_alt_outlined, size: 18),
+                          label: const Text('Ambil foto (Kamera)'),
                         ),
                         if (_photoPath != null) ...[
                           const SizedBox(height: 6),
                           TextButton.icon(
                             onPressed: _hapusFoto,
-                            icon: const Icon(
-                              Icons.delete_outline,
-                              size: 18,
-                              color: AppColors.dangerMid,
-                            ),
-                            label: const Text(
-                              'Hapus foto',
-                              style: TextStyle(color: AppColors.dangerMid),
-                            ),
+                            icon: const Icon(Icons.delete_outline, size: 18, color: AppColors.dangerMid),
+                            label: const Text('Hapus foto', style: TextStyle(color: AppColors.dangerMid)),
                           ),
                         ],
                       ],
@@ -407,48 +404,9 @@ class _ProdukFormScreenState extends ConsumerState<ProdukFormScreen> {
                 ],
               ),
               const SizedBox(height: 6),
-              Text(
-                _photoPath == null
-                    ? 'Belum ada foto. Barang memakai emoji di bawah — pilih '
-                        'salah satu, atau ambil foto dari galeri HP.'
-                    : 'Foto ini akan tampil di daftar barang, kasir, dan '
-                        'peringatan stok.',
-                style: const TextStyle(
-                  fontSize: 11,
-                  color: AppColors.textTertiary,
-                  height: 1.4,
-                ),
-              ),
-              const SizedBox(height: 12),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: _emojis.map((e) {
-                  // Emoji ditandai terpilih hanya kalau tidak ada foto, supaya
-                  // pemilik tidak bingung mana yang sebenarnya berlaku.
-                  final isSelected = _photoPath == null && _emoji == e;
-                  return GestureDetector(
-                    onTap: () => setState(() => _emoji = e),
-                    child: Container(
-                      width: 44,
-                      height: 44,
-                      decoration: BoxDecoration(
-                        color: isSelected
-                            ? AppColors.primaryLight
-                            : AppColors.bgCard,
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(
-                          color: isSelected
-                              ? AppColors.primary
-                              : AppColors.border,
-                        ),
-                      ),
-                      child: Center(
-                        child: Text(e, style: const TextStyle(fontSize: 20)),
-                      ),
-                    ),
-                  );
-                }).toList(),
+              const Text(
+                'Foto ini akan tampil di daftar barang, kasir, dan peringatan stok.',
+                style: TextStyle(fontSize: 11, color: AppColors.textTertiary, height: 1.4),
               ),
               const SizedBox(height: 16),
               TextFormField(

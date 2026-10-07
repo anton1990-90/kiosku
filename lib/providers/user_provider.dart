@@ -123,6 +123,19 @@ class UserNotifier extends StateNotifier<UserState> {
     }
   }
 
+  /// Menghapus akun.
+  Future<bool> hapus(int userId) async {
+    state = state.copyWith(isLoading: true, error: null);
+    try {
+      await _repo.deleteUser(userId);
+      await _segarkan();
+      return true;
+    } catch (e) {
+      state = state.copyWith(isLoading: false, error: _pesan(e));
+      return false;
+    }
+  }
+
   void bersihkanError() {
     state = state.copyWith(error: null);
   }

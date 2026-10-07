@@ -264,6 +264,11 @@ class _UserScreenState extends ConsumerState<UserScreen> {
                   value: 'hapus-pin',
                   child: Text('Hapus PIN'),
                 ),
+              const PopupMenuDivider(),
+              const PopupMenuItem(
+                value: 'hapus',
+                child: Text('Hapus akun', style: TextStyle(color: AppColors.dangerMid)),
+              ),
             ],
           ),
         ],
@@ -334,6 +339,18 @@ class _UserScreenState extends ConsumerState<UserScreen> {
 
       case 'pin':
         await _bukaAturPin(akun);
+
+      case 'hapus':
+        final yakin = await _konfirmasi(
+          judul: 'Hapus akun ini?',
+          isi: '"${akun.email}" akan dihapus permanen. Aksi ini tidak bisa dibatalkan.',
+        );
+        if (yakin != true) return;
+        await _jalankan(
+          () => ref.read(userProvider.notifier).hapus(id),
+          'Akun ${akun.email} berhasil dihapus.',
+        );
+        return;
 
       case 'hapus-pin':
         final yakin = await _konfirmasi(

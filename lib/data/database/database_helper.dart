@@ -807,36 +807,7 @@ class DatabaseHelper {
   }
 
   Future<void> _seedProducts(Database db) async {
-    final now = DateTime.now().toIso8601String();
-    final products = [
-      ['Beras Premium 5kg', 'Sembako', 55000, 65000, 24, 5, 'PT Cap Ayam', '🍚', '8991002101234'],
-      ['Minyak Goreng 2L', 'Sembako', 32000, 38000, 12, 5, 'PT Indofood', '🛢️', '8991002101235'],
-      ['Gula Pasir 1kg', 'Sembako', 13000, 16000, 3, 5, 'PT Indofood', '🧂', '8991002101236'],
-      ['Telur Ayam 1kg', 'Sembako', 24000, 28000, 18, 5, null, '🥚', '8991002101237'],
-      ['Mie Instan (isi 10)', 'Snack', 28000, 34000, 40, 10, 'PT Indofood', '🍜', '8991002101238'],
-      ['Kopi Sachet (isi 10)', 'Minuman', 14000, 18000, 22, 5, null, '☕', '8991002101239'],
-      ['Susu Kental Manis', 'Minuman', 9000, 11000, 15, 5, null, '🥛', '8991002101240'],
-      ['Sabun Mandi', 'Kebutuhan', 3500, 4500, 0, 10, 'PT Unilever', '🧴', '8991002101241'],
-      ['Mentega 200g', 'Kebutuhan', 12000, 14500, 2, 5, 'PT Blue Band', '🧈', '8991002101242'],
-      ['Garam 1kg', 'Sembako', 3000, 4500, 20, 5, null, '🧂', '8991002101243'],
-      ['Tepung Terigu 1kg', 'Sembako', 10000, 13000, 8, 5, null, '🌾', '8991002101244'],
-      ['Air Mineral 600ml', 'Minuman', 2000, 3500, 50, 10, null, '💧', '8991002101245'],
-    ];
-
-    for (final p in products) {
-      await db.insert('products', {
-        'name': p[0] as String,
-        'category': p[1] as String,
-        'cost_price': p[2] as int,
-        'sell_price': p[3] as int,
-        'stock': Angka.jumlah(p[4]),
-        'min_stock': Angka.jumlah(p[5]),
-        'supplier': p[6],
-        'emoji': p[7] as String,
-        'barcode': p[8] as String,
-        'created_at': now,
-        'updated_at': now,
-      });
-    }
+    // Sengaja dikosongkan agar pengguna baru melihat aplikasi kosong
+    // tanpa data contoh/dummy.
   }
 }

@@ -38,6 +38,10 @@ class _ProdukFormScreenState extends ConsumerState<ProdukFormScreen> {
   final _stockController = TextEditingController();
   final _minStockController = TextEditingController();
   final _barcodeController = TextEditingController();
+  final _wholesaleMinQtyController = TextEditingController();
+  final _wholesalePriceController = TextEditingController();
+
+  DateTime? _expiredDate;
 
   String _category = 'Sembako';
   String _emoji = '📦';
@@ -103,6 +107,13 @@ class _ProdukFormScreenState extends ConsumerState<ProdukFormScreen> {
       _unit = p.unit;
       _photoPath = p.photoPath;
       _supplier = p.supplier ?? '';
+      _wholesaleMinQtyController.text = p.wholesaleMinQty?.toString() ?? '';
+      _wholesalePriceController.text = p.wholesalePrice?.toString() ?? '';
+      if (p.expiredDate != null && p.expiredDate!.isNotEmpty) {
+        try {
+          _expiredDate = DateTime.parse(p.expiredDate!);
+        } catch (_) {}
+      }
     } else if (_isService) {
       _category = 'Jasa';
       _unit = 'kali';
@@ -149,6 +160,8 @@ class _ProdukFormScreenState extends ConsumerState<ProdukFormScreen> {
     _stockController.dispose();
     _minStockController.dispose();
     _barcodeController.dispose();
+    _wholesaleMinQtyController.dispose();
+    _wholesalePriceController.dispose();
     super.dispose();
   }
 
@@ -302,6 +315,9 @@ class _ProdukFormScreenState extends ConsumerState<ProdukFormScreen> {
       emoji: _emoji,
       unit: _unit,
       photoPath: _photoPath,
+      wholesaleMinQty: int.tryParse(_wholesaleMinQtyController.text.trim()),
+      wholesalePrice: int.tryParse(_wholesalePriceController.text.trim()),
+      expiredDate: _expiredDate?.toIso8601String(),
       createdAt: widget.product?.createdAt ?? DateTime.now(),
       updatedAt: DateTime.now(),
     );
@@ -332,9 +348,12 @@ class _ProdukFormScreenState extends ConsumerState<ProdukFormScreen> {
       _stockController.clear();
       _minStockController.clear();
       _barcodeController.clear();
+      _wholesaleMinQtyController.clear();
+      _wholesalePriceController.clear();
       setState(() {
         _saving = false;
         _photoPath = null;
+        _expiredDate = null;
         _emoji = '📦';
       });
     } else {
@@ -622,6 +641,35 @@ class _ProdukFormScreenState extends ConsumerState<ProdukFormScreen> {
                     ),
                   );
                 }),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Expanded(
+                    flex: 1,
+                    child: TextFormField(
+                      controller: _wholesaleMinQtyController,
+                      keyboardType: TextInputType.number,
+                      decoration: const InputDecoration(
+                        labelText: 'Min. Qty Grosir',
+                        hintText: 'Opsional (Misal: 5)',
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    flex: 2,
+                    child: TextFormField(
+                      controller: _wholesalePriceController,
+                      keyboardType: TextInputType.number,
+                      decoration: const InputDecoration(
+                        labelText: 'Harga Grosir',
+                        prefixText: 'Rp ',
+                        hintText: 'Opsional',
+                      ),
+                    ),
+                  ),
+                ],
+              ),
               const SizedBox(height: 8),
               if (!_isService) ...[
                 Row(
@@ -649,6 +697,46 @@ class _ProdukFormScreenState extends ConsumerState<ProdukFormScreen> {
                         decoration: const InputDecoration(
                           labelText: 'Min. stok',
                           hintText: '5',
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: InkWell(
+                        onTap: () async {
+                          final picked = await showDatePicker(
+                            context: context,
+                            initialDate: _expiredDate ?? DateTime.now().add(const Duration(days: 30)),
+                            firstDate: DateTime.now(),
+                            lastDate: DateTime.now().add(const Duration(days: 365 * 10)),
+                          );
+                          if (picked != null) {
+                            setState(() => _expiredDate = picked);
+                          }
+                        },
+                        child: InputDecorator(
+                          decoration: InputDecoration(
+                            labelText: 'Tanggal Kedaluwarsa',
+                            hintText: 'Opsional',
+                            suffixIcon: _expiredDate != null
+                                ? IconButton(
+                                    icon: const Icon(Icons.clear, size: 20),
+                                    onPressed: () => setState(() => _expiredDate = null),
+                                  )
+                                : const Icon(Icons.calendar_today_outlined, size: 20),
+                          ),
+                          child: Text(
+                            _expiredDate == null
+                                ? 'Tidak diatur'
+                                : Formatters.tanggalPendek(_expiredDate!),
+                            style: TextStyle(
+                              color: _expiredDate == null ? AppColors.textTertiary : AppColors.textPrimary,
+                            ),
+                          ),
                         ),
                       ),
                     ),

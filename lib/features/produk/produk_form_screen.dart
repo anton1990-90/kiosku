@@ -58,7 +58,7 @@ class _ProdukFormScreenState extends ConsumerState<ProdukFormScreen> {
 
   List<String> _categories = ['Sembako', 'Minuman', 'Snack', 'Kebutuhan', 'Lainnya'];
   final _emojis = ['📦', '🍚', '🛢️', '🧂', '🥚', '🍜', '☕', '🥛', '🧴', '🧈', '🌾', '💧'];
-  final _units = [
+  List<String> _units = [
     'pcs',
     'kg',
     'gram',
@@ -69,6 +69,11 @@ class _ProdukFormScreenState extends ConsumerState<ProdukFormScreen> {
     'sachet',
     'dus',
     'karton',
+    'kali',
+    'jam',
+    'hari',
+    'paket',
+    'orang',
   ];
 
   bool get isEditing => widget.product != null;
@@ -99,6 +104,17 @@ class _ProdukFormScreenState extends ConsumerState<ProdukFormScreen> {
     ProductRepository().getCategories().then((cats) {
       if (mounted && cats.isNotEmpty) {
         setState(() => _categories = cats);
+      }
+    });
+
+    // Ambil semua satuan unik yang pernah dipakai sebelumnya.
+    ProductRepository().getUnits().then((units) {
+      if (mounted && units.isNotEmpty) {
+        setState(() {
+          for (var u in units) {
+            if (!_units.contains(u)) _units.add(u);
+          }
+        });
       }
     });
 
@@ -297,13 +313,6 @@ class _ProdukFormScreenState extends ConsumerState<ProdukFormScreen> {
     ];
 
     // Satuan produk lama bisa saja di luar daftar baku (misalnya diisi dari
-    // perangkat lain), jadi nilainya selalu disisipkan. Tanpa itu dropdown
-    // tampil kosong, karena `DropdownButtonFormField` tidak menampilkan item
-    // yang tidak ada di daftarnya.
-    final satuanTersedia = <String>[
-      ..._units,
-      if (!_units.contains(_unit)) _unit,
-    ];
 
     return Scaffold(
       backgroundColor: AppColors.bgPage,
@@ -459,13 +468,31 @@ class _ProdukFormScreenState extends ConsumerState<ProdukFormScreen> {
                   ),
                   const SizedBox(width: 12),
                   Expanded(
-                    child: DropdownButtonFormField<String>(
-                      value: _unit,
-                      decoration: const InputDecoration(labelText: 'Satuan'),
-                      items: satuanTersedia
-                          .map((u) => DropdownMenuItem(value: u, child: Text(u)))
-                          .toList(),
-                      onChanged: (v) => setState(() => _unit = v ?? 'pcs'),
+                    child: Autocomplete<String>(
+                      initialValue: TextEditingValue(text: _unit),
+                      optionsBuilder: (TextEditingValue textEditingValue) {
+                        if (textEditingValue.text.isEmpty) {
+                          return _units;
+                        }
+                        return _units.where((String option) {
+                          return option.toLowerCase().contains(textEditingValue.text.toLowerCase());
+                        });
+                      },
+                      onSelected: (String selection) {
+                        setState(() => _unit = selection);
+                      },
+                      fieldViewBuilder: (context, controller, focusNode, onFieldSubmitted) {
+                        if (isEditing && controller.text.isEmpty && _unit.isNotEmpty) {
+                          controller.text = _unit;
+                        }
+                        return TextFormField(
+                          controller: controller,
+                          focusNode: focusNode,
+                          decoration: const InputDecoration(labelText: 'Satuan'),
+                          onChanged: (v) => setState(() => _unit = v.trim()),
+                          validator: (v) => v == null || v.trim().isEmpty ? 'Wajib' : null,
+                        );
+                      },
                     ),
                   ),
                 ],

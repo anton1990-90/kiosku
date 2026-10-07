@@ -211,6 +211,15 @@ class ProductRepository {
     return results.map((m) => m['category'] as String).toList();
   }
 
+  /// Get distinct units (satuan).
+  Future<List<String>> getUnits() async {
+    final db = await _db.database;
+    final results = await db.rawQuery(
+      'SELECT DISTINCT unit FROM products WHERE unit != "" ORDER BY unit ASC',
+    );
+    return results.map((m) => m['unit'] as String).toList();
+  }
+
   /// Get stock summary counts.
   Future<({int ok, int low, int out})> getStockSummary() async {
     final db = await _db.database;

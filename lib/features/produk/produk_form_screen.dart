@@ -734,7 +734,7 @@ class _ProdukFormScreenState extends ConsumerState<ProdukFormScreen> {
                                 ? 'Tidak diatur'
                                 : Formatters.tanggalPendek(_expiredDate!),
                             style: TextStyle(
-                              color: _expiredDate == null ? AppColors.textTertiary : AppColors.textPrimary,
+                              color: _expiredDate == null ? AppColors.textTertiary : AppColors.textMain,
                             ),
                           ),
                         ),

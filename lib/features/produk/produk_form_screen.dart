@@ -16,13 +16,15 @@ import '../../shared/services/barcode_wedge.dart';
 import '../../shared/services/product_photo_service.dart';
 import '../../shared/widgets/shared_widgets.dart';
 import '../kasir/barcode_scanner_screen.dart';
+import 'hpp_calculator_screen.dart';
 
 /// Produk form — tambah atau edit produk.
 /// Barcode bisa diisi manual atau diambil langsung dari hasil scan kamera.
 class ProdukFormScreen extends ConsumerStatefulWidget {
   final ProductModel? product;
+  final bool isService;
 
-  const ProdukFormScreen({super.key, this.product});
+  const ProdukFormScreen({super.key, this.product, this.isService = false});
 
   @override
   ConsumerState<ProdukFormScreen> createState() => _ProdukFormScreenState();
@@ -78,11 +80,18 @@ class _ProdukFormScreenState extends ConsumerState<ProdukFormScreen> {
 
   bool get isEditing => widget.product != null;
 
+  late bool _isService;
+
   @override
   void initState() {
     super.initState();
+    _isService = widget.isService;
+
     if (widget.product != null) {
       final p = widget.product!;
+      // Kenali otomatis sebagai jasa jika stok yang disetel sangat besar (>= 99.000)
+      if (p.stock >= 99000) _isService = true;
+
       _nameController.text = p.name;
       _category = p.category;
       _costPriceController.text = p.costPrice.toString();
@@ -94,7 +103,15 @@ class _ProdukFormScreenState extends ConsumerState<ProdukFormScreen> {
       _unit = p.unit;
       _photoPath = p.photoPath;
       _supplier = p.supplier ?? '';
+    } else if (_isService) {
+      _category = 'Jasa';
+      _unit = 'kali';
+      _stockController.text = '99999';
+      _minStockController.text = '0';
+      _costPriceController.text = '0';
+      _emoji = '🛠️';
     }
+
     // Pastikan daftar supplier terbaru sudah dimuat untuk dropdown.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ref.read(supplierProvider.notifier).loadSuppliers();
@@ -517,9 +534,26 @@ class _ProdukFormScreenState extends ConsumerState<ProdukFormScreen> {
                       controller: _costPriceController,
                       keyboardType: TextInputType.number,
                       onChanged: (_) => setState(() {}),
-                      decoration: const InputDecoration(
+                      decoration: InputDecoration(
                         labelText: 'Harga modal',
                         prefixText: 'Rp ',
+                        suffixIcon: IconButton(
+                          icon: const Icon(Icons.calculate_outlined, color: AppColors.primary),
+                          tooltip: 'Kalkulator HPP',
+                          onPressed: () async {
+                            final hpp = await Navigator.push<int>(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => const HppCalculatorScreen(),
+                              ),
+                            );
+                            if (hpp != null && mounted) {
+                              setState(() {
+                                _costPriceController.text = hpp.toString();
+                              });
+                            }
+                          },
+                        ),
                       ),
                       validator: (v) =>
                           v == null || v.trim().isEmpty ? 'Wajib diisi' : null,
@@ -563,71 +597,73 @@ class _ProdukFormScreenState extends ConsumerState<ProdukFormScreen> {
                   );
                 }),
               const SizedBox(height: 8),
-              Row(
-                children: [
-                  Expanded(
-                    child: TextFormField(
-                      controller: _stockController,
-                      keyboardType: const TextInputType.numberWithOptions(
-                          decimal: true),
-                      decoration: const InputDecoration(labelText: 'Stok awal'),
-                      validator: (v) {
-                        final n = Satuan.baca(v);
-                        if (n == null) return 'Wajib diisi';
-                        if (n < 0) return 'Tidak boleh negatif';
-                        return null;
-                      },
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: TextFormField(
-                      controller: _minStockController,
-                      keyboardType: const TextInputType.numberWithOptions(
-                          decimal: true),
-                      decoration: const InputDecoration(
-                        labelText: 'Min. stok',
-                        hintText: '5',
+              if (!_isService) ...[
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextFormField(
+                        controller: _stockController,
+                        keyboardType: const TextInputType.numberWithOptions(
+                            decimal: true),
+                        decoration: const InputDecoration(labelText: 'Stok awal'),
+                        validator: (v) {
+                          final n = Satuan.baca(v);
+                          if (n == null) return 'Wajib diisi';
+                          if (n < 0) return 'Tidak boleh negatif';
+                          return null;
+                        },
                       ),
                     ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
-              // Supplier — dipilih dari data supplier yang bisa diedit di Profil.
-              Row(
-                children: [
-                  const Expanded(
-                    child: Text(
-                      'Supplier',
-                      style:
-                          TextStyle(fontSize: 13, color: AppColors.textSecondary),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: TextFormField(
+                        controller: _minStockController,
+                        keyboardType: const TextInputType.numberWithOptions(
+                            decimal: true),
+                        decoration: const InputDecoration(
+                          labelText: 'Min. stok',
+                          hintText: '5',
+                        ),
+                      ),
                     ),
-                  ),
-                  TextButton.icon(
-                    onPressed: _addSupplier,
-                    icon: const Icon(Icons.add, size: 16),
-                    label: const Text('Supplier baru'),
-                  ),
-                ],
-              ),
-              DropdownButtonFormField<String>(
-                value: _supplier,
-                decoration: const InputDecoration(),
-                items: [
-                  const DropdownMenuItem<String>(
-                    value: '',
-                    child: Text('Tidak ada supplier'),
-                  ),
-                  ...supplierNames.map(
-                    (name) => DropdownMenuItem<String>(
-                      value: name,
-                      child: Text(name),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                // Supplier — dipilih dari data supplier yang bisa diedit di Profil.
+                Row(
+                  children: [
+                    const Expanded(
+                      child: Text(
+                        'Supplier',
+                        style:
+                            TextStyle(fontSize: 13, color: AppColors.textSecondary),
+                      ),
                     ),
-                  ),
-                ],
-                onChanged: (v) => setState(() => _supplier = v ?? ''),
-              ),
+                    TextButton.icon(
+                      onPressed: _addSupplier,
+                      icon: const Icon(Icons.add, size: 16),
+                      label: const Text('Supplier baru'),
+                    ),
+                  ],
+                ),
+                DropdownButtonFormField<String>(
+                  value: _supplier,
+                  decoration: const InputDecoration(),
+                  items: [
+                    const DropdownMenuItem<String>(
+                      value: '',
+                      child: Text('Tidak ada supplier'),
+                    ),
+                    ...supplierNames.map(
+                      (name) => DropdownMenuItem<String>(
+                        value: name,
+                        child: Text(name),
+                      ),
+                    ),
+                  ],
+                  onChanged: (v) => setState(() => _supplier = v ?? ''),
+                ),
+              ],
               const SizedBox(height: 28),
               SizedBox(
                 width: double.infinity,

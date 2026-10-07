@@ -51,10 +51,38 @@ class _ProdukScreenState extends ConsumerState<ProdukScreen> {
             padding: const EdgeInsets.only(right: 12),
             child: ElevatedButton.icon(
               onPressed: () async {
+                final isService = await showModalBottomSheet<bool>(
+                  context: context,
+                  builder: (ctx) => SafeArea(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const ListTile(
+                          title: Text('Tambah Produk', style: TextStyle(fontWeight: FontWeight.bold)),
+                        ),
+                        ListTile(
+                          leading: const Icon(Icons.inventory_2_outlined, color: AppColors.primary),
+                          title: const Text('Barang Fisik'),
+                          subtitle: const Text('Barang yang memiliki stok fisik (contoh: minuman, beras)'),
+                          onTap: () => Navigator.pop(ctx, false),
+                        ),
+                        ListTile(
+                          leading: const Icon(Icons.handyman_outlined, color: AppColors.success),
+                          title: const Text('Jasa / Layanan'),
+                          subtitle: const Text('Tidak memiliki stok fisik (contoh: servis, cuci, paket)'),
+                          onTap: () => Navigator.pop(ctx, true),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+                
+                if (isService == null || !mounted) return;
+
                 await Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (_) => const ProdukFormScreen(),
+                    builder: (_) => ProdukFormScreen(isService: isService),
                   ),
                 );
               },

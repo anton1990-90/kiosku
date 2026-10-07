@@ -950,7 +950,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                       radius: 36,
                       backgroundColor: Colors.white.withOpacity(0.2),
                       foregroundColor: Colors.white,
-                      borderColor: Colors.white.withOpacity(0.3),
                     ),
                     const SizedBox(height: 12),
                     Text(

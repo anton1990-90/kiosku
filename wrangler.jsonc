@@ -1,0 +1,19 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "tokoku-sales",
+  "main": "sales_page/worker.js",
+  "compatibility_date": "2026-10-01",
+  "observability": {
+    "enabled": true
+  },
+  "assets": {
+    "directory": "sales_page"
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "tokoku-lisensi",
+      "database_id": "7b228966-1656-4c35-9ed8-f8e3e3f88377"
+    }
+  ]
+}

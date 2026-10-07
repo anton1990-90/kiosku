@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TokoKu - Aplikasi Kasir UMKM Offline Terbaik</title>
+    <meta name="description" content="Aplikasi kasir (POS) toko sembako UMKM offline-first dengan fitur lengkap: barcode, cetak struk, laporan keuangan, dan manajemen stok. Hanya Rp 99.000 (Lifetime)!">
+    <link rel="stylesheet" href="styles.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    
+    <!-- Meta Pixel Code Placeholder -->
+    <script>
+    !function(f,b,e,v,n,t,s)
+    {if(f.fbq)return;n=f.fbq=function(){n.callMethod?
+    n.callMethod.apply(n,arguments):n.queue.push(arguments)};
+    if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';
+    n.queue=[];t=b.createElement(e);t.async=!0;
+    t.src=v;s=b.getElementsByTagName(e)[0];
+    s.parentNode.insertBefore(t,s)}(window, document,'script',
+    'https://connect.facebook.net/en_US/fbevents.js');
+    fbq('init', 'YOUR_PIXEL_ID'); // REPLACE WITH ACTUAL PIXEL ID
+    fbq('track', 'PageView');
+    </script>
+    <noscript><img height="1" width="1" style="display:none"
+    src="https://www.facebook.com/tr?id=YOUR_PIXEL_ID&ev=PageView&noscript=1"
+    /></noscript>
+    <!-- End Meta Pixel Code -->
+</head>
+<body>
+    <header class="hero">
+        <div class="container hero-content">
+            <div class="hero-text">
+                <h1>Ubah HP-mu Jadi Mesin Kasir Canggih!</h1>
+                <p>TokoKu adalah aplikasi kasir (POS) offline-first yang didesain khusus untuk UMKM & toko sembako. Kelola stok, cetak struk, dan pantau laba tanpa perlu langganan internet bulanan.</p>
+                <div class="price-badge">
+                    <span class="price">Rp 99.000</span>
+                    <span class="lifetime">Sekali Bayar (Lifetime)</span>
+                </div>
+                <div class="checkout-form" id="checkout-form-1">
+                    <input type="text" id="cust-name-1" placeholder="Nama Anda" required class="input-field">
+                    <input type="email" id="cust-email-1" placeholder="Alamat Email (untuk kode lisensi)" required class="input-field">
+                    <button class="cta-btn primary-btn" id="btn-checkout-1">Beli Sekarang</button>
+                    <p class="small-note">Kode Lisensi akan dikirim otomatis ke email Anda.</p>
+                </div>
+            </div>
+            <div class="hero-image">
+                <!-- Placeholder for the dashboard mockup -->
+                <img src="assets/hero_dashboard.jpg" alt="TokoKu Dashboard" class="mockup-img">
+            </div>
+        </div>
+    </header>
+
+    <section class="features">
+        <div class="container">
+            <h2 class="section-title">Fitur Super Lengkap untuk Toko Anda</h2>
+            <div class="feature-grid">
+                <div class="feature-card">
+                    <div class="icon">📶</div>
+                    <h3>Offline-First</h3>
+                    <p>Jualan jalan terus tanpa internet. Data aman tersimpan di HP Anda.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="icon">📷</div>
+                    <h3>Scan Barcode</h3>
+                    <p>Proses transaksi secepat kasir minimarket pakai kamera HP Anda.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="icon">🖨️</div>
+                    <h3>Cetak Struk Thermal</h3>
+                    <p>Hubungkan ke printer bluetooth untuk mencetak bukti pembayaran profesional.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="icon">📦</div>
+                    <h3>Manajemen Stok & Harga</h3>
+                    <p>Atur harga modal, harga jual, dan dapatkan peringatan otomatis saat stok menipis.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="icon">🤝</div>
+                    <h3>Hutang & Piutang</h3>
+                    <p>Catat kasbon pelanggan dengan rapi agar perputaran uang tetap sehat.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="icon">📊</div>
+                    <h3>Laporan Lengkap</h3>
+                    <p>Pantau laba bersih harian, mingguan, bulanan dengan grafik yang mudah dibaca.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="pos-showcase">
+         <div class="container showcase-content">
+            <div class="showcase-image">
+                 <img src="assets/pos_cashier.jpg" alt="TokoKu Kasir" class="mockup-img">
+            </div>
+            <div class="showcase-text">
+                <h2>Kasir Cepat, Antrian Bebas Macet</h2>
+                <ul>
+                    <li>✅ Tambahkan barang dengan scan barcode atau pencarian cepat.</li>
+                    <li>✅ Dukung pembayaran tunai, QRIS, dan e-wallet.</li>
+                    <li>✅ Bisa kasih diskon borongan atau per barang.</li>
+                    <li>✅ Fitur batal/retur transaksi yang aman dan rapi secara akuntansi.</li>
+                </ul>
+            </div>
+        </div>
+    </section>
+
+    <section class="cta-section">
+        <div class="container">
+            <h2>Tinggalkan Cara Manual, Mulai Digitalisasi Toko Anda!</h2>
+            <p>Hanya dengan sekali bayar, Anda mendapatkan asisten toko pribadi yang bekerja 24 jam.</p>
+            <div class="price-box">
+                <p class="normal-price"><s>Rp 299.000</s></p>
+                <p class="promo-price">Rp 99.000</p>
+                <p class="lifetime-note">Lisensi Seumur Hidup | Tanpa Biaya Bulanan</p>
+            </div>
+            <div class="checkout-form" id="checkout-form-2" style="max-width: 400px; margin: 0 auto;">
+                <input type="text" id="cust-name-2" placeholder="Nama Anda" required class="input-field">
+                <input type="email" id="cust-email-2" placeholder="Alamat Email" required class="input-field">
+                <button class="cta-btn pulse-btn" id="btn-checkout-2" style="width: 100%;">Amankan Harga Promo Sekarang</button>
+                <p class="small-note mt-2">Kode Lisensi akan dikirim otomatis ke email Anda.</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- Modal Checkout -->
+    <div id="checkoutModal" class="modal">
+        <div class="modal-content">
+            <span class="close-btn" onclick="closeModal()">&times;</span>
+            <h2>Detail Pembayaran</h2>
+            <div class="checkout-details">
+                <p><strong>Produk:</strong> TokoKu Lisensi Lifetime</p>
+                <p><strong>Harga Normal:</strong> <s>Rp 299.000</s></p>
+                <p><strong>Total Pembayaran:</strong> <span id="totalPayment" style="font-size: 1.2em; font-weight: bold; color: #e46455;">Rp 99.000</span></p>
+            </div>
+            
+            <div class="coupon-section" style="margin-top: 15px;">
+                <label>Punya Kode Kupon?</label>
+                <div style="display: flex; gap: 10px;">
+                    <input type="text" id="couponCode" placeholder="Masukkan Kupon" class="input-field" style="margin-bottom: 0;">
+                    <button type="button" class="cta-btn secondary-btn" onclick="applyCoupon()" style="padding: 10px 15px;">Aktifkan</button>
+                </div>
+                <p id="couponMessage" style="font-size: 0.85em; margin-top: 5px; color: green; display: none;"></p>
+            </div>
+
+            <div class="payment-method-section" style="margin-top: 15px;">
+                <label>Metode Pembayaran</label>
+                <select id="paymentMethod" class="input-field">
+                    <option value="qris">QRIS (Langsung)</option>
+                    <option value="bri_va">BRI Virtual Account</option>
+                    <option value="bni_va">BNI Virtual Account</option>
+                    <option value="cimb_niaga_va">CIMB Niaga Virtual Account</option>
+                    <option value="permata_va">Permata Virtual Account</option>
+                    <option value="maybank_va">Maybank Virtual Account</option>
+                </select>
+            </div>
+
+            <div class="checkout-form" style="margin-top: 20px;">
+                <input type="text" id="cust-name-modal" placeholder="Nama Anda" required class="input-field">
+                <input type="email" id="cust-email-modal" placeholder="Alamat Email (untuk lisensi)" required class="input-field">
+                <button class="cta-btn primary-btn" id="btn-process-checkout" style="width: 100%;" onclick="processCheckout()">Lanjutkan ke Pembayaran</button>
+            </div>
+        </div>
+    </div>
+
+    <style>
+        .modal { display: none; position: fixed; z-index: 9999; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5); }
+        .modal-content { background-color: #fff; margin: 5% auto; padding: 20px; border-radius: 10px; width: 90%; max-width: 450px; position: relative; }
+        .close-btn { position: absolute; right: 20px; top: 15px; font-size: 24px; font-weight: bold; cursor: pointer; color: #555; }
+        .close-btn:hover { color: #000; }
+        .secondary-btn { background-color: #f1f1f1; color: #333; border: 1px solid #ccc; }
+        .modal .input-field { background-color: #fff; color: #333; border: 1px solid #ccc; width: 100%; padding: 12px; border-radius: 8px; }
+        .modal .input-field::placeholder { color: #888; }
+        .modal .input-field:focus { background-color: #fff; border-color: #F37021; outline: none; }
+        .modal select.input-field { appearance: auto; -webkit-appearance: auto; padding-right: 30px; }
+    </style>
+
+    <footer>
+        <div class="container">
+            <p>&copy; 2026 TokoKu. All rights reserved.</p>
+            <p>Powered by Pakasir</p>
+        </div>
+    </footer>
+
+    <script>
+        let currentAmount = 99000;
+
+        function openModal() {
+            document.getElementById('checkoutModal').style.display = 'block';
+        }
+
+        function closeModal() {
+            document.getElementById('checkoutModal').style.display = 'none';
+            if (window.pollInterval) clearInterval(window.pollInterval);
+        }
+
+        function applyCoupon() {
+            const code = document.getElementById('couponCode').value.trim().toUpperCase();
+            const msg = document.getElementById('couponMessage');
+            if (code === 'KIBO26') {
+                currentAmount = 59400; // Diskon 40% dari 99.000
+                document.getElementById('totalPayment').innerText = 'Rp ' + currentAmount.toLocaleString('id-ID');
+                msg.innerText = 'Kupon berhasil diterapkan! Anda mendapat diskon 40% (Rp 39.600).';
+                msg.style.color = 'green';
+                msg.style.display = 'block';
+            } else {
+                currentAmount = 99000;
+                document.getElementById('totalPayment').innerText = 'Rp 99.000';
+                msg.innerText = 'Kupon tidak valid.';
+                msg.style.color = 'red';
+                msg.style.display = 'block';
+            }
+        }
+
+        async function processCheckout() {
+            const nameInput = document.getElementById('cust-name-modal');
+            const emailInput = document.getElementById('cust-email-modal');
+            const btn = document.getElementById('btn-process-checkout');
+            const paymentMethod = document.getElementById('paymentMethod').value;
+            
+            const name = nameInput.value.trim();
+            const email = emailInput.value.trim();
+
+            if (!name || !email) {
+                alert("Mohon isi Nama dan Email Anda agar kami bisa mengirimkan Kode Lisensi.");
+                return;
+            }
+
+            const originalText = btn.innerText;
+            btn.innerText = "Memproses...";
+            btn.disabled = true;
+
+            // Lacak event ke Meta Pixel
+            fbq('track', 'InitiateCheckout');
+            fbq('track', 'Lead');
+
+            try {
+                // Panggil Cloudflare Pages Function kita
+                const response = await fetch('/api/checkout', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name: name, email: email, amount: currentAmount, method: paymentMethod })
+                });
+                const data = await response.json();
+
+                if (data.payment_link) {
+                    const returnUrl = encodeURIComponent("https://tokoku.dompetkuai.my.id/download");
+                    window.location.href = data.payment_link + "?redirect=" + returnUrl;
+                } else if (data.qr_string) {
+                    // Tampilkan QR Code di dalam Modal
+                    const qrUrl = "https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=" + encodeURIComponent(data.qr_string);
+                    document.querySelector('.modal-content').innerHTML = `
+                        <span class="close-btn" onclick="closeModal()">&times;</span>
+                        <h2 style="text-align: center; margin-bottom: 5px;">Scan QRIS</h2>
+                        <p style="text-align: center; color: #666; margin-bottom: 15px;">Gunakan aplikasi M-Banking atau e-Wallet Anda.</p>
+                        <div style="text-align: center;">
+                            <img src="${qrUrl}" alt="QRIS" style="max-width: 200px; border-radius: 10px; border: 1px solid #ddd; padding: 10px; background: #fff;">
+                        </div>
+                        <div style="text-align: center; margin-top: 10px;">
+                            <button onclick="downloadQR('${qrUrl}')" style="background: #10B981; color: #fff; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 0.85em; font-weight: 600;">⬇ Unduh Barcode QRIS</button>
+                        </div>
+                        <h3 style="text-align: center; margin-top: 15px; color: #F37021;">Total: Rp ${data.total_payment.toLocaleString('id-ID')}</h3>
+                        <p style="text-align: center; font-size: 0.8em; margin-top: 10px;" id="paymentStatusText">Jika sudah dibayar, otomatis akan diproses dalam beberapa detik dan Anda akan menerima email berisikan Kode Lisensi & Link Unduh.</p>
+                    `;
+                    
+                    // Tambahkan fungsi downloadQR ke window
+                    window.downloadQR = function(url) {
+                        fetch(url)
+                            .then(res => res.blob())
+                            .then(blob => {
+                                const link = document.createElement('a');
+                                link.href = URL.createObjectURL(blob);
+                                link.download = 'QRIS-Pembayaran-TokoKu.png';
+                                document.body.appendChild(link);
+                                link.click();
+                                document.body.removeChild(link);
+                            }).catch(() => {
+                                // Fallback jika fetch gagal karena CORS
+                                window.open(url, '_blank');
+                            });
+                    };
+
+                } else if (data.va_number) {
+                    // Tampilkan VA Number di dalam Modal
+                    document.querySelector('.modal-content').innerHTML = `
+                        <span class="close-btn" onclick="closeModal()">&times;</span>
+                        <h2 style="text-align: center; margin-bottom: 5px;">Virtual Account (${data.payment_method.replace('_va', '').toUpperCase()})</h2>
+                        <p style="text-align: center; color: #666; margin-bottom: 15px;">Lakukan transfer ke nomor Virtual Account di bawah ini:</p>
+                        <div style="background: #f1f5f9; padding: 15px; border-radius: 10px; text-align: center; border: 1px dashed #cbd5e1;">
+                            <h1 style="letter-spacing: 2px; color: #0B57A5; margin-bottom: 5px;">${data.va_number}</h1>
+                            <p style="font-size: 0.9em; color: #888;">a.n. Pakasir - TokoKu</p>
+                        </div>
+                        <h3 style="text-align: center; margin-top: 10px; color: #F37021;">Total: Rp ${data.total_payment.toLocaleString('id-ID')}</h3>
+                        <p style="text-align: center; font-size: 0.8em; margin-top: 10px;" id="paymentStatusText">Jika sudah dibayar, otomatis akan diproses dalam beberapa menit dan Anda akan menerima email berisikan Kode Lisensi.</p>
+                    `;
+
+                } else {
+                    alert('Gagal membuat transaksi: ' + (data.error || 'Terjadi kesalahan.'));
+                    btn.innerText = originalText;
+                    btn.disabled = false;
+                }
+
+                if (data.qr_string || data.va_number) {
+                    if (window.pollInterval) clearInterval(window.pollInterval);
+                    window.pollInterval = setInterval(async () => {
+                        try {
+                            const res = await fetch('/api/check-payment?order_id=' + data.order_id);
+                            const checkData = await res.json();
+                            if (checkData.status && checkData.status !== 'pending') {
+                                clearInterval(window.pollInterval);
+                                document.getElementById('paymentStatusText').innerText = "Pembayaran Berhasil! Sedang mengarahkan ke halaman unduh...";
+                                document.getElementById('paymentStatusText').style.color = "green";
+                                setTimeout(() => { window.location.href = '/download'; }, 2000);
+                            }
+                        } catch(e) {}
+                    }, 5000);
+                }
+            } catch (error) {
+                alert('Gagal menghubungi server.');
+                btn.innerText = originalText;
+                btn.disabled = false;
+            }
+        }
+
+        // Buka modal saat tombol beli di-klik
+        document.getElementById('btn-checkout-1').addEventListener('click', (e) => { e.preventDefault(); openModal(); });
+        document.getElementById('btn-checkout-2').addEventListener('click', (e) => { e.preventDefault(); openModal(); });
+
+        // Ubah form di halaman utama menjadi tombol biasa untuk membuka modal
+        document.getElementById('checkout-form-1').innerHTML = '<button class="cta-btn primary-btn" id="btn-checkout-1" onclick="openModal()">Beli Sekarang</button>';
+        document.getElementById('checkout-form-2').innerHTML = '<button class="cta-btn pulse-btn" id="btn-checkout-2" style="width: 100%;" onclick="openModal()">Amankan Harga Promo Sekarang</button>';
+
+    </script>
+</body>
+</html>

@@ -1,0 +1,342 @@
+:root {
+    --primary: #0B57A5;
+    --primary-light: #186FCA;
+    --secondary: #F37021;
+    --secondary-hover: #D95D1A;
+    --dark: #1E293B;
+    --light: #F8FAFC;
+    --text: #334155;
+    --text-light: #64748B;
+    --white: #FFFFFF;
+    --success: #10B981;
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    font-family: 'Inter', sans-serif;
+}
+
+body {
+    background-color: var(--light);
+    color: var(--text);
+    line-height: 1.6;
+}
+
+.container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 20px;
+}
+
+/* Header & Hero */
+.hero {
+    background: linear-gradient(135deg, var(--dark) 0%, #0F172A 100%);
+    color: var(--white);
+    padding: 80px 0;
+    overflow: hidden;
+}
+
+.hero-content {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 40px;
+}
+
+.hero-text {
+    flex: 1;
+    max-width: 600px;
+}
+
+.hero-text h1 {
+    font-size: 3rem;
+    font-weight: 800;
+    line-height: 1.2;
+    margin-bottom: 20px;
+    background: linear-gradient(to right, #60A5FA, #34D399);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+.hero-text p {
+    font-size: 1.125rem;
+    color: #CBD5E1;
+    margin-bottom: 30px;
+}
+
+.price-badge {
+    display: inline-block;
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    padding: 10px 20px;
+    border-radius: 50px;
+    margin-bottom: 30px;
+    backdrop-filter: blur(10px);
+}
+
+.price {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--secondary);
+    margin-right: 10px;
+}
+
+.lifetime {
+    font-size: 0.875rem;
+    color: #94A3B8;
+}
+
+.cta-btn {
+    display: inline-block;
+    padding: 16px 32px;
+    font-size: 1.125rem;
+    font-weight: 600;
+    text-decoration: none;
+    border-radius: 8px;
+    transition: all 0.3s ease;
+    text-align: center;
+}
+
+.primary-btn {
+    background-color: var(--secondary);
+    color: var(--white);
+    box-shadow: 0 4px 14px rgba(243, 112, 33, 0.4);
+}
+
+.primary-btn:hover {
+    background-color: var(--secondary-hover);
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(243, 112, 33, 0.6);
+}
+
+.hero-image {
+    flex: 1;
+    display: flex;
+    justify-content: center;
+    position: relative;
+}
+
+.mockup-img {
+    max-width: 100%;
+    height: auto;
+    border-radius: 24px;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+    border: 8px solid rgba(255, 255, 255, 0.1);
+}
+
+/* Features Section */
+.features {
+    padding: 80px 0;
+    background-color: var(--white);
+}
+
+.section-title {
+    text-align: center;
+    font-size: 2.25rem;
+    font-weight: 700;
+    color: var(--dark);
+    margin-bottom: 50px;
+}
+
+.feature-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 30px;
+}
+
+.feature-card {
+    background: var(--light);
+    padding: 30px;
+    border-radius: 16px;
+    border: 1px solid #E2E8F0;
+    transition: transform 0.3s ease;
+}
+
+.feature-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05);
+}
+
+.feature-card .icon {
+    font-size: 2.5rem;
+    margin-bottom: 20px;
+}
+
+.feature-card h3 {
+    font-size: 1.25rem;
+    color: var(--dark);
+    margin-bottom: 10px;
+}
+
+.feature-card p {
+    color: var(--text-light);
+}
+
+/* Showcase Section */
+.pos-showcase {
+    padding: 80px 0;
+    background: linear-gradient(180deg, var(--white) 0%, #F1F5F9 100%);
+}
+
+.showcase-content {
+    display: flex;
+    align-items: center;
+    gap: 60px;
+}
+
+.showcase-image {
+    flex: 1;
+}
+
+.showcase-text {
+    flex: 1;
+}
+
+.showcase-text h2 {
+    font-size: 2.25rem;
+    font-weight: 700;
+    color: var(--dark);
+    margin-bottom: 24px;
+}
+
+.showcase-text ul {
+    list-style: none;
+}
+
+.showcase-text li {
+    font-size: 1.125rem;
+    margin-bottom: 16px;
+    color: var(--text);
+    display: flex;
+    align-items: flex-start;
+}
+
+/* CTA Section */
+.cta-section {
+    padding: 100px 0;
+    background-color: var(--primary);
+    color: var(--white);
+    text-align: center;
+}
+
+.cta-section h2 {
+    font-size: 2.5rem;
+    font-weight: 800;
+    margin-bottom: 20px;
+}
+
+.cta-section p {
+    font-size: 1.25rem;
+    margin-bottom: 40px;
+    opacity: 0.9;
+}
+
+.price-box {
+    background: rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255,255,255,0.2);
+    border-radius: 16px;
+    padding: 30px;
+    max-width: 400px;
+    margin: 0 auto 40px auto;
+}
+
+.normal-price {
+    font-size: 1.25rem;
+    color: #94A3B8 !important;
+    margin-bottom: 5px !important;
+}
+
+.promo-price {
+    font-size: 3rem !important;
+    font-weight: 800;
+    color: #FDE047 !important;
+    margin-bottom: 10px !important;
+}
+
+.lifetime-note {
+    font-size: 1rem !important;
+    font-weight: 500;
+}
+
+.pulse-btn {
+    background-color: var(--secondary);
+    color: var(--white);
+    font-size: 1.25rem;
+    padding: 20px 40px;
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0% {
+        box-shadow: 0 0 0 0 rgba(243, 112, 33, 0.7);
+    }
+    70% {
+        box-shadow: 0 0 0 15px rgba(243, 112, 33, 0);
+    }
+    100% {
+        box-shadow: 0 0 0 0 rgba(243, 112, 33, 0);
+    }
+}
+
+/* Footer */
+footer {
+    background-color: var(--dark);
+    color: #94A3B8;
+    padding: 30px 0;
+    text-align: center;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .hero-content, .showcase-content {
+        flex-direction: column;
+        text-align: center;
+    }
+    
+    .hero-text h1 {
+        font-size: 2.25rem;
+    }
+    
+    .showcase-text ul {
+        text-align: left;
+    }
+}
+
+/* Forms */
+.checkout-form {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-bottom: 20px;
+}
+
+.input-field {
+    padding: 14px 16px;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    border-radius: 8px;
+    font-size: 1rem;
+    background: rgba(255, 255, 255, 0.1);
+    color: var(--white);
+    transition: all 0.3s ease;
+}
+
+.input-field::placeholder {
+    color: rgba(255, 255, 255, 0.7);
+}
+
+.input-field:focus {
+    outline: none;
+    border-color: var(--secondary);
+    background: rgba(255, 255, 255, 0.2);
+}
+
+.small-note {
+    font-size: 0.8rem !important;
+    color: rgba(255, 255, 255, 0.6) !important;
+    margin-bottom: 0 !important;
+}
+
+.mt-2 { margin-top: 8px; }

@@ -14,7 +14,7 @@ class AppConfig {
   /// Contoh: https://tokoku-lisensi.nama-anda.workers.dev
   /// Jangan diakhiri garis miring.
   static const String activationServerUrl =
-      'https://tokoku-lisensi.dompetkuai.workers.dev';
+      'https://lisensi.dompetkuai.my.id';
 
   /// Halaman portal aktivasi untuk pelanggan.
   ///

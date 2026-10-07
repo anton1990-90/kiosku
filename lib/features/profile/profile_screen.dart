@@ -1056,8 +1056,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    if (pemilik) const _MenuGroupTitle('Toko & bisnis'),
-                    if (pemilik) _MenuCard(
+                    if (pemilik) _MenuAccordion(
+                      title: 'Toko & bisnis',
                       children: [
                         _MenuItem(
                           icon: Icons.store_outlined,
@@ -1115,8 +1115,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                       ],
                     ),
                     if (pemilik) const SizedBox(height: 20),
-                    const _MenuGroupTitle('Hutang & catatan'),
-                    _MenuCard(
+                    _MenuAccordion(
+                      title: 'Hutang & catatan',
                       children: [
                         _MenuItem(
                           icon: Icons.handshake_outlined,
@@ -1143,8 +1143,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                       ],
                     ),
                     const SizedBox(height: 20),
-                    const _MenuGroupTitle('Kas & laporan keuangan'),
-                    _MenuCard(
+                    _MenuAccordion(
+                      title: 'Kas & laporan keuangan',
                       children: [
                         _MenuItem(
                           icon: Icons.account_balance_wallet_outlined,
@@ -1193,8 +1193,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                       ],
                     ),
                     const SizedBox(height: 20),
-                    if (pemilik) const _MenuGroupTitle('Preferensi'),
-                    if (pemilik) _MenuCard(
+                    if (pemilik) _MenuAccordion(
+                      title: 'Preferensi',
                       children: [
                         _MenuItem(
                           icon: Icons.notifications_active_outlined,
@@ -1229,8 +1229,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                       ],
                     ),
                     if (pemilik) const SizedBox(height: 20),
-                    if (pemilik) const _MenuGroupTitle('Data & keamanan'),
-                    if (pemilik) _MenuCard(
+                    if (pemilik) _MenuAccordion(
+                      title: 'Data & keamanan',
                       children: [
                         _MenuItem(
                           icon: Icons.backup_outlined,
@@ -1301,8 +1301,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                       ],
                     ),
                     if (pemilik) const SizedBox(height: 20),
-                    if (pemilik) const _MenuGroupTitle('Lisensi & aplikasi'),
-                    if (pemilik) _MenuCard(
+                    if (pemilik) _MenuAccordion(
+                      title: 'Lisensi & aplikasi',
                       children: [
                         _MenuItem(
                           icon: Icons.verified_user_outlined,
@@ -1325,8 +1325,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                       ],
                     ),
                     if (pemilik) const SizedBox(height: 20),
-                    const _MenuGroupTitle('Kunci layar'),
-                    _MenuCard(
+                    _MenuAccordion(
+                      title: 'Kunci layar',
                       children: [
                         _MenuItem(
                           icon: Icons.lock_outline,
@@ -1350,8 +1350,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                       ],
                     ),
                     const SizedBox(height: 20),
-                    const _MenuGroupTitle('Bantuan'),
-                    _MenuCard(
+                    _MenuAccordion(
+                      title: 'Bantuan',
                       children: [
                         _MenuItem(
                           icon: Icons.help_outline,
@@ -1437,30 +1437,11 @@ class _StatColumn extends StatelessWidget {
   }
 }
 
-class _MenuGroupTitle extends StatelessWidget {
-  final String text;
-  const _MenuGroupTitle(this.text);
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Text(
-        text,
-        style: const TextStyle(
-          fontSize: 12,
-          fontWeight: FontWeight.w600,
-          color: AppColors.textTertiary,
-          letterSpacing: 0.5,
-        ),
-      ),
-    );
-  }
-}
-
-class _MenuCard extends StatelessWidget {
+class _MenuAccordion extends StatelessWidget {
+  final String title;
   final List<Widget> children;
-  const _MenuCard({required this.children});
+  
+  const _MenuAccordion({required this.title, required this.children});
 
   @override
   Widget build(BuildContext context) {
@@ -1470,14 +1451,29 @@ class _MenuCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: AppColors.border, width: 0.5),
       ),
-      child: Column(
-        children: [
-          for (int i = 0; i < children.length; i++) ...[
-            children[i],
-            if (i < children.length - 1)
-              const Divider(height: 1, color: AppColors.border),
+      child: Theme(
+        data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+        child: ExpansionTile(
+          initiallyExpanded: false,
+          tilePadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
+          title: Text(
+            title,
+            style: const TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+              color: AppColors.textTertiary,
+              letterSpacing: 0.5,
+            ),
+          ),
+          children: [
+            const Divider(height: 1, color: AppColors.border),
+            for (int i = 0; i < children.length; i++) ...[
+              children[i],
+              if (i < children.length - 1)
+                const Divider(height: 1, color: AppColors.border),
+            ],
           ],
-        ],
+        ),
       ),
     );
   }

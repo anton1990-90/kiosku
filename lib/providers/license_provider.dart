@@ -55,6 +55,27 @@ class LicenseNotifier extends StateNotifier<LicenseState> {
     }
   }
 
+  /// Melepas lisensi agar bisa dipakai di HP lain.
+  Future<String?> unlinkDevice() async {
+    try {
+      final lic = state.license;
+      if (lic == null) return 'Lisensi tidak ditemukan di perangkat ini.';
+      await _repo.unlinkDevice(code: lic.code, deviceId: lic.deviceId);
+      // Hapus lisensi lokal
+      await _repo.clearLocal();
+      state = const LicenseState(
+        isLoading: false,
+        isLicensed: false,
+        license: null,
+      );
+      return null;
+    } on LicenseException catch (e) {
+      return e.message;
+    } catch (e) {
+      return 'Gagal melepas lisensi: $e';
+    }
+  }
+
   /// Muat ulang status dari perangkat (mis. setelah data dibersihkan).
   Future<void> refresh() async {
     state = const LicenseState();

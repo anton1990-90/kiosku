@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:package_info_plus/package_info_plus.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/utils/formatters.dart';
 import '../../core/utils/responsive.dart';
@@ -410,6 +411,26 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
         );
       },
     );
+  }
+
+  Future<void> _pindahHp() async {
+    final password = await _mintaPassword();
+    if (password == null) return;
+
+    if (!mounted) return;
+    _pesan('Sedang memproses pelepasan...');
+
+    final msg = await ref.read(licenseProvider.notifier).unlinkDevice();
+    
+    if (!mounted) return;
+    if (msg != null) {
+      _pesan(msg, gagal: true);
+      return;
+    }
+    
+    _pesan('Lisensi berhasil dilepas. Mengeluarkan akun...');
+    // Keluar, layar aktivasi akan muncul lagi saat aplikasi dibuka/re-route.
+    await ref.read(authProvider.notifier).logout();
   }
 
   /// Minta password akun. Mengembalikan password yang SUDAH terbukti benar,
@@ -1367,6 +1388,14 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                                 ? null
                                 : _cobaCadanganLagi,
                           ),
+                        _MenuItem(
+                          icon: Icons.phonelink_erase_outlined,
+                          color: AppColors.dangerMid,
+                          title: 'Pindah HP',
+                          subtitle: 'Lepaskan lisensi agar bisa dipakai di perangkat lain (butuh koneksi dan password)',
+                          trailing: Icons.chevron_right,
+                          onTap: _pindahHp,
+                        ),
                         _MenuItem(
                           icon: Icons.delete_forever_outlined,
                           color: AppColors.dangerMid,

@@ -289,6 +289,35 @@ async function tanganiAktivasi(request, env) {
   return balasJson(hasil);
 }
 
+async function tanganiLepasPerangkatSendiri(request, env) {
+  const body = (await bacaJson(request)) ?? {};
+  const kode = normalisasi(body.code);
+  const deviceId = normalisasi(body.device_id);
+  
+  if (!kode || !deviceId) {
+    return balasJson({ ok: false, reason: 'invalid_code' }, 400);
+  }
+
+  // Cek apakah benar perangkat ini yang sedang memegang lisensi
+  const sah = await env.DB.prepare(
+    'SELECT count(*) as sah FROM licenses WHERE code = ? AND device_id = ?'
+  )
+    .bind(kode, deviceId)
+    .first();
+
+  if (!sah || sah.sah === 0) {
+    return balasJson({ ok: false, reason: 'unauthorized_device' }, 403);
+  }
+
+  const hasil = await env.DB.prepare(
+    'UPDATE licenses SET device_id = NULL, activated_at = NULL WHERE code = ?'
+  )
+    .bind(kode)
+    .run();
+
+  return balasJson({ ok: true, code: kode });
+}
+
 // ---------------------------------------------------------------------------
 // Operasi admin (penjual) — semuanya wajib menyertakan header x-admin-key
 // ---------------------------------------------------------------------------
@@ -815,6 +844,10 @@ export default {
 
       if (jalur === '/api/aktivasi' && metode === 'POST') {
         return await tanganiAktivasi(request, env);
+      }
+
+      if (jalur === '/api/pindah-hp' && metode === 'POST') {
+        return await tanganiLepasPerangkatSendiri(request, env);
       }
 
       // Pesanan dari platform jualan (OrderHero). Diverifikasi dengan

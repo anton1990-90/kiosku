@@ -135,6 +135,43 @@ class LicenseRepository {
     }
   }
 
+  /// Melepas lisensi dari perangkat ini dengan mengontak server.
+  Future<void> unlinkDevice({required String code, required String deviceId}) async {
+    final http.Response response;
+    try {
+      response = await http
+          .post(
+            Uri.parse('${AppConfig.activationServerUrl}/api/pindah-hp'),
+            headers: const {'Content-Type': 'application/json'},
+            body: jsonEncode({
+              'code': code,
+              'device_id': deviceId,
+            }),
+          )
+          .timeout(const Duration(seconds: 20));
+    } catch (_) {
+      throw const LicenseException(
+        'Tidak dapat menghubungi server. Periksa koneksi internet Anda '
+        'lalu coba lagi.',
+      );
+    }
+
+    final Map<String, dynamic> data;
+    try {
+      final dynamic decoded = jsonDecode(response.body);
+      data = Map<String, dynamic>.from(decoded);
+    } catch (_) {
+      throw const LicenseException('Jawaban server tidak dikenali.');
+    }
+
+    if (data['ok'] != true) {
+      if (data['reason'] == 'unauthorized_device') {
+        throw const LicenseException('Gagal: Perangkat ini bukan pemilik lisensi tersebut.');
+      }
+      throw LicenseException(_messageFor(data['reason']?.toString()));
+    }
+  }
+
   /// Simpan status lisensi ke perangkat, disertai tanda tangan pemeriksa.
   Future<void> saveLocal(LicenseModel license) async {
     final prefs = await SharedPreferences.getInstance();

@@ -89,7 +89,7 @@ class _ProdukScreenState extends ConsumerState<ProdukScreen> {
                 await Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (_) => ProdukFormScreen(isService: isService),
+                    builder: (_) => ProdukFormScreen(isService: isService!),
                   ),
                 );
               },
@@ -194,6 +194,7 @@ class _ProdukScreenState extends ConsumerState<ProdukScreen> {
                 );
               },
             ),
+          ),
           ),
           const SizedBox(height: 8),
           // Product list

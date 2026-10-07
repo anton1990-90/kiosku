@@ -313,7 +313,33 @@ class _ProdukFormScreenState extends ConsumerState<ProdukFormScreen> {
       await notifier.addProduct(product);
     }
 
-    if (mounted) Navigator.pop(context);
+    if (!mounted) return;
+    
+    if (!_isService && !isEditing) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Produk "${product.name}" berhasil ditambahkan!'),
+          backgroundColor: AppColors.success,
+          behavior: SnackBarBehavior.floating,
+          duration: const Duration(seconds: 2),
+        ),
+      );
+      
+      // Kosongkan form untuk input berikutnya
+      _nameController.clear();
+      _costPriceController.clear();
+      _sellPriceController.clear();
+      _stockController.clear();
+      _minStockController.clear();
+      _barcodeController.clear();
+      setState(() {
+        _saving = false;
+        _photoPath = null;
+        _emoji = '📦';
+      });
+    } else {
+      Navigator.pop(context);
+    }
   }
 
   @override

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/utils/formatters.dart';
 import '../../core/utils/responsive.dart';
@@ -51,31 +52,37 @@ class _ProdukScreenState extends ConsumerState<ProdukScreen> {
             padding: const EdgeInsets.only(right: 12),
             child: ElevatedButton.icon(
               onPressed: () async {
-                final isService = await showModalBottomSheet<bool>(
-                  context: context,
-                  builder: (ctx) => SafeArea(
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const ListTile(
-                          title: Text('Tambah Produk', style: TextStyle(fontWeight: FontWeight.bold)),
-                        ),
-                        ListTile(
-                          leading: const Icon(Icons.inventory_2_outlined, color: AppColors.primary),
-                          title: const Text('Barang Fisik'),
-                          subtitle: const Text('Barang yang memiliki stok fisik (contoh: minuman, beras)'),
-                          onTap: () => Navigator.pop(ctx, false),
-                        ),
-                        ListTile(
-                          leading: const Icon(Icons.handyman_outlined, color: AppColors.success),
-                          title: const Text('Jasa / Layanan'),
-                          subtitle: const Text('Tidak memiliki stok fisik (contoh: servis, cuci, paket)'),
-                          onTap: () => Navigator.pop(ctx, true),
-                        ),
-                      ],
+                final prefs = await SharedPreferences.getInstance();
+                final showService = prefs.getBool('show_service_option') ?? true;
+                
+                bool? isService = false;
+                if (showService) {
+                  isService = await showModalBottomSheet<bool>(
+                    context: context,
+                    builder: (ctx) => SafeArea(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const ListTile(
+                            title: Text('Tambah Produk', style: TextStyle(fontWeight: FontWeight.bold)),
+                          ),
+                          ListTile(
+                            leading: const Icon(Icons.inventory_2_outlined, color: AppColors.primary),
+                            title: const Text('Barang Fisik'),
+                            subtitle: const Text('Barang yang memiliki stok fisik (contoh: minuman, beras)'),
+                            onTap: () => Navigator.pop(ctx, false),
+                          ),
+                          ListTile(
+                            leading: const Icon(Icons.handyman_outlined, color: AppColors.success),
+                            title: const Text('Jasa / Layanan'),
+                            subtitle: const Text('Tidak memiliki stok fisik (contoh: servis, cuci, paket)'),
+                            onTap: () => Navigator.pop(ctx, true),
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
-                );
+                  );
+                }
                 
                 if (isService == null || !mounted) return;
 
@@ -93,6 +100,31 @@ class _ProdukScreenState extends ConsumerState<ProdukScreen> {
                 minimumSize: const Size(0, 36),
               ),
             ),
+          ),
+          PopupMenuButton<String>(
+            icon: const Icon(Icons.more_vert),
+            onSelected: (val) async {
+              if (val == 'toggle_jasa') {
+                final prefs = await SharedPreferences.getInstance();
+                final current = prefs.getBool('show_service_option') ?? true;
+                await prefs.setBool('show_service_option', !current);
+                if (mounted) setState(() {});
+              }
+            },
+            itemBuilder: (ctx) {
+              return [
+                PopupMenuItem(
+                  value: 'toggle_jasa',
+                  child: FutureBuilder<SharedPreferences>(
+                    future: SharedPreferences.getInstance(),
+                    builder: (context, snapshot) {
+                      final show = snapshot.data?.getBool('show_service_option') ?? true;
+                      return Text(show ? 'Sembunyikan Opsi Jasa' : 'Tampilkan Opsi Jasa');
+                    }
+                  ),
+                )
+              ];
+            }
           ),
         ],
       ),

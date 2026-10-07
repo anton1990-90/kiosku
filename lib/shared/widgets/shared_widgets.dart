@@ -553,17 +553,20 @@ class ProductIcon extends StatelessWidget {
       ),
       clipBehavior: Clip.antiAlias,
       child: adaFoto
-          ? Image.file(
-              File(photoPath!),
-              width: size,
-              height: size,
-              fit: BoxFit.cover,
-              // Berkas rusak di tengah jalan tidak boleh memunculkan kotak
-              // galat di tengah daftar barang.
-              errorBuilder: (context, error, stackTrace) => Center(
-                child: Text(
-                  emoji ?? '📦',
-                  style: TextStyle(fontSize: emojiSize),
+          ? ClipRRect(
+              borderRadius: BorderRadius.circular(adaGaris ? (radius - borderWidth).clamp(0.0, 999.0) : radius),
+              child: Image.file(
+                File(photoPath!),
+                width: size,
+                height: size,
+                fit: BoxFit.cover,
+                // Berkas rusak di tengah jalan tidak boleh memunculkan kotak
+                // galat di tengah daftar barang.
+                errorBuilder: (context, error, stackTrace) => Center(
+                  child: Text(
+                    emoji ?? '📦',
+                    style: TextStyle(fontSize: emojiSize),
+                  ),
                 ),
               ),
             )

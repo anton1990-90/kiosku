@@ -179,6 +179,14 @@ class _HelpScreenState extends ConsumerState<HelpScreen> {
           'ulang lewat menu Profil → Kunci PIN.',
     ),
     (
+      tanya: 'Cara mengatur harga grosir?',
+      jawab: 'Saat menambahkan atau mengedit produk di halaman Produk, isi kolom "Minimum Qty Grosir" dan "Harga Grosir". Saat kasir melayani pembeli dan jumlah barang mencapai minimum qty tersebut, sistem otomatis akan menggunakan harga grosir.',
+    ),
+    (
+      tanya: 'Bagaimana cara menambahkan produk jasa/layanan?',
+      jawab: 'Di halaman Produk, klik Tambah. Akan muncul pilihan "Barang Fisik" atau "Jasa / Layanan". Pilih "Jasa / Layanan" untuk layanan yang tidak memiliki stok (misalnya: ongkos pasang, jasa bungkus, dsb).',
+    ),
+    (
       tanya: 'Apakah data hilang kalau aplikasi dihapus?',
       jawab: 'Ya. Data tersimpan di dalam aplikasi. Sebelum menghapus '
           'aplikasi atau berganti HP, cadangkan dulu lewat Profil lalu simpan '

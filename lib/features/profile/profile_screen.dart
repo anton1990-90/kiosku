@@ -332,6 +332,86 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     _pesan('Cadangan dibuat. Simpan berkasnya ke email atau Google Drive.');
   }
 
+  Future<void> _bukaPengaturanCadanganOtomatis() async {
+    final prefs = await SharedPreferences.getInstance();
+    final emailController = TextEditingController(text: prefs.getString('backup_email') ?? '');
+    TimeOfDay waktu = TimeOfDay(
+      hour: prefs.getInt('backup_jam') ?? 21,
+      minute: prefs.getInt('backup_menit') ?? 0,
+    );
+
+    if (!mounted) return;
+    await showDialog(
+      context: context,
+      builder: (dialogContext) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              title: const Text('Pengaturan Cadangan'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Karena aplikasi beroperasi tanpa internet (offline), sistem tidak dapat menembus server email untuk mengirim berkas diam-diam. '
+                    'Aplikasi akan mengingatkan Anda untuk mengirim berkas ke email ini pada jam yang ditentukan.',
+                    style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                  ),
+                  const SizedBox(height: 16),
+                  TextField(
+                    controller: emailController,
+                    decoration: const InputDecoration(
+                      labelText: 'Email Tujuan',
+                      hintText: 'contoh@gmail.com',
+                      prefixIcon: Icon(Icons.email_outlined),
+                    ),
+                    keyboardType: TextInputType.emailAddress,
+                  ),
+                  const SizedBox(height: 16),
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text('Waktu Pengingat'),
+                    trailing: Text(
+                      '${waktu.hour.toString().padLeft(2, '0')}:${waktu.minute.toString().padLeft(2, '0')}',
+                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: AppColors.primary),
+                    ),
+                    onTap: () async {
+                      final jamBaru = await showTimePicker(
+                        context: context,
+                        initialTime: waktu,
+                      );
+                      if (jamBaru != null) {
+                        setDialogState(() => waktu = jamBaru);
+                      }
+                    },
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('Batal'),
+                ),
+                ElevatedButton(
+                  onPressed: () async {
+                    await prefs.setString('backup_email', emailController.text);
+                    await prefs.setInt('backup_jam', waktu.hour);
+                    await prefs.setInt('backup_menit', waktu.minute);
+                    // Nyalakan toggle otomatis di state backup
+                    ref.read(backupProvider.notifier).setOtomatis(true);
+                    if (context.mounted) Navigator.pop(context);
+                  },
+                  child: const Text('Simpan'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
   /// Minta password akun. Mengembalikan password yang SUDAH terbukti benar,
   /// atau `null` kalau dibatalkan maupun salah.
   Future<String?> _mintaPassword() async {
@@ -1264,14 +1344,12 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                               ? 'Cadangan terakhir GAGAL dibuat'
                               : (backupState.otomatis
                                   ? (backupState.terakhir == null
-                                      ? 'Menyala — belum pernah dibuat'
+                                      ? 'Menyala — ketuk untuk atur email/jam'
                                       : 'Menyala — terakhir '
                                           '${_waktuSingkat(backupState.terakhir!)}')
-                                  : 'Mati — cadangan tidak dibuat otomatis'),
-                          toggle: backupState.otomatis,
-                          onToggle: (nilai) => ref
-                              .read(backupProvider.notifier)
-                              .setOtomatis(nilai),
+                                  : 'Mati — ketuk untuk mengatur'),
+                          trailing: Icons.settings,
+                          onTap: _bukaPengaturanCadanganOtomatis,
                         ),
                         // Kegagalan cadangan harus terlihat, bukan cuma
                         // tersimpan di state. Pemilik toko yang mengira

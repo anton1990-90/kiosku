@@ -474,7 +474,10 @@ class _KasirScreenState extends ConsumerState<KasirScreen> {
                         Expanded(
                           child: Container(
                             width: double.infinity,
-                            color: AppColors.bgSoft,
+                            decoration: const BoxDecoration(
+                              color: AppColors.bgSoft,
+                              borderRadius: BorderRadius.vertical(top: Radius.circular(12)),
+                            ),
                             child: LayoutBuilder(
                               builder: (context, batas) {
                                 // Foto dibuat sebesar ruang yang tersedia,
@@ -534,6 +537,14 @@ class _KasirScreenState extends ConsumerState<KasirScreen> {
                                 ),
                               ),
                               const SizedBox(height: 2),
+                              if (product.wholesaleMinQty != null && product.wholesalePrice != null)
+                                Padding(
+                                  padding: const EdgeInsets.only(bottom: 2),
+                                  child: Text(
+                                    'Grosir: ${Formatters.rupiah(product.wholesalePrice!)} (min ${product.wholesaleMinQty})',
+                                    style: const TextStyle(fontSize: 10, color: AppColors.primary, fontWeight: FontWeight.w600),
+                                  ),
+                                ),
                               Text(
                                 'Stok: ${Formatters.jumlah(product.stock)} '
                                 '${product.unit}',
@@ -652,9 +663,9 @@ class _KasirScreenState extends ConsumerState<KasirScreen> {
                                             color: AppColors.primaryLight,
                                             borderRadius: BorderRadius.circular(4),
                                           ),
-                                          child: const Text(
-                                            'Harga Grosir',
-                                            style: TextStyle(
+                                          child: Text(
+                                            'Harga Grosir: ${Formatters.rupiah(item.effectivePrice)}',
+                                            style: const TextStyle(
                                               fontSize: 9,
                                               fontWeight: FontWeight.bold,
                                               color: AppColors.primary,

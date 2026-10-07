@@ -695,10 +695,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: const Text('Keluar?'),
         content: const Text(
-          'Anda akan keluar dari akun. Data tetap tersimpan di perangkat '
-          'ini.\n\n'
-          'Sesudah keluar, aplikasi kembali ke layar PIN — di situ Anda bisa '
-          'masuk sebagai akun lain, atau memakai email dan password.',
+          'Anda akan keluar dari sesi masuk Anda saat ini.\n\n'
+          'Sesudah keluar, aplikasi akan mewajibkan Anda untuk memasukkan ulang Email dan Password untuk masuk kembali. PIN Anda tetap bisa digunakan lagi jika Anda sudah masuk nantinya.',
         ),
         actions: [
           TextButton(
@@ -708,12 +706,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           ElevatedButton(
             onPressed: () async {
               Navigator.pop(ctx);
-              // Bukan `logout()` saja: sesudah keluar, gerbang PIN ikut
-              // dikunci supaya pemakai berikutnya mendarat di layar PIN —
-              // itulah pintu masuk harian sekarang. Kalau tidak ada akun
-              // ber-PIN, gerbangnya memang dibiarkan terbuka dan pemakai
-              // berikutnya mendarat di layar masuk.
-              await ref.read(authProvider.notifier).gantiPengguna();
+              await ref.read(authProvider.notifier).logout();
             },
             style: ElevatedButton.styleFrom(backgroundColor: AppColors.danger),
             child: const Text('Keluar'),

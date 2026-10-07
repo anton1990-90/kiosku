@@ -130,20 +130,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       final isLoggedIn = authState.isAuthenticated;
       final isAuthRoute = location.startsWith('/auth');
 
-      // Gerbang PIN — sejak v1.20.0 PIN adalah cara masuk harian, bukan lagi
-      // tambahan di atas sesi. Karena itu gerbangnya TIDAK lagi berada di dalam
-      // `if (isLoggedIn)`: orang yang belum masuk pun harus melewatinya, dan
-      // justru itulah yang membuat PIN menggantikan email & kata sandi.
-      //
-      // Sesi yang tersimpan sengaja tidak dipercaya sampai PIN diketik: di HP
-      // yang dipakai bergantian, sesi sisa dari kemarin bisa milik orang lain.
-      //
-      // Urutannya load-bearing. Gerbang PIN diperiksa SEBELUM hak akses peran
-      // (v1.16.0) — kalau terbalik, kasir yang belum membuka PIN diantar ke
-      // Beranda, dan dari sana ia bisa menekan apa saja yang terlihat tanpa
-      // pernah melewati kuncinya.
-      if (pinState.perluDibuka && !isPinRoute) return '/auth/pin';
-      if (isPinRoute && !pinState.perluDibuka) {
+      // Gerbang PIN — berfungsi sebagai layar kunci bagi sesi yang aktif.
+      // Jika belum masuk (isLoggedIn == false), PIN tidak boleh muncul.
+      if (isLoggedIn && pinState.perluDibuka && !isPinRoute) return '/auth/pin';
+      if (isPinRoute && (!pinState.perluDibuka || !isLoggedIn)) {
         return isLoggedIn ? '/dashboard' : '/auth/login';
       }
 

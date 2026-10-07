@@ -81,7 +81,7 @@ class DatabaseHelper {
   static final DatabaseHelper instance = DatabaseHelper._();
 
   static const _dbName = 'tokoku.db';
-  static const _dbVersion = 12;
+  static const _dbVersion = 13;
 
   Database? _database;
 
@@ -118,6 +118,7 @@ class DatabaseHelper {
     await _upgradeV10(db);
     await _upgradeV11(db);
     await _upgradeV12(db);
+    await _upgradeV13(db);
     await _seedProducts(db);
     await _seedPaymentMethods(db);
   }
@@ -677,6 +678,17 @@ class DatabaseHelper {
   Future<void> _upgradeV12(Database db) async {
     await _addColumnIfMissing(db, 'users', 'pin_hash', 'TEXT');
   }
+  /// Kolom versi 13 — Harga Grosir & Tanggal Kedaluwarsa
+  ///
+  /// `wholesale_min_qty` (jumlah minimum beli untuk dapat harga grosir)
+  /// `wholesale_price` (harga grosir per unit)
+  /// `expired_date` (tanggal kedaluwarsa untuk produk makanan/minuman)
+  Future<void> _upgradeV13(Database db) async {
+    await _addColumnIfMissing(db, 'products', 'wholesale_min_qty', 'INTEGER');
+    await _addColumnIfMissing(db, 'products', 'wholesale_price', 'INTEGER');
+    await _addColumnIfMissing(db, 'products', 'expired_date', 'TEXT');
+  }
+
 
   /// Migrasi dari versi lama. Data yang sudah ada tidak boleh hilang.
   Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
@@ -715,6 +727,9 @@ class DatabaseHelper {
     }
     if (oldVersion < 12) {
       await _upgradeV12(db);
+    }
+    if (oldVersion < 13) {
+      await _upgradeV13(db);
     }
   }
 

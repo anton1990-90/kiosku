@@ -19,6 +19,9 @@ class ProductModel {
   /// Path foto barang yang dipilih dari galeri HP. Kalau null, tampilan
   /// kembali memakai [emoji] — jadi produk lama tidak perlu disunting.
   final String? photoPath;
+  final int? wholesaleMinQty; // Minimum jumlah beli untuk dapat harga grosir
+  final int? wholesalePrice;  // Harga grosir
+  final String? expiredDate;  // Tanggal kedaluwarsa (ISO-8601)
   final DateTime createdAt;
   final DateTime updatedAt;
 
@@ -35,6 +38,9 @@ class ProductModel {
     this.barcode,
     this.unit = 'pcs',
     this.photoPath,
+    this.wholesaleMinQty,
+    this.wholesalePrice,
+    this.expiredDate,
     required this.createdAt,
     required this.updatedAt,
   });
@@ -63,6 +69,9 @@ class ProductModel {
       'barcode': barcode,
       'unit': unit,
       'photo_path': photoPath,
+      'wholesale_min_qty': wholesaleMinQty,
+      'wholesale_price': wholesalePrice,
+      'expired_date': expiredDate,
       'created_at': createdAt.toIso8601String(),
       'updated_at': updatedAt.toIso8601String(),
     };
@@ -82,6 +91,9 @@ class ProductModel {
       barcode: map['barcode'] as String?,
       unit: (map['unit'] as String?) ?? 'pcs',
       photoPath: map['photo_path'] as String?,
+      wholesaleMinQty: map['wholesale_min_qty'] as int?,
+      wholesalePrice: map['wholesale_price'] as int?,
+      expiredDate: map['expired_date'] as String?,
       createdAt: DateTime.parse(map['created_at'] as String),
       updatedAt: DateTime.parse(map['updated_at'] as String),
     );
@@ -100,6 +112,9 @@ class ProductModel {
     String? barcode,
     String? unit,
     String? photoPath,
+    int? wholesaleMinQty,
+    int? wholesalePrice,
+    String? expiredDate,
     DateTime? createdAt,
     DateTime? updatedAt,
   }) {
@@ -116,6 +131,9 @@ class ProductModel {
       barcode: barcode ?? this.barcode,
       unit: unit ?? this.unit,
       photoPath: photoPath ?? this.photoPath,
+      wholesaleMinQty: wholesaleMinQty ?? this.wholesaleMinQty,
+      wholesalePrice: wholesalePrice ?? this.wholesalePrice,
+      expiredDate: expiredDate ?? this.expiredDate,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
     );

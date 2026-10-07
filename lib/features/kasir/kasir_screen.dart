@@ -646,7 +646,7 @@ class _KasirScreenState extends ConsumerState<KasirScreen> {
                                       ),
                                       if (item.effectivePrice < item.product.sellPrice)
                                         Container(
-                                          margin: const EdgeInsets.top(2),
+                                          margin: const EdgeInsets.only(top: 2),
                                           padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
                                           decoration: BoxDecoration(
                                             color: AppColors.primaryLight,

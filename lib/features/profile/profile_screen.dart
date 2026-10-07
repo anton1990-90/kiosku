@@ -414,7 +414,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   }
 
   Future<void> _pindahHp() async {
-    final password = await _mintaPassword();
+    final password = await _mintaPassword(actionLabel: 'Pindah HP');
     if (password == null) return;
 
     if (!mounted) return;
@@ -435,7 +435,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
 
   /// Minta password akun. Mengembalikan password yang SUDAH terbukti benar,
   /// atau `null` kalau dibatalkan maupun salah.
-  Future<String?> _mintaPassword() async {
+  Future<String?> _mintaPassword({String actionLabel = 'Lanjutkan'}) async {
     final controller = TextEditingController();
 
     final diketik = await showDialog<String>(
@@ -456,7 +456,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(dialogContext, controller.text),
-            child: const Text('Pulihkan'),
+            child: Text(actionLabel),
           ),
         ],
       ),
@@ -655,7 +655,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
 
     if (lanjut != true || !mounted) return;
 
-    final password = await _mintaPassword();
+    final password = await _mintaPassword(actionLabel: 'Pulihkan');
     if (password == null || !mounted) return;
 
     final user = ref.read(authProvider).user;

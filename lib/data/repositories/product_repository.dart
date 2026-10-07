@@ -32,6 +32,7 @@ class ProductRepository {
     return results.map((m) => ProductModel.fromMap(m)).toList();
   }
 
+
   Future<ProductModel?> getById(int id) async {
     final db = await _db.database;
     final results = await db.query(

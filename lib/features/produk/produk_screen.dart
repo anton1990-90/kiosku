@@ -92,11 +92,13 @@ class _ProdukScreenState extends ConsumerState<ProdukScreen> {
           // Category filters
           SizedBox(
             height: 44,
-            child: ListView.builder(
-              scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              itemCount: productState.categories.length,
-              itemBuilder: (context, index) {
+            child: Center(
+              child: ListView.builder(
+                shrinkWrap: true,
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                itemCount: productState.categories.length,
+                itemBuilder: (context, index) {
                 final cat = productState.categories[index];
                 final isActive = productState.selectedCategory == cat;
                 return Padding(

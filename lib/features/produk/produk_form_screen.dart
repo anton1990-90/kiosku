@@ -56,7 +56,7 @@ class _ProdukFormScreenState extends ConsumerState<ProdukFormScreen> {
   /// layar yang sudah ditutup tidak ikut menanggapi scan.
   StreamSubscription<String>? _langgananScan;
 
-  final _categories = ['Sembako', 'Minuman', 'Snack', 'Kebutuhan', 'Lainnya'];
+  List<String> _categories = ['Sembako', 'Minuman', 'Snack', 'Kebutuhan', 'Lainnya'];
   final _emojis = ['📦', '🍚', '🛢️', '🧂', '🥚', '🍜', '☕', '🥛', '🧴', '🧈', '🌾', '💧'];
   final _units = [
     'pcs',
@@ -93,6 +93,13 @@ class _ProdukFormScreenState extends ConsumerState<ProdukFormScreen> {
     // Pastikan daftar supplier terbaru sudah dimuat untuk dropdown.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ref.read(supplierProvider.notifier).loadSuppliers();
+    });
+
+    // Ambil semua kategori unik yang pernah dipakai sebelumnya.
+    ProductRepository().getCategories().then((cats) {
+      if (mounted && cats.isNotEmpty) {
+        setState(() => _categories = cats);
+      }
     });
 
     // Scanner barcode Bluetooth (mode HID) mengisi kolom barcode yang sama
@@ -420,14 +427,34 @@ class _ProdukFormScreenState extends ConsumerState<ProdukFormScreen> {
               Row(
                 children: [
                   Expanded(
-                    child: DropdownButtonFormField<String>(
-                      value: _category,
-                      decoration: const InputDecoration(labelText: 'Kategori'),
-                      items: _categories
-                          .map((c) => DropdownMenuItem(value: c, child: Text(c)))
-                          .toList(),
-                      onChanged: (v) =>
-                          setState(() => _category = v ?? 'Sembako'),
+                    child: Autocomplete<String>(
+                      initialValue: TextEditingValue(text: _category),
+                      optionsBuilder: (TextEditingValue textEditingValue) {
+                        if (textEditingValue.text.isEmpty) {
+                          return _categories;
+                        }
+                        return _categories.where((String option) {
+                          return option.toLowerCase().contains(textEditingValue.text.toLowerCase());
+                        });
+                      },
+                      onSelected: (String selection) {
+                        _category = selection;
+                      },
+                      fieldViewBuilder: (context, controller, focusNode, onFieldSubmitted) {
+                        // Pastikan controller diisi nilai awal jika mengedit,
+                        // agar tidak kosong meski _category ada isinya.
+                        if (isEditing && controller.text.isEmpty && _category.isNotEmpty) {
+                          controller.text = _category;
+                        }
+                        return TextFormField(
+                          controller: controller,
+                          focusNode: focusNode,
+                          textCapitalization: TextCapitalization.words,
+                          decoration: const InputDecoration(labelText: 'Kategori'),
+                          onChanged: (v) => _category = v.trim(),
+                          validator: (v) => v == null || v.trim().isEmpty ? 'Wajib diisi' : null,
+                        );
+                      },
                     ),
                   ),
                   const SizedBox(width: 12),

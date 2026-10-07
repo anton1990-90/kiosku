@@ -133,4 +133,11 @@ class Formatters {
     }
     return '${date(from)} - ${date(to)}';
   }
+  /// Rentang tanggal ringkas dalam format dd/MM/yyyy — dipakai di form produk
+  /// untuk menampilkan tanggal kedaluwarsa.
+  static String tanggalPendek(DateTime dt) {
+    final d = dt.day.toString().padLeft(2, '0');
+    final m = dt.month.toString().padLeft(2, '0');
+    return '$d/$m/${dt.year}';
+  }
 }

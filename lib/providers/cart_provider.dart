@@ -17,8 +17,18 @@ class CartItem {
     this.discount = 0,
   });
 
-  /// Harga sebelum potongan.
-  int get grossSubtotal => (product.sellPrice * quantity).round();
+  /// Harga satuan yang berlaku (bisa Harga Jual normal atau Harga Grosir)
+  int get effectivePrice {
+    if (product.wholesaleMinQty != null &&
+        product.wholesalePrice != null &&
+        quantity >= product.wholesaleMinQty!) {
+      return product.wholesalePrice!;
+    }
+    return product.sellPrice;
+  }
+
+  /// Harga sebelum potongan (kotor).
+  int get grossSubtotal => (effectivePrice * quantity).round();
 
   /// Potongan yang benar-benar berlaku.
   ///
@@ -77,7 +87,7 @@ class CartState {
               productId: i.product.id!,
               productName: i.product.name,
               costPrice: i.product.costPrice,
-              sellPrice: i.product.sellPrice,
+              sellPrice: i.effectivePrice,
               quantity: i.quantity,
               subtotal: i.subtotal,
               discount: i.potongan,

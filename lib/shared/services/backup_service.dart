@@ -283,7 +283,9 @@ class BackupService {
       rows: [
         [
           'ID', 'Nama', 'Kategori', 'Harga beli', 'Harga jual', 'Stok',
-          'Stok minimum', 'Supplier', 'Barcode', 'Emoji', 'Dibuat', 'Diubah',
+          'Stok minimum', 'Supplier', 'Barcode', 'Emoji', 
+          'Min. grosir', 'Harga grosir', 'Kedaluwarsa',
+          'Dibuat', 'Diubah',
         ],
         for (final p in rows)
           [
@@ -297,6 +299,9 @@ class BackupService {
             _teks(p['supplier']),
             _teks(p['barcode']),
             _teks(p['emoji']),
+            _int(p['wholesale_min_qty']),
+            _int(p['wholesale_price']),
+            _teks(p['expired_date']),
             _teks(p['created_at']),
             _teks(p['updated_at']),
           ],

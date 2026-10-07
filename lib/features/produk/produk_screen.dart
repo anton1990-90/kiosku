@@ -275,6 +275,28 @@ class _ProductCard extends StatelessWidget {
     required this.onDelete,
   });
 
+  bool get _isExpiringSoon {
+    if (product.expiredDate == null) return false;
+    try {
+      final date = DateTime.parse(product.expiredDate!);
+      final diff = date.difference(DateTime.now()).inDays;
+      return diff <= 30 && diff >= 0;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  bool get _hasExpired {
+    if (product.expiredDate == null) return false;
+    try {
+      final date = DateTime.parse(product.expiredDate!);
+      final today = DateTime.now();
+      return date.isBefore(DateTime(today.year, today.month, today.day));
+    } catch (_) {
+      return false;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -333,6 +355,24 @@ class _ProductCard extends StatelessWidget {
                     ),
                   ],
                 ),
+                if (_hasExpired || _isExpiringSoon) ...[
+                  const SizedBox(height: 4),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: _hasExpired ? AppColors.dangerLight : AppColors.warningLight,
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: Text(
+                      _hasExpired ? 'Sudah Kedaluwarsa' : 'Akan Kedaluwarsa',
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                        color: _hasExpired ? AppColors.danger : AppColors.warningMid,
+                      ),
+                    ),
+                  ),
+                ],
               ],
             ),
           ),

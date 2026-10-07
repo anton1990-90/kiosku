@@ -734,8 +734,8 @@ async function tanganiVersi(env, url) {
     ukuran: rilis.ukuran,
     catatan: rilis.catatan,
     diterbitkan: rilis.diterbitkan,
-    unduh: new URL('/unduh/apk', url.origin).toString(),
-    halaman: new URL('/unduh', url.origin).toString(),
+    unduh: 'https://lisensi.dompetkuai.my.id/unduh/apk',
+    halaman: 'https://lisensi.dompetkuai.my.id/unduh',
   });
 }
 

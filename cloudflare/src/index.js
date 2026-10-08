@@ -27,6 +27,8 @@ import { halamanPortal } from './halaman-portal.js';
 import { halamanAdmin } from './halaman-admin.js';
 import { halamanUnduh, halamanUnduhGagal } from './halaman-unduh.js';
 import { emailVoucher } from './email-voucher.js';
+import { tanganiCrmApp } from './crm.js';
+import PostalMime from 'postal-mime';
 
 /**
  * Alfabet kode. Huruf I, O, 0, dan 1 dibuang karena sering tertukar saat
@@ -618,15 +620,42 @@ async function tanganiWebhookOrderHero(request, env) {
     }
   }
 
-  // Baru bertindak setelah pembayaran benar-benar masuk.
-  if (event !== 'order_paid') {
-    await catat('ignored', null, '', '', 'event ' + (event || '(kosong)') + ' diabaikan');
-    return balasJson({ ok: true, diabaikan: true, event: event });
-  }
-
   const email = String(isi.customer_email || '').trim().slice(0, 160);
   const nama = String(isi.customer_name || '').trim().slice(0, 80);
-  const orderRef = String(isi.order_number || isi.order_id || '').trim().slice(0, 60);
+  const phone = String(isi.customer_phone || isi.phone || isi.buyer_phone || '').trim().slice(0, 50);
+  const orderRef = String(isi.order_number || isi.order_id || delivery || '').trim().slice(0, 60);
+  const price = parseInt(isi.total || isi.amount || isi.price || 0, 10);
+  
+  let sourceApp = 'dompetkuai.my.id';
+  const productName = String(isi.product_name || isi.item_name || (isi.items && isi.items[0] && isi.items[0].name) || 'Lisensi').trim();
+  if (productName.toLowerCase().includes('tokoku')) {
+      sourceApp = 'tokoku.dompetkuai.my.id';
+  } else if (isi.source) {
+      sourceApp = String(isi.source).trim();
+  }
+
+  // Selalu catat ke tabel CRM terlepas dari apakah sudah lunas atau belum
+  try {
+      const orderStatus = event === 'order_paid' ? 'paid' : 'pending';
+      // Kalau order_id sudah ada, statusnya akan diperbarui (berkat INSERT OR REPLACE jika order_id sama, tapi 
+      // di SQLite INSERT OR REPLACE menimpa baris, jadi created_at akan berubah. Lebih baik UPDATE terpisah atau abaikan created_at berubah)
+      // Tunggu, kalau REPLACE maka baris terganti total. Mari pakai INSERT ... ON CONFLICT
+      await env.DB.prepare(
+        'INSERT INTO orders (order_id, source, customer_name, customer_email, customer_phone, product_name, price, status, created_at, updated_at) ' +
+        'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ' +
+        'ON CONFLICT(order_id) DO UPDATE SET status = excluded.status, updated_at = excluded.updated_at, customer_phone = excluded.customer_phone'
+      )
+        .bind(orderRef, sourceApp, nama, email, phone, productName, price, orderStatus, sekarangIso(), sekarangIso())
+        .run();
+  } catch (err) {
+      console.error('Gagal mencatat order CRM:', err);
+  }
+
+  // Baru bertindak membuat lisensi jika pembayaran benar-benar masuk.
+  if (event !== 'order_paid') {
+    await catat('ignored', null, email, '', 'event ' + (event || '(kosong)') + ' diabaikan');
+    return balasJson({ ok: true, diabaikan: true, event: event });
+  }
 
   const kode = await buatSatuVoucher(env, (orderRef || 'PESANAN').slice(0, 40), nama, email, orderRef);
   if (!kode) {
@@ -645,6 +674,59 @@ async function tanganiWebhookOrderHero(request, env) {
 
   await catat('processed', kode, email, emailStatus, '');
   return balasJson({ ok: true, voucher: kode, email: emailStatus });
+}
+
+// Pencegat Gaib (Network Interceptor) - menyalin data lalu meloloskannya ke server asli
+async function catatDanTeruskanKeOrigin(request, env, sourceName) {
+  // Salin request agar bisa dibaca tanpa merusak aslinya (karena request.body cuma bisa dibaca 1x)
+  const reqClone = request.clone();
+  
+  try {
+      const raw = await reqClone.text();
+      const delivery = crypto.randomUUID();
+      
+      // Simpan data mentah
+      try {
+        await env.DB.prepare(
+          'INSERT INTO webhook_events (delivery_id, sumber, event, status, email, alasan, received_at) VALUES (?, ?, ?, ?, ?, ?, ?)'
+        )
+        .bind(delivery, 'interceptor', 'mentah', 'pending', '', raw.slice(0, 450), sekarangIso())
+        .run();
+      } catch (err) {}
+
+      // Ekstrak untuk CRM
+      let data;
+      try { data = JSON.parse(raw); } catch (_) {}
+      
+      if (data) {
+          const email = String(data.customer_email || data.email || data.buyer_email || '').trim().slice(0, 160);
+          const nama = String(data.customer_name || data.name || data.buyer_name || '').trim().slice(0, 80);
+          const phone = String(data.customer_phone || data.phone || data.buyer_phone || '').trim().slice(0, 50);
+          const orderRef = String(data.order_id || data.invoice_id || data.reference || delivery).trim().slice(0, 60);
+          const price = parseInt(data.amount || data.total || data.price || 0, 10);
+          const productName = String(data.product_name || data.item_name || 'Lisensi Aplikasi').trim();
+          
+          let status = 'pending';
+          const eventName = String(data.event || data.status || '').toLowerCase();
+          if (eventName.includes('paid') || eventName.includes('success') || eventName.includes('settled')) {
+              status = 'paid';
+          }
+
+          if (email) {
+              await env.DB.prepare(
+                'INSERT INTO orders (order_id, source, customer_name, customer_email, customer_phone, product_name, price, status, created_at, updated_at) ' +
+                'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(order_id) DO UPDATE SET status = excluded.status, updated_at = excluded.updated_at, customer_phone = excluded.customer_phone'
+              )
+              .bind(orderRef, sourceName, nama, email, phone, productName, price, status, sekarangIso(), sekarangIso())
+              .run();
+          }
+      }
+  } catch(err) {
+      console.error('Gagal menyadap:', err);
+  }
+  
+  // Lepaskan kembali request aslinya ke server tujuan aslinya seolah tak terjadi apa-apa!
+  return fetch(request);
 }
 
 /** Kirim ulang email voucher dari halaman admin (kalau email pertama gagal). */
@@ -837,6 +919,12 @@ export default {
     }
 
     try {
+      // --- CRM App ------------------------------------------------------
+      // Bisa diakses lewat crm.dompetkuai.my.id atau /crm di domain utama
+      if (url.hostname.startsWith('crm.') || jalur === '/crm' || jalur.startsWith('/crm/') || jalur.startsWith('/api/crm')) {
+         return await tanganiCrmApp(request, env, url, metode, jalur);
+      }
+
       // --- publik -------------------------------------------------------
       if (jalur === '/' && metode === 'GET') {
         return balasHtml(halamanPortal(env));
@@ -854,6 +942,32 @@ export default {
       // tanda tangan, jadi endpoint ini boleh publik.
       if (jalur === '/webhook/orderhero' && metode === 'POST') {
         return await tanganiWebhookOrderHero(request, env);
+      }
+
+      // Sinyal Internal dari dalam sistem backend aplikasi dompetkuai/tokoku Anda
+      if (jalur === '/webhook/internal-crm' && metode === 'POST') {
+        try {
+            const body = await request.json();
+            if (body.email) {
+                await env.DB.prepare(
+                    'INSERT INTO orders (order_id, source, customer_name, customer_email, product_name, price, status, created_at, updated_at) ' +
+                    'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(order_id) DO UPDATE SET status = excluded.status, updated_at = excluded.updated_at'
+                )
+                .bind(body.order_id || crypto.randomUUID(), body.source || 'dompetkuai.my.id', body.name || 'Pengguna', body.email, body.event === 'register' ? 'Pendaftaran Akun' : 'Lisensi Aplikasi', body.amount || 0, 'pending', sekarangIso(), sekarangIso())
+                .run();
+            }
+        } catch (e) {}
+        return balasJson({ ok: true });
+      }
+
+      // Pencegatan jaringan untuk web dompetkuai.my.id asli Anda
+      if (url.hostname === 'dompetkuai.my.id' && jalur === '/api/pakasir/webhook' && metode === 'POST') {
+        return await catatDanTeruskanKeOrigin(request, env, 'dompetkuai.my.id');
+      }
+
+      // Pencegatan jaringan untuk web tokoku.dompetkuai.my.id asli Anda
+      if (url.hostname === 'tokoku.dompetkuai.my.id' && jalur === '/api/webhook' && metode === 'POST') {
+        return await catatDanTeruskanKeOrigin(request, env, 'tokoku.dompetkuai.my.id');
       }
 
       // Pembaruan aplikasi — pengganti tautan GitHub supaya akun GitHub
@@ -913,4 +1027,48 @@ export default {
       return balasJson({ ok: false, reason: 'server_error' }, 500);
     }
   },
+
+  // Handler untuk menangkap email masuk (Email Routing)
+  async email(message, env, ctx) {
+    try {
+        const rawEmail = await new Response(message.raw).arrayBuffer();
+        const parser = new PostalMime();
+        const parsedEmail = await parser.parse(rawEmail);
+        
+        // 1. Cek apakah ini balasan dari pelanggan (bukan email otomatis)
+        const fromAddress = message.from;
+        const subject = parsedEmail.subject || '(Tanpa Subjek)';
+        const textBody = parsedEmail.text || parsedEmail.html || '(Tanpa Isi)';
+        const userName = parsedEmail.from?.name || fromAddress;
+
+        // Jangan proses kalau ini email bounce/mailer-daemon
+        if (fromAddress.toLowerCase().includes('mailer-daemon') || fromAddress.toLowerCase().includes('bounce')) {
+            return;
+        }
+
+        // 2. Cari atau buat tiket baru berdasarkan email pengguna
+        // Logika sederhana: jika ada tiket 'open' dari email ini, tambahkan pesannya. Jika tidak, buat tiket baru.
+        let ticketId = null;
+        const existingTicket = await env.DB.prepare("SELECT id FROM tickets WHERE user_email = ? AND status = 'open' ORDER BY updated_at DESC LIMIT 1").bind(fromAddress).first();
+        
+        const now = new Date().toISOString();
+        if (existingTicket) {
+            ticketId = existingTicket.id;
+            // Update waktu tiket
+            await env.DB.prepare("UPDATE tickets SET updated_at = ? WHERE id = ?").bind(now, ticketId).run();
+        } else {
+            ticketId = crypto.randomUUID();
+            await env.DB.prepare("INSERT INTO tickets (id, user_email, user_name, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)")
+                .bind(ticketId, fromAddress, userName, 'open', now, now).run();
+        }
+
+        // 3. Simpan isi pesan
+        const msgId = crypto.randomUUID();
+        await env.DB.prepare("INSERT INTO ticket_messages (id, ticket_id, direction, subject, body_text, created_at) VALUES (?, ?, ?, ?, ?, ?)")
+            .bind(msgId, ticketId, 'in', subject, textBody.substring(0, 5000), now).run();
+
+    } catch (e) {
+        console.error("Gagal memproses email:", e);
+    }
+  }
 };

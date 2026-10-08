@@ -642,36 +642,36 @@ class _ProdukFormScreenState extends ConsumerState<ProdukFormScreen> {
                   );
                 }),
               const SizedBox(height: 12),
-              Row(
-                children: [
-                  Expanded(
-                    flex: 1,
-                    child: TextFormField(
-                      controller: _wholesaleMinQtyController,
-                      keyboardType: TextInputType.number,
-                      decoration: const InputDecoration(
-                        labelText: 'Min. Qty Grosir',
-                        hintText: 'Opsional (Misal: 5)',
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    flex: 2,
-                    child: TextFormField(
-                      controller: _wholesalePriceController,
-                      keyboardType: TextInputType.number,
-                      decoration: const InputDecoration(
-                        labelText: 'Harga Grosir',
-                        prefixText: 'Rp ',
-                        hintText: 'Opsional',
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
               if (!_isService) ...[
+                Row(
+                  children: [
+                    Expanded(
+                      flex: 1,
+                      child: TextFormField(
+                        controller: _wholesaleMinQtyController,
+                        keyboardType: TextInputType.number,
+                        decoration: const InputDecoration(
+                          labelText: 'Min. Qty Grosir',
+                          hintText: 'Opsional (Misal: 5)',
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      flex: 2,
+                      child: TextFormField(
+                        controller: _wholesalePriceController,
+                        keyboardType: TextInputType.number,
+                        decoration: const InputDecoration(
+                          labelText: 'Harga Grosir',
+                          prefixText: 'Rp ',
+                          hintText: 'Opsional',
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
                 Row(
                   children: [
                     Expanded(

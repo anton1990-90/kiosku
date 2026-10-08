@@ -16,6 +16,12 @@ compatibility_date = "2026-09-01"
 #   * TIDAK ada pembekuan karena tidak dipakai (beda dengan Supabase)
 workers_dev = true
 
+routes = [
+  { pattern = "lisensi.dompetkuai.my.id", custom_domain = true },
+  { pattern = "crm.dompetkuai.my.id", custom_domain = true },
+  { pattern = "dompetkuai.my.id/api/pakasir/webhook", zone_name = "dompetkuai.my.id" },
+  { pattern = "tokoku.dompetkuai.my.id/api/webhook", zone_name = "dompetkuai.my.id" }
+]
 [[d1_databases]]
 binding = "DB"
 database_name = "tokoku-lisensi"
@@ -26,6 +32,8 @@ database_id = "7b228966-1656-4c35-9ed8-f8e3e3f88377"
 APP_NAME = "TokoKu"
 # Nomor WhatsApp dukungan (format 628..., boleh dikosongkan).
 SUPPORT_WHATSAPP = ""
+# Email pengirim yang telah terverifikasi di Resend
+EMAIL_DARI = "DompetKu Support <support@dompetkuai.my.id>"
 
 # Repo tempat rilis APK disimpan. Nilai ini HANYA ada di sisi server —
 # pelanggan tidak pernah melihatnya. Aplikasi meminta versi & file APK

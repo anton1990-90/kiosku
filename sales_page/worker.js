@@ -177,6 +177,22 @@ export default {
         )
         .run();
 
+        // KABARI CRM
+        try {
+          await fetch("https://lisensi.dompetkuai.my.id/webhook/internal-crm", {
+             method: "POST",
+             headers: { "Content-Type": "application/json" },
+             body: JSON.stringify({
+                event: "checkout",
+                email: customerEmail,
+                name: customerName,
+                amount: requestedAmount,
+                order_id: orderId,
+                source: "tokoku.dompetkuai.my.id"
+             })
+          });
+        } catch (e) {}
+
         return new Response(JSON.stringify(data), {
           headers: { "Content-Type": "application/json" }
         });

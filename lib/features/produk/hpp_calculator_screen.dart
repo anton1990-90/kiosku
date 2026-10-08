@@ -138,7 +138,7 @@ class _HppCalculatorScreenState extends State<HppCalculatorScreen> {
                 ),
                 if (items.length > 1)
                   IconButton(
-                    icon: const Icon(Icons.remove_circle_outline, color: AppColors.error),
+                    icon: const Icon(Icons.remove_circle_outline, color: Colors.red),
                     onPressed: () => _removeItem(items, idx),
                   )
                 else
@@ -228,7 +228,7 @@ class _HppCalculatorScreenState extends State<HppCalculatorScreen> {
                   Container(
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      color: AppColors.white,
+                      color: Colors.white,
                       borderRadius: BorderRadius.circular(12),
                       boxShadow: [
                         BoxShadow(

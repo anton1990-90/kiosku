@@ -3,8 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TokoKu - Aplikasi Kasir UMKM Offline Terbaik</title>
-    <meta name="description" content="Aplikasi kasir (POS) toko sembako UMKM offline-first dengan fitur lengkap: barcode, cetak struk, laporan keuangan, dan manajemen stok. Hanya Rp 99.000 (Lifetime)!">
+    <title>TokoKu POS - Aplikasi Kasir UMKM & Toko Sembako Offline Terbaik</title>
+    <meta name="description" content="Aplikasi kasir (POS) toko sembako UMKM offline-first dengan fitur lengkap: barcode, cetak struk Bluetooth, kalkulator HPP, tutup kasir laci, dan laporan keuangan 4 pilar. Hanya Rp 99.000 (Lifetime)!">
     <link rel="stylesheet" href="styles.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -18,167 +18,249 @@
     if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';
     n.queue=[];t=b.createElement(e);t.async=!0;
     t.src=v;s=b.getElementsByTagName(e)[0];
-    s.parentNode.insertBefore(t,s)}(window, document,'script',
+    p=s.parentNode.insertBefore(t,s)}(window, document,'script',
     'https://connect.facebook.net/en_US/fbevents.js');
-    fbq('init', 'YOUR_PIXEL_ID'); // REPLACE WITH ACTUAL PIXEL ID
+    fbq('init', 'YOUR_PIXEL_ID');
     fbq('track', 'PageView');
     </script>
     <noscript><img height="1" width="1" style="display:none"
     src="https://www.facebook.com/tr?id=YOUR_PIXEL_ID&ev=PageView&noscript=1"
     /></noscript>
-    <!-- End Meta Pixel Code -->
 </head>
 <body>
+    <!-- Navbar Sticky -->
+    <nav class="navbar">
+        <div class="container nav-container">
+            <a href="#" class="brand-logo">
+                <div class="brand-icon">🏪</div>
+                <div class="brand-name">TokoKu<span>POS</span></div>
+            </a>
+            <button class="nav-cta" onclick="openModal()">Beli Lisensi (Rp 99rb)</button>
+        </div>
+    </nav>
+
+    <!-- Hero Header -->
     <header class="hero">
         <div class="container hero-content">
             <div class="hero-text">
-                <h1>Ubah HP-mu Jadi Mesin Kasir Canggih!</h1>
-                <p>TokoKu adalah aplikasi kasir (POS) offline-first yang didesain khusus untuk UMKM & toko sembako. Kelola stok, cetak struk, dan pantau laba tanpa perlu langganan internet bulanan.</p>
+                <div class="tag-badge">
+                    <span>⚡</span> 100% Offline • Sekali Bayar Seumur Hidup
+                </div>
+                <h1>Ubah HP Android Jadi Mesin Kasir Pintar!</h1>
+                <p>TokoKu adalah aplikasi kasir (POS) offline-first yang didesain khusus untuk warung sembako, toko kelontong, dan usaha jasa UMKM. Kelola kas harian, scan barcode, cetak struk Bluetooth, hitung HPP otomatis, dan pantau laba tanpa langganan bulanan.</p>
+                
                 <div class="price-badge">
                     <span class="price">Rp 99.000</span>
-                    <span class="lifetime">Sekali Bayar (Lifetime)</span>
+                    <span class="lifetime">Lisensi Lifetime (1 HP)</span>
                 </div>
-                <div class="checkout-form" id="checkout-form-1">
-                    <input type="text" id="cust-name-1" placeholder="Nama Anda" required class="input-field">
-                    <input type="email" id="cust-email-1" placeholder="Alamat Email (untuk kode lisensi)" required class="input-field">
-                    <button class="cta-btn primary-btn" id="btn-checkout-1">Beli Sekarang</button>
-                    <p class="small-note">Kode Lisensi akan dikirim otomatis ke email Anda.</p>
+                
+                <div id="checkout-form-1">
+                    <button class="cta-btn primary-btn" id="btn-checkout-1" onclick="openModal()">
+                        🛒 Dapatkan Lisensi Sekarang
+                    </button>
+                    <p class="small-note">Kode Lisensi & Tautan Unduh APK dikirim otomatis ke email Anda.</p>
                 </div>
             </div>
+            
             <div class="hero-image">
-                <!-- Placeholder for the dashboard mockup -->
-                <img src="assets/hero_dashboard.jpg" alt="TokoKu Dashboard" class="mockup-img">
+                <div class="phone-mockup-frame">
+                    <img src="assets/hero_dashboard.jpg" alt="TokoKu Dashboard Asli" class="mockup-img">
+                </div>
+                <div class="floating-pill">
+                    <div class="pill-icon">👛</div>
+                    <div class="pill-text">
+                        <h4>Saldo Kas & Buku Kas</h4>
+                        <p>Rp 2.450.000 (Terkontrol)</p>
+                    </div>
+                </div>
             </div>
         </div>
     </header>
 
+    <!-- Galeri Desain Asli Aplikasi -->
+    <section class="app-gallery-section">
+        <div class="container">
+            <h2 class="section-title">Lihat Desain Asli Aplikasi TokoKu</h2>
+            <p class="section-subtitle">Tampilan bersih berbasis Material 3, bahasa Indonesia ramah pengguna, dan palet warna Teal yang nyaman di mata kasir seharian.</p>
+            
+            <div class="gallery-grid">
+                <!-- Card 1: Kasir POS -->
+                <div class="gallery-card">
+                    <div class="gallery-card-img-wrap">
+                        <img src="assets/pos_cashier.jpg" alt="Kasir POS Offline TokoKu">
+                    </div>
+                    <div class="gallery-card-body">
+                        <span class="gallery-card-badge badge-pos">Offline POS</span>
+                        <h3>Kasir Transaksi Cepat</h3>
+                        <p>Scan barcode kamera / gun Bluetooth, diskon grosir otomatis, dan multi-pembayaran Tunai, QRIS, & Hutang.</p>
+                    </div>
+                </div>
+
+                <!-- Card 2: HPP Calculator -->
+                <div class="gallery-card">
+                    <div class="gallery-card-img-wrap">
+                        <img src="assets/hpp_calculator.jpg" alt="Kalkulator HPP Rinci">
+                    </div>
+                    <div class="gallery-card-body">
+                        <span class="gallery-card-badge badge-hpp">Produksi & Jasa</span>
+                        <h3>Kalkulator HPP Rinci</h3>
+                        <p>Rincian akurat biaya Bahan Baku, Tenaga Kerja, dan Overhead untuk mengetahui modal riil dan margin laba bersih.</p>
+                    </div>
+                </div>
+
+                <!-- Card 3: Tutup Kasir -->
+                <div class="gallery-card">
+                    <div class="gallery-card-img-wrap">
+                        <img src="assets/tutup_kasir.jpg" alt="Tutup Kasir Laci TokoKu">
+                    </div>
+                    <div class="gallery-card-body">
+                        <span class="gallery-card-badge badge-closing">Anti Kebocoran</span>
+                        <h3>Rekonsiliasi Tutup Kasir</h3>
+                        <p>Hitung uang fisik di laci dan bandingkan dengan catatan kasir sistem. Selisih terdeteksi otomatis tanpa curiga.</p>
+                    </div>
+                </div>
+
+                <!-- Card 4: Laporan Keuangan -->
+                <div class="gallery-card">
+                    <div class="gallery-card-img-wrap">
+                        <img src="assets/financial_report.jpg" alt="Laporan Keuangan 4 Pilar TokoKu">
+                    </div>
+                    <div class="gallery-card-body">
+                        <span class="gallery-card-badge badge-finance">Standar Akuntansi</span>
+                        <h3>Laporan Keuangan 4 Pilar</h3>
+                        <p>Laba Rugi, Ekuitas, Neraca, dan Arus Kas standar akuntansi lengkap dengan ekspor dokumen resmi PDF & Excel.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Fitur Unggulan -->
     <section class="features">
         <div class="container">
-            <h2 class="section-title">Fitur Super Lengkap untuk Toko Anda</h2>
+            <h2 class="section-title">Fitur Super Lengkap untuk Usaha Anda</h2>
+            <p class="section-subtitle">Dibuat khusus menjawab kebutuhan nyata warung sembako, toko kelontong, dan UMKM di Indonesia.</p>
+            
             <div class="feature-grid">
                 <div class="feature-card">
                     <div class="icon">⚡</div>
-                    <h3>100% Offline</h3>
-                    <p>Jualan seharian tanpa butuh kuota internet. Bebas dari gangguan sinyal, server down, atau mati lampu.</p>
+                    <h3>100% Offline Tanpa Kuota</h3>
+                    <p>Jualan seharian penuh tanpa butuh koneksi internet. Bebas dari gangguan sinyal lemot, server mati, atau mati lampu.</p>
                 </div>
                 <div class="feature-card">
                     <div class="icon">🛒</div>
-                    <h3>Kasir Pintar & Cetak Struk</h3>
-                    <p>Scan barcode, hitung kembalian otomatis, jual eceran (seperti ¼ kg), dan cetak struk profesional langsung ke Printer Bluetooth.</p>
+                    <h3>Kasir Cepat & Struk Bluetooth</h3>
+                    <p>Mendukung barcode scanner HID Bluetooth, hitung kembalian cepat, dan cetak struk ESC/POS 58mm & 80mm secara instan.</p>
                 </div>
                 <div class="feature-card">
                     <div class="icon">📦</div>
                     <h3>Harga Grosir Otomatis</h3>
-                    <p>Atur batas beli (misal: beli 12 otomatis turun harga). Sistem akan mengubahnya sendiri secara cerdas, tanpa kasir harus hafal!</p>
-                </div>
-                <div class="feature-card">
-                    <div class="icon">📉</div>
-                    <h3>Akuntansi & Laporan PDF</h3>
-                    <p>Bukan cuma buku kas, pantau Laba/Rugi, Neraca, Ekuitas, & Arus Kas layaknya PT besar. Ekspor laporan ke PDF/Excel kapan saja.</p>
-                </div>
-                <div class="feature-card">
-                    <div class="icon">🤝</div>
-                    <h3>Buku Pelanggan & Hutang</h3>
-                    <p>Catat kasbon pelanggan (piutang) maupun tagihan supplier tanpa tercecer. Langsung klik & chat WhatsApp mereka untuk menagih!</p>
-                </div>
-                <div class="feature-card">
-                    <div class="icon">👥</div>
-                    <h3>Hak Akses Owner & Karyawan</h3>
-                    <p>Lindungi privasi toko. Owner punya akses penuh, sementara Karyawan hanya bisa jualan. Dilengkapi fitur tutup shift kasir untuk cegah uang hilang.</p>
-                </div>
-                <div class="feature-card">
-                    <div class="icon">🔙</div>
-                    <h3>Retur & Batal Otomatis</h3>
-                    <p>Salah input? Batalkan dengan satu sentuhan. Stok kembali, uang disesuaikan, piutang dihapus rapi dalam hitungan detik tanpa merusak akuntansi.</p>
-                </div>
-                <div class="feature-card">
-                    <div class="icon">💾</div>
-                    <h3>Backup & Pemulihan</h3>
-                    <p>Jangan takut kehilangan data! Tersedia fitur pencadangan lengkap dan pemulihan data instan yang bisa Anda simpan mandiri.</p>
-                </div>
-                <div class="feature-card">
-                    <div class="icon">📱</div>
-                    <h3>Bebas Pindah HP</h3>
-                    <p>HP lama rusak atau beli baru? Cukup lakukan pemulihan data dan pindahkan lisensi Anda ke perangkat baru tanpa harus beli lisensi ulang.</p>
-                </div>
-                <div class="feature-card">
-                    <div class="icon">🔄</div>
-                    <h3>Update Aplikasi Gratis</h3>
-                    <p>Sekali bayar untuk seumur hidup, dan Anda akan terus mendapatkan pembaruan aplikasi rutin dengan fitur-fitur baru secara gratis.</p>
-                </div>
-                <div class="feature-card">
-                    <div class="icon">💼</div>
-                    <h3>Bisa untuk Usaha Jasa & Dagang</h3>
-                    <p>Bukan cuma jualan barang fisik! Aplikasi ini mendukung input Produk Jasa/Layanan tanpa perlu pusing soal sisa stok.</p>
+                    <p>Atur batas minimal beli (misal: beli 3 dus harga otomatis turun). Kasir tidak perlu pusing menghafal diskon grosir.</p>
                 </div>
                 <div class="feature-card">
                     <div class="icon">🧮</div>
-                    <h3>Kalkulator HPP Otomatis</h3>
-                    <p>Bingung tentukan Harga Modal? Gunakan Kalkulator HPP bawaan untuk menghitung biaya bahan, tenaga, dan overhead dengan akurat.</p>
+                    <h3>Kalkulator HPP & Produk Jasa</h3>
+                    <p>Bisa input produk barang maupun jasa (laundry, salon, cuci motor). Hitung biaya produksi sampai ke tingkat satuan.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="icon">🔒</div>
+                    <h3>Tutup Kasir (Shift Rekonsiliasi)</h3>
+                    <p>Cegah uang hilang di laci kasir. Rekonsiliasi kas teoritis vs fisik laci dengan cetak struk penutupan kasir shift.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="icon">📊</div>
+                    <h3>Akuntansi & Ekspor PDF / Excel</h3>
+                    <p>Bukan sekadar buku kas biasa! Nikmati Laporan Laba Rugi, Neraca, Ekuitas, & Arus Kas layaknya perusahaan besar.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="icon">🤝</div>
+                    <h3>Buku Pelanggan & Kasbon (Hutang)</h3>
+                    <p>Catat kasbon pelanggan (piutang) dan tagihan supplier dengan tanggal jatuh tempo. Dilengkapi tautan tagih via WhatsApp.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="icon">💾</div>
+                    <h3>Cadangan Otomatis ke Excel</h3>
+                    <p>Setiap 24 jam aplikasi otomatis mencadangkan seluruh data usaha ke format Excel yang bisa disimpan ke Google Drive.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="icon">🔄</div>
+                    <h3>Bebas Pindah HP & Update Rutin</h3>
+                    <p>Ganti HP baru? Lisensi bisa dipindahkan dengan mudah melalui bantuan admin CRM tanpa harus beli lisensi baru.</p>
                 </div>
             </div>
         </div>
     </section>
 
+    <!-- Showcase Detail Kasir -->
     <section class="pos-showcase">
-         <div class="container showcase-content">
+        <div class="container showcase-content">
             <div class="showcase-image">
-                 <img src="assets/pos_cashier.jpg" alt="TokoKu Kasir" class="mockup-img">
+                <div class="showcase-phone-frame">
+                    <img src="assets/pos_cashier.jpg" alt="TokoKu Kasir POS" class="mockup-img">
+                </div>
             </div>
             <div class="showcase-text">
                 <h2>Kasir Cepat, Antrian Bebas Macet</h2>
                 <ul>
-                    <li>✅ Tambahkan barang dengan scan barcode atau pencarian cepat.</li>
-                    <li>✅ Dukung pembayaran tunai, QRIS, dan e-wallet.</li>
-                    <li>✅ Bisa kasih diskon borongan atau per barang.</li>
-                    <li>✅ Fitur batal/retur transaksi yang aman dan rapi secara akuntansi.</li>
+                    <li><span class="check-icon">✓</span> Scan barcode kamera atau barcode gun Bluetooth instan.</li>
+                    <li><span class="check-icon">✓</span> Multi-metode pembayaran: Tunai (pecahan cepat), QRIS, Transfer, dan Hutang.</li>
+                    <li><span class="check-icon">✓</span> Potongan harga nota fleksibel dan harga grosir otomatis.</li>
+                    <li><span class="check-icon">✓</span> Cetak nota thermal atau bagikan struk digital via WhatsApp.</li>
                 </ul>
+                <div style="margin-top: 32px;">
+                    <button class="cta-btn primary-btn" onclick="openModal()">Miliki Sekarang (Rp 99.000)</button>
+                </div>
             </div>
         </div>
     </section>
 
+    <!-- Call to Action Promo -->
     <section class="cta-section">
         <div class="container">
-            <h2>Tinggalkan Cara Manual, Mulai Digitalisasi Toko Anda!</h2>
-            <p>Hanya dengan sekali bayar, Anda mendapatkan asisten toko pribadi yang bekerja 24 jam.</p>
+            <h2>Tinggalkan Buku Manual, Modernkan Toko Anda Sekarang!</h2>
+            <p>Hanya dengan sekali bayar, Anda mendapatkan asisten toko pribadi yang bekerja 24 jam tanpa biaya bulanan.</p>
+            
             <div class="price-box">
                 <p class="normal-price"><s>Rp 299.000</s></p>
                 <p class="promo-price">Rp 99.000</p>
-                <p class="lifetime-note">Lisensi Seumur Hidup | Tanpa Biaya Bulanan</p>
+                <p class="lifetime-note">Lisensi Seumur Hidup • Gratis Pembaruan Selamanya</p>
             </div>
-            <div class="checkout-form" id="checkout-form-2" style="max-width: 400px; margin: 0 auto;">
-                <input type="text" id="cust-name-2" placeholder="Nama Anda" required class="input-field">
-                <input type="email" id="cust-email-2" placeholder="Alamat Email" required class="input-field">
-                <button class="cta-btn pulse-btn" id="btn-checkout-2" style="width: 100%;">Amankan Harga Promo Sekarang</button>
-                <p class="small-note mt-2">Kode Lisensi akan dikirim otomatis ke email Anda.</p>
+            
+            <div id="checkout-form-2" style="max-width: 440px; margin: 0 auto;">
+                <button class="cta-btn pulse-btn" id="btn-checkout-2" style="width: 100%;" onclick="openModal()">
+                    🚀 Amankan Harga Promo Rp 99rb
+                </button>
+                <p class="small-note mt-2">Garansi aktivasi instan via email dalam hitungan menit.</p>
             </div>
         </div>
     </section>
 
-    <!-- Modal Checkout -->
+    <!-- Modal Checkout Pakasir -->
     <div id="checkoutModal" class="modal">
         <div class="modal-content">
             <span class="close-btn" onclick="closeModal()">&times;</span>
-            <h2>Detail Pembayaran</h2>
-            <div class="checkout-details">
-                <p><strong>Produk:</strong> TokoKu Lisensi Lifetime</p>
-                <p><strong>Harga Normal:</strong> <s>Rp 299.000</s></p>
-                <p><strong>Total Pembayaran:</strong> <span id="totalPayment" style="font-size: 1.2em; font-weight: bold; color: #e46455;">Rp 99.000</span></p>
+            <h2 style="font-size: 1.45rem; font-weight: 800; margin-bottom: 8px;">Detail Pembayaran Lisensi</h2>
+            <p style="font-size: 0.9rem; color: #64748B; margin-bottom: 20px;">Lisensi otomatis dikirim ke email setelah pembayaran terverifikasi.</p>
+            
+            <div style="background: #F8FAFC; padding: 16px; border-radius: 14px; border: 1px solid #E2E8F0; margin-bottom: 18px;">
+                <p style="margin-bottom: 4px;"><strong>Produk:</strong> TokoKu POS Lifetime (1 Perangkat)</p>
+                <p style="margin-bottom: 4px; color: #94A3B8;"><strong>Harga Normal:</strong> <s>Rp 299.000</s></p>
+                <p style="margin: 0;"><strong>Total Pembayaran:</strong> <span id="totalPayment" style="font-size: 1.3rem; font-weight: 800; color: #0F6E56;">Rp 99.000</span></p>
             </div>
             
-            <div class="coupon-section" style="margin-top: 15px;">
-                <label>Punya Kode Kupon?</label>
-                <div style="display: flex; gap: 10px;">
-                    <input type="text" id="couponCode" placeholder="Masukkan Kupon" class="input-field" style="margin-bottom: 0;">
-                    <button type="button" class="cta-btn secondary-btn" onclick="applyCoupon()" style="padding: 10px 15px;">Aktifkan</button>
+            <div style="margin-bottom: 16px;">
+                <label style="font-size: 0.85rem; font-weight: 600; color: #475569; display: block; margin-bottom: 6px;">Punya Kode Kupon Diskon?</label>
+                <div style="display: flex; gap: 8px;">
+                    <input type="text" id="couponCode" placeholder="Masukkan Kupon (misal: KIBO26)" class="input-field" style="margin-bottom: 0;">
+                    <button type="button" class="cta-btn secondary-btn" onclick="applyCoupon()" style="padding: 10px 16px; font-size: 0.9rem;">Terapkan</button>
                 </div>
-                <p id="couponMessage" style="font-size: 0.85em; margin-top: 5px; color: green; display: none;"></p>
+                <p id="couponMessage" style="font-size: 0.82rem; margin-top: 6px; display: none;"></p>
             </div>
 
-            <div class="payment-method-section" style="margin-top: 15px;">
-                <label>Metode Pembayaran</label>
+            <div style="margin-bottom: 16px;">
+                <label style="font-size: 0.85rem; font-weight: 600; color: #475569; display: block; margin-bottom: 6px;">Metode Pembayaran</label>
                 <select id="paymentMethod" class="input-field">
-                    <option value="qris">QRIS (Langsung)</option>
+                    <option value="qris">QRIS (BCA, Mandiri, GoPay, OVO, ShopeePay)</option>
                     <option value="bri_va">BRI Virtual Account</option>
                     <option value="bni_va">BNI Virtual Account</option>
                     <option value="cimb_niaga_va">CIMB Niaga Virtual Account</option>
@@ -187,30 +269,21 @@
                 </select>
             </div>
 
-            <div class="checkout-form" style="margin-top: 20px;">
-                <input type="text" id="cust-name-modal" placeholder="Nama Anda" required class="input-field">
-                <input type="email" id="cust-email-modal" placeholder="Alamat Email (untuk lisensi)" required class="input-field">
-                <button class="cta-btn primary-btn" id="btn-process-checkout" style="width: 100%;" onclick="processCheckout()">Lanjutkan ke Pembayaran</button>
+            <div class="checkout-form" style="margin-top: 18px; margin-bottom: 0;">
+                <input type="text" id="cust-name-modal" placeholder="Nama Lengkap Anda" required class="input-field">
+                <input type="email" id="cust-email-modal" placeholder="Alamat Email Aktif (untuk lisensi)" required class="input-field">
+                <button class="cta-btn primary-btn" id="btn-process-checkout" style="width: 100%;" onclick="processCheckout()">
+                    Lanjutkan ke Pembayaran
+                </button>
             </div>
         </div>
     </div>
 
-    <style>
-        .modal { display: none; position: fixed; z-index: 9999; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5); }
-        .modal-content { background-color: #fff; margin: 5% auto; padding: 20px; border-radius: 10px; width: 90%; max-width: 450px; position: relative; }
-        .close-btn { position: absolute; right: 20px; top: 15px; font-size: 24px; font-weight: bold; cursor: pointer; color: #555; }
-        .close-btn:hover { color: #000; }
-        .secondary-btn { background-color: #f1f1f1; color: #333; border: 1px solid #ccc; }
-        .modal .input-field { background-color: #fff; color: #333; border: 1px solid #ccc; width: 100%; padding: 12px; border-radius: 8px; }
-        .modal .input-field::placeholder { color: #888; }
-        .modal .input-field:focus { background-color: #fff; border-color: #F37021; outline: none; }
-        .modal select.input-field { appearance: auto; -webkit-appearance: auto; padding-right: 30px; }
-    </style>
-
+    <!-- Footer -->
     <footer>
         <div class="container">
-            <p>&copy; 2026 TokoKu. All rights reserved.</p>
-            <p>Powered by KIBO</p>
+            <p style="color: #CBD5E1; font-weight: 600;">&copy; 2026 TokoKu POS by DompetkuAI. Seluruh hak cipta dilindungi.</p>
+            <p style="color: #64748B;">Aplikasi Kasir UMKM Offline-First Indonesia • Layanan Bantuan: support@dompetkuai.my.id</p>
         </div>
     </footer>
 
@@ -230,16 +303,16 @@
             const code = document.getElementById('couponCode').value.trim().toUpperCase();
             const msg = document.getElementById('couponMessage');
             if (code === 'KIBO26') {
-                currentAmount = 59400; // Diskon 40% dari 99.000
+                currentAmount = 59400; // Diskon 40%
                 document.getElementById('totalPayment').innerText = 'Rp ' + currentAmount.toLocaleString('id-ID');
-                msg.innerText = 'Kupon berhasil diterapkan! Anda mendapat diskon 40% (Rp 39.600).';
-                msg.style.color = 'green';
+                msg.innerText = 'Kupon berhasil diterapkan! Anda hemat 40% (Rp 39.600).';
+                msg.style.color = '#0F6E56';
                 msg.style.display = 'block';
             } else {
                 currentAmount = 99000;
                 document.getElementById('totalPayment').innerText = 'Rp 99.000';
                 msg.innerText = 'Kupon tidak valid.';
-                msg.style.color = 'red';
+                msg.style.color = '#E24B4A';
                 msg.style.display = 'block';
             }
         }
@@ -259,15 +332,15 @@
             }
 
             const originalText = btn.innerText;
-            btn.innerText = "Memproses...";
+            btn.innerText = "Memproses Pesanan...";
             btn.disabled = true;
 
-            // Lacak event ke Meta Pixel
-            fbq('track', 'InitiateCheckout');
-            fbq('track', 'Lead');
+            if (typeof fbq === 'function') {
+                fbq('track', 'InitiateCheckout');
+                fbq('track', 'Lead');
+            }
 
             try {
-                // Panggil Cloudflare Pages Function kita
                 const response = await fetch('/api/checkout', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -279,23 +352,21 @@
                     const returnUrl = encodeURIComponent("https://tokoku.dompetkuai.my.id/download");
                     window.location.href = data.payment_link + "?redirect=" + returnUrl;
                 } else if (data.qr_string) {
-                    // Tampilkan QR Code di dalam Modal
                     const qrUrl = "https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=" + encodeURIComponent(data.qr_string);
                     document.querySelector('.modal-content').innerHTML = `
                         <span class="close-btn" onclick="closeModal()">&times;</span>
-                        <h2 style="text-align: center; margin-bottom: 5px;">Scan QRIS</h2>
-                        <p style="text-align: center; color: #666; margin-bottom: 15px;">Gunakan aplikasi M-Banking atau e-Wallet Anda.</p>
+                        <h2 style="text-align: center; margin-bottom: 6px; font-size: 1.4rem;">Scan QRIS Pembayaran</h2>
+                        <p style="text-align: center; color: #64748B; margin-bottom: 16px; font-size: 0.9rem;">Gunakan M-Banking (BCA, Mandiri, BRI, BNI) atau e-Wallet (GoPay, OVO, ShopeePay).</p>
                         <div style="text-align: center;">
-                            <img src="${qrUrl}" alt="QRIS" style="max-width: 200px; border-radius: 10px; border: 1px solid #ddd; padding: 10px; background: #fff;">
+                            <img src="${qrUrl}" alt="QRIS" style="max-width: 220px; border-radius: 12px; border: 1px solid #E2E8F0; padding: 12px; background: #fff;">
                         </div>
-                        <div style="text-align: center; margin-top: 10px;">
-                            <button onclick="downloadQR('${qrUrl}')" style="background: #10B981; color: #fff; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 0.85em; font-weight: 600;">⬇ Unduh Barcode QRIS</button>
+                        <div style="text-align: center; margin-top: 12px;">
+                            <button onclick="downloadQR('${qrUrl}')" style="background: #0F6E56; color: #fff; border: none; padding: 9px 18px; border-radius: 8px; cursor: pointer; font-size: 0.9rem; font-weight: 700;">⬇ Unduh Gambar QRIS</button>
                         </div>
-                        <h3 style="text-align: center; margin-top: 15px; color: #F37021;">Total: Rp ${data.total_payment.toLocaleString('id-ID')}</h3>
-                        <p style="text-align: center; font-size: 0.8em; margin-top: 10px;" id="paymentStatusText">Jika sudah dibayar, otomatis akan diproses dalam beberapa detik dan Anda akan menerima email berisikan Kode Lisensi & Link Unduh.</p>
+                        <h3 style="text-align: center; margin-top: 16px; color: #0F6E56; font-size: 1.4rem;">Total: Rp ${data.total_payment.toLocaleString('id-ID')}</h3>
+                        <p style="text-align: center; font-size: 0.85rem; margin-top: 10px; color: #64748B;" id="paymentStatusText">Menunggu pembayaran... Setelah Anda bayar, kode lisensi akan otomatis dikirimkan ke email Anda dalam hitungan detik.</p>
                     `;
                     
-                    // Tambahkan fungsi downloadQR ke window
                     window.downloadQR = function(url) {
                         fetch(url)
                             .then(res => res.blob())
@@ -307,27 +378,25 @@
                                 link.click();
                                 document.body.removeChild(link);
                             }).catch(() => {
-                                // Fallback jika fetch gagal karena CORS
                                 window.open(url, '_blank');
                             });
                     };
 
                 } else if (data.va_number) {
-                    // Tampilkan VA Number di dalam Modal
                     document.querySelector('.modal-content').innerHTML = `
                         <span class="close-btn" onclick="closeModal()">&times;</span>
-                        <h2 style="text-align: center; margin-bottom: 5px;">Virtual Account (${data.payment_method.replace('_va', '').toUpperCase()})</h2>
-                        <p style="text-align: center; color: #666; margin-bottom: 15px;">Lakukan transfer ke nomor Virtual Account di bawah ini:</p>
-                        <div style="background: #f1f5f9; padding: 15px; border-radius: 10px; text-align: center; border: 1px dashed #cbd5e1;">
-                            <h1 style="letter-spacing: 2px; color: #0B57A5; margin-bottom: 5px;">${data.va_number}</h1>
-                            <p style="font-size: 0.9em; color: #888;">a.n. Pakasir - TokoKu</p>
+                        <h2 style="text-align: center; margin-bottom: 6px; font-size: 1.4rem;">Transfer Virtual Account</h2>
+                        <p style="text-align: center; color: #64748B; margin-bottom: 16px; font-size: 0.9rem;">Bank ${data.payment_method.replace('_va', '').toUpperCase()}</p>
+                        <div style="background: #F1F5F9; padding: 18px; border-radius: 14px; text-align: center; border: 1px dashed #CBD5E1;">
+                            <h1 style="letter-spacing: 2px; color: #0F6E56; margin-bottom: 4px; font-size: 2rem;">${data.va_number}</h1>
+                            <p style="font-size: 0.85rem; color: #64748B;">a.n. Pakasir - TokoKu POS</p>
                         </div>
-                        <h3 style="text-align: center; margin-top: 10px; color: #F37021;">Total: Rp ${data.total_payment.toLocaleString('id-ID')}</h3>
-                        <p style="text-align: center; font-size: 0.8em; margin-top: 10px;" id="paymentStatusText">Jika sudah dibayar, otomatis akan diproses dalam beberapa menit dan Anda akan menerima email berisikan Kode Lisensi.</p>
+                        <h3 style="text-align: center; margin-top: 14px; color: #0F6E56; font-size: 1.4rem;">Total: Rp ${data.total_payment.toLocaleString('id-ID')}</h3>
+                        <p style="text-align: center; font-size: 0.85rem; margin-top: 10px; color: #64748B;" id="paymentStatusText">Menunggu transfer masuk... Kode lisensi akan dikirim otomatis ke email Anda.</p>
                     `;
 
                 } else {
-                    alert('Gagal membuat transaksi: ' + (data.error || 'Terjadi kesalahan.'));
+                    alert('Gagal membuat transaksi: ' + (data.error || 'Terjadi kesalahan sistem.'));
                     btn.innerText = originalText;
                     btn.disabled = false;
                 }
@@ -341,7 +410,7 @@
                             if (checkData.status && checkData.status !== 'pending') {
                                 clearInterval(window.pollInterval);
                                 document.getElementById('paymentStatusText').innerText = "Pembayaran Berhasil! Sedang mengarahkan ke halaman unduh...";
-                                document.getElementById('paymentStatusText').style.color = "green";
+                                document.getElementById('paymentStatusText').style.color = "#0F6E56";
                                 setTimeout(() => { window.location.href = '/download'; }, 2000);
                             }
                         } catch(e) {}
@@ -353,15 +422,6 @@
                 btn.disabled = false;
             }
         }
-
-        // Buka modal saat tombol beli di-klik
-        document.getElementById('btn-checkout-1').addEventListener('click', (e) => { e.preventDefault(); openModal(); });
-        document.getElementById('btn-checkout-2').addEventListener('click', (e) => { e.preventDefault(); openModal(); });
-
-        // Ubah form di halaman utama menjadi tombol biasa untuk membuka modal
-        document.getElementById('checkout-form-1').innerHTML = '<button class="cta-btn primary-btn" id="btn-checkout-1" onclick="openModal()">Beli Sekarang</button>';
-        document.getElementById('checkout-form-2').innerHTML = '<button class="cta-btn pulse-btn" id="btn-checkout-2" style="width: 100%;" onclick="openModal()">Amankan Harga Promo Sekarang</button>';
-
     </script>
 </body>
 </html>

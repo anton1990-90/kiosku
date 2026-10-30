@@ -19,7 +19,7 @@ sudah **berjalan**. Tidak ada lagi langkah persiapan yang tertinggal.
 | Kode lisensi + aktivasi + cek pembaruan | Selesai |
 | Fitur hutang, catatan, laporan, scan barcode, profil toko | Selesai — versi **1.5.0** |
 | Portal aktivasi pelanggan + halaman admin penjual | Selesai — [buka portal](https://lisensi.kibo.ai.id) |
-| Halaman unduh APK untuk pelanggan | Selesai — [buka halaman unduh](https://lisensi.kibo.ai.id/unduh) |
+| Halaman unduh APK untuk pelanggan | Selesai — [buka halaman unduh](https://tokoku.kibo.ai.id/unduh) |
 | **Kunci tanda tangan (BAGIAN A)** | **Selesai** — 4 GitHub Secrets sudah terisi, APK ditandatangani kunci rilis |
 | **Server aktivasi (BAGIAN B)** | **Selesai** — berjalan di `https://lisensi.kibo.ai.id` |
 | **Pesanan otomatis dari OrderHero (BAGIAN C-2)** | **Kode selesai & sudah terpasang di server** — tinggal 2 langkah milik Anda: beli domain untuk email, lalu sambungkan OrderHero |
@@ -32,8 +32,8 @@ server aktivasi:
 
 | Keperluan | Alamat yang dipakai aplikasi |
 |---|---|
-| Unduh APK | `https://lisensi.kibo.ai.id/unduh` |
-| Berkas APK-nya | `https://lisensi.kibo.ai.id/unduh/apk` |
+| Unduh APK | `https://tokoku.kibo.ai.id/unduh` |
+| Berkas APK-nya | `https://tokoku.kibo.ai.id/unduh/apk` |
 | Cek versi terbaru | `https://lisensi.kibo.ai.id/api/versi` |
 
 Server yang mengambilkan berkasnya dari rilis GitHub, jadi yang terlihat
@@ -188,7 +188,7 @@ Cukup kirim **satu tautan** ini — pelanggan akan melihat halaman unduh yang
 ramah, lengkap dengan nomor versi terbaru:
 
 ```
-https://lisensi.kibo.ai.id/unduh
+https://tokoku.kibo.ai.id/unduh
 ```
 
 Halaman itu punya tombol **Unduh APK** yang otomatis mengambil versi terbaru.
@@ -454,7 +454,7 @@ nonaktifkan vouchernya (`"jenis":"voucher"`) — kodenya jadi tidak berguna.
 - [x] `ADMIN_KEY` sudah disimpan (ada di `release-signing/admin-key-tokoku.txt`)
 - [x] `app_config.dart` sudah diisi `activationServerUrl` — **selesai**
 - [ ] Sudah push, dan build GitHub Actions **hijau**
-- [ ] Halaman unduh `https://lisensi.kibo.ai.id/unduh` bisa
+- [ ] Halaman unduh `https://tokoku.kibo.ai.id/unduh` bisa
       dibuka dan tombol **Unduh APK** benar-benar mengunduh berkasnya
 - [ ] Di halaman unduh dan portal, **tidak ada** kata "github" yang terlihat
 

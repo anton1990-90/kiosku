@@ -284,7 +284,7 @@ export default {
                   namaPembeli: order.customer_name,
                   kodeVoucher: voucherCode,
                   namaAplikasi: "TokoKu",
-                  halamanUnduh: "https://lisensi.kibo.ai.id/unduh",
+                  halamanUnduh: "https://tokoku.kibo.ai.id/unduh",
                   portal: "https://lisensi.kibo.ai.id"
                 });
 
@@ -323,6 +323,48 @@ export default {
         }), { status: 405, headers: { "Content-Type": "application/json" } });
 
       }
+    }
+
+    // 3. UNDUHAN — dilayani dari domain ini, bukan dari server lisensi
+    //
+    // Halaman unduh dan berkas APK-nya dulu hanya ada di
+    // lisensi.kibo.ai.id/unduh, jadi itu alamat yang harus dibagikan ke
+    // pelanggan. Sekarang alamatnya cukup satu: tokoku.kibo.ai.id/unduh.
+    //
+    // Berkas APK tetap diambil dari server lisensi karena hanya di sana
+    // kredensial GitHub disimpan — Worker ini sengaja tidak tahu-menahu soal
+    // repo rilis. Yang berubah hanya alamat yang dilihat pelanggan.
+    if (request.method === "GET" && url.pathname === "/api/versi") {
+      try {
+        return await fetch("https://lisensi.kibo.ai.id/api/versi", {
+          headers: { "Accept": "application/json" }
+        });
+      } catch (err) {
+        return new Response(JSON.stringify({ ok: false, error: err.message }), {
+          status: 502,
+          headers: { "Content-Type": "application/json" }
+        });
+      }
+    }
+
+    if (request.method === "GET" && url.pathname === "/unduh/apk") {
+      try {
+        // Dialirkan apa adanya: header Content-Type dan Content-Disposition
+        // dari server lisensi ikut terbawa, jadi peramban tetap menyimpannya
+        // sebagai app-release.apk.
+        return await fetch("https://lisensi.kibo.ai.id/unduh/apk");
+      } catch (err) {
+        return new Response("Gagal mengambil berkas APK: " + err.message, {
+          status: 502,
+          headers: { "Content-Type": "text/plain; charset=utf-8" }
+        });
+      }
+    }
+
+    // Alamat lama (dipakai di email dan tautan yang sudah beredar) tetap
+    // hidup: /unduh dilayani otomatis dari berkas unduh.html.
+    if (request.method === "GET" && url.pathname === "/unduh/") {
+      return Response.redirect(url.origin + "/unduh", 301);
     }
 
     // Jika bukan ke /api/checkout atau webhook, serahkan ke aset statis

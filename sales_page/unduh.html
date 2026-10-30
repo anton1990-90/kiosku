@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Unduh TokoKu POS — Aplikasi Kasir UMKM Offline</title>
+    <meta name="description" content="Unduh aplikasi TokoKu POS untuk Android. Kasir offline-first untuk toko sembako dan UMKM, cukup sekali bayar untuk lisensi seumur hidup.">
+    <link rel="icon" type="image/png" sizes="32x32" href="favicon.png">
+    <link rel="icon" type="image/png" sizes="192x192" href="favicon-192.png">
+    <link rel="apple-touch-icon" href="favicon-192.png">
+    <meta name="theme-color" content="#0F6E56">
+    <link rel="stylesheet" href="styles.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        body {
+            background-color: var(--bg-page);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 24px 16px;
+        }
+        .unduh-box {
+            background: #fff;
+            border: 1px solid var(--border);
+            border-radius: 24px;
+            box-shadow: 0 20px 40px -10px rgba(15, 110, 86, 0.12);
+            max-width: 520px;
+            width: 100%;
+            padding: 36px 32px;
+            text-align: center;
+        }
+        .unduh-logo {
+            height: 64px;
+            width: 64px;
+            margin: 0 auto 14px auto;
+            display: block;
+        }
+        .unduh-produk {
+            font-size: 0.8rem;
+            font-weight: 700;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: var(--primary);
+            margin-bottom: 6px;
+        }
+        h1 {
+            font-size: 1.7rem;
+            font-weight: 800;
+            color: var(--text-main);
+            margin-bottom: 10px;
+        }
+        .unduh-ket {
+            color: var(--text-secondary);
+            font-size: 0.95rem;
+            line-height: 1.6;
+            margin-bottom: 22px;
+        }
+        .versi {
+            display: none;
+            font-size: 0.82rem;
+            color: var(--text-muted);
+            margin-bottom: 18px;
+        }
+        .unduh-btn {
+            display: block;
+            width: 100%;
+            padding: 18px 24px;
+            border-radius: 14px;
+            background: var(--teal-gradient);
+            color: #fff;
+            font-weight: 800;
+            font-size: 1.05rem;
+            text-decoration: none;
+            box-shadow: 0 10px 25px -5px rgba(15, 110, 86, 0.35);
+            transition: transform 0.15s ease;
+        }
+        .unduh-btn:active { transform: scale(0.98); }
+        .langkah {
+            text-align: left;
+            background: var(--bg-page);
+            border-radius: 14px;
+            padding: 16px 18px;
+            margin-top: 22px;
+            font-size: 0.88rem;
+            color: #334155;
+            line-height: 1.7;
+        }
+        .langkah b { color: var(--text-main); }
+        .bantuan {
+            margin-top: 20px;
+            font-size: 0.82rem;
+            color: var(--text-muted);
+            line-height: 1.7;
+        }
+        .kembali {
+            display: inline-block;
+            margin-top: 14px;
+            font-size: 0.9rem;
+            font-weight: 700;
+            color: var(--primary);
+            text-decoration: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="unduh-box">
+        <img src="kibo-mark.png" alt="Kibo" class="unduh-logo">
+        <div class="unduh-produk">TokoKu POS</div>
+        <h1>Unduh Aplikasi</h1>
+        <p class="unduh-ket">Aplikasi kasir Android yang bekerja tanpa internet. Sekali bayar, lisensi seumur hidup untuk satu HP.</p>
+        <div class="versi" id="info-versi"></div>
+
+        <a class="unduh-btn" id="tombol-unduh" href="/unduh/apk">⬇ Unduh APK</a>
+
+        <div class="langkah">
+            <b>Setelah terunduh:</b><br>
+            1. Buka berkas APK-nya, lalu izinkan pemasangan dari sumber ini bila Android meminta.<br>
+            2. Buka aplikasi TokoKu.<br>
+            3. Masukkan email dan <b>Kode Lisensi</b> yang dikirim ke email Anda saat pembelian.
+        </div>
+
+        <p class="bantuan">
+            Belum punya lisensi? <a href="/" style="color: var(--primary); font-weight: 700;">Lihat halaman produk</a>.<br>
+            Butuh bantuan? Email <strong>support@kibo.ai.id</strong>
+        </p>
+
+        <a href="/" class="kembali">&larr; Kembali ke beranda</a>
+    </div>
+
+    <script>
+        // Nomor versi diambil dari server lisensi lewat perantara domain ini,
+        // supaya pelanggan tidak pernah melihat domain lain saat mengunduh.
+        // Kalau gagal, barisnya dibiarkan tersembunyi — halaman tetap berguna.
+        (async function () {
+            try {
+                const res = await fetch('/api/versi', { headers: { 'Accept': 'application/json' } });
+                if (!res.ok) return;
+                const data = await res.json();
+                if (!data || !data.versi) return;
+
+                const bagian = [];
+                bagian.push('Versi ' + data.versi);
+                if (data.ukuran) {
+                    bagian.push((data.ukuran / 1048576).toFixed(1).replace('.', ',') + ' MB');
+                }
+                if (data.diterbitkan) {
+                    const tgl = new Date(data.diterbitkan);
+                    if (!isNaN(tgl.getTime())) {
+                        bagian.push('dirilis ' + tgl.toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' }));
+                    }
+                }
+
+                const el = document.getElementById('info-versi');
+                el.textContent = bagian.join(' · ');
+                el.style.display = 'block';
+            } catch (e) {
+                // Diam saja: tanpa info versi pun tombol unduh tetap jalan.
+            }
+        })();
+    </script>
+</body>
+</html>

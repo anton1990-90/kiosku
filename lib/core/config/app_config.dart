@@ -42,7 +42,13 @@ class AppConfig {
       activationServerUrl.startsWith('http');
 
   /// Halaman unduh aplikasi yang bisa dibagikan ke pelanggan.
-  static String get downloadPageUrl => '$activationServerUrl/unduh';
+  ///
+  /// Sengaja terpisah dari [activationServerUrl]: halaman produk dan unduhan
+  /// ada di domain toko (tokoku.kibo.ai.id), sedangkan aktivasi lisensi tetap
+  /// di server lisensi. Satu alamat yang dibagikan ke pelanggan cukup satu —
+  /// kalau ikut menempel ke server aktivasi, tautannya berubah jadi
+  /// `lisensi.…/unduh` yang tidak dikenal pembeli.
+  static const String downloadPageUrl = 'https://tokoku.kibo.ai.id/unduh';
 
   /// Alamat pemeriksaan versi terbaru.
   static String get versionCheckUrl => '$activationServerUrl/api/versi';

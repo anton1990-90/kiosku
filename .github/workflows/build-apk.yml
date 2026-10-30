@@ -15,6 +15,8 @@ on:
     branches: [ main, master ]
     paths-ignore:
       - 'cloudflare/**'   # Worker diterbitkan lewat `wrangler deploy`
+      - 'sales_page/**'   # halaman penjualan, juga diterbitkan lewat `wrangler deploy`
+      - 'wrangler.jsonc'  # konfigurasi Worker, bukan bagian APK
       - 'docs/**'         # panduan untuk penjual, bukan bagian APK
       - '**/*.md'         # README dan catatan lain
       - '.gitignore'      # tidak ikut masuk ke APK

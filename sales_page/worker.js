@@ -325,7 +325,21 @@ export default {
       }
     }
 
-    // Jika bukan ke /api/checkout atau webhook, load file HTML/CSS dari assets (GET /)
-    return env.ASSETS.fetch(request);
+    // Jika bukan ke /api/checkout atau webhook, serahkan ke aset statis
+    // (HTML/CSS/gambar).
+    //
+    // Binding `ASSETS` hanya ada kalau didaftarkan di konfigurasi deploy.
+    // Tanpa pemeriksaan ini, permintaan ke berkas yang sudah dihapus atau URL
+    // yang salah ketik melempar galat dan Cloudflare menjawab 500 ("Worker
+    // threw an exception") — terlihat seperti server rusak, padahal yang
+    // benar cukup 404. Ini juga yang terjadi pada halaman lama yang masih
+    // di-cache dan meminta logo yang sudah tidak dipakai.
+    if (env.ASSETS) {
+      return env.ASSETS.fetch(request);
+    }
+    return new Response("Halaman tidak ditemukan", {
+      status: 404,
+      headers: { "Content-Type": "text/plain; charset=utf-8" }
+    });
   }
 };

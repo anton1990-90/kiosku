@@ -626,10 +626,10 @@ async function tanganiWebhookOrderHero(request, env) {
   const orderRef = String(isi.order_number || isi.order_id || delivery || '').trim().slice(0, 60);
   const price = parseInt(isi.total || isi.amount || isi.price || 0, 10);
   
-  let sourceApp = 'dompetkuai.my.id';
+  let sourceApp = 'kibo.ai.id';
   const productName = String(isi.product_name || isi.item_name || (isi.items && isi.items[0] && isi.items[0].name) || 'Lisensi').trim();
   if (productName.toLowerCase().includes('tokoku')) {
-      sourceApp = 'tokoku.dompetkuai.my.id';
+      sourceApp = 'tokoku.kibo.ai.id';
   } else if (isi.source) {
       sourceApp = String(isi.source).trim();
   }
@@ -845,8 +845,8 @@ async function tanganiVersi(env, url) {
     ukuran: rilis.ukuran,
     catatan: rilis.catatan,
     diterbitkan: rilis.diterbitkan,
-    unduh: 'https://lisensi.dompetkuai.my.id/unduh/apk',
-    halaman: 'https://lisensi.dompetkuai.my.id/unduh',
+    unduh: 'https://lisensi.kibo.ai.id/unduh/apk',
+    halaman: 'https://lisensi.kibo.ai.id/unduh',
   });
 }
 
@@ -920,7 +920,7 @@ export default {
 
     try {
       // --- CRM App ------------------------------------------------------
-      // Bisa diakses lewat crm.dompetkuai.my.id atau /crm di domain utama
+      // Bisa diakses lewat crm.kibo.ai.id atau /crm di domain utama
       if (url.hostname.startsWith('crm.') || jalur === '/crm' || jalur.startsWith('/crm/') || jalur.startsWith('/api/crm')) {
          return await tanganiCrmApp(request, env, url, metode, jalur);
       }
@@ -953,21 +953,21 @@ export default {
                     'INSERT INTO orders (order_id, source, customer_name, customer_email, product_name, price, status, created_at, updated_at) ' +
                     'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(order_id) DO UPDATE SET status = excluded.status, updated_at = excluded.updated_at'
                 )
-                .bind(body.order_id || crypto.randomUUID(), body.source || 'dompetkuai.my.id', body.name || 'Pengguna', body.email, body.event === 'register' ? 'Pendaftaran Akun' : 'Lisensi Aplikasi', body.amount || 0, 'pending', sekarangIso(), sekarangIso())
+                .bind(body.order_id || crypto.randomUUID(), body.source || 'kibo.ai.id', body.name || 'Pengguna', body.email, body.event === 'register' ? 'Pendaftaran Akun' : 'Lisensi Aplikasi', body.amount || 0, 'pending', sekarangIso(), sekarangIso())
                 .run();
             }
         } catch (e) {}
         return balasJson({ ok: true });
       }
 
-      // Pencegatan jaringan untuk web dompetkuai.my.id asli Anda
-      if (url.hostname === 'dompetkuai.my.id' && jalur === '/api/pakasir/webhook' && metode === 'POST') {
-        return await catatDanTeruskanKeOrigin(request, env, 'dompetkuai.my.id');
+      // Pencegatan jaringan untuk web kibo.ai.id asli Anda
+      if (url.hostname === 'kibo.ai.id' && jalur === '/api/pakasir/webhook' && metode === 'POST') {
+        return await catatDanTeruskanKeOrigin(request, env, 'kibo.ai.id');
       }
 
-      // Pencegatan jaringan untuk web tokoku.dompetkuai.my.id asli Anda
-      if (url.hostname === 'tokoku.dompetkuai.my.id' && jalur === '/api/webhook' && metode === 'POST') {
-        return await catatDanTeruskanKeOrigin(request, env, 'tokoku.dompetkuai.my.id');
+      // Pencegatan jaringan untuk web tokoku.kibo.ai.id asli Anda
+      if (url.hostname === 'tokoku.kibo.ai.id' && jalur === '/api/webhook' && metode === 'POST') {
+        return await catatDanTeruskanKeOrigin(request, env, 'tokoku.kibo.ai.id');
       }
 
       // Pembaruan aplikasi — pengganti tautan GitHub supaya akun GitHub

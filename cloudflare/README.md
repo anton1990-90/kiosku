@@ -1,7 +1,7 @@
 # Server Aktivasi TokoKu — Cloudflare Worker + D1
 
 > **Status: sudah diterbitkan.**
-> Alamat: `https://tokoku-lisensi.dompetkuai.workers.dev`
+> Alamat: `https://lisensi.kibo.ai.id`
 > Database D1 `tokoku-lisensi` sudah dibuat dan `schema.sql` sudah dijalankan.
 > Secret `ADMIN_KEY` sudah terpasang. Langkah di bawah disimpan untuk keadaan
 > darurat — misalnya kalau server perlu dibuat ulang dari nol.
@@ -284,7 +284,7 @@ kosong, server tetap membuat voucher tapi emailnya dilewati — tercatat sebagai
 
 | Kolom | Isi |
 |---|---|
-| URL | `https://tokoku-lisensi.dompetkuai.workers.dev/webhook/orderhero` |
+| URL | `https://lisensi.kibo.ai.id/webhook/orderhero` |
 | Event | `order_paid` (wajib), `order_new` boleh ikut |
 | Secret | salin nilai `whsec_...` yang ditampilkan, lalu pakai sebagai `ORDERHERO_WEBHOOK_SECRET` |
 

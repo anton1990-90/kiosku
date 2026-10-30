@@ -17,10 +17,10 @@ compatibility_date = "2026-09-01"
 workers_dev = true
 
 routes = [
-  { pattern = "lisensi.dompetkuai.my.id", custom_domain = true },
-  { pattern = "crm.dompetkuai.my.id", custom_domain = true },
-  { pattern = "dompetkuai.my.id/api/pakasir/webhook", zone_name = "dompetkuai.my.id" },
-  { pattern = "tokoku.dompetkuai.my.id/api/webhook", zone_name = "dompetkuai.my.id" }
+  { pattern = "lisensi.kibo.ai.id", custom_domain = true },
+  { pattern = "crm.kibo.ai.id", custom_domain = true },
+  { pattern = "kibo.ai.id/api/pakasir/webhook", zone_name = "kibo.ai.id" },
+  { pattern = "tokoku.kibo.ai.id/api/webhook", zone_name = "kibo.ai.id" }
 ]
 [[d1_databases]]
 binding = "DB"
@@ -33,7 +33,7 @@ APP_NAME = "TokoKu"
 # Nomor WhatsApp dukungan (format 628..., boleh dikosongkan).
 SUPPORT_WHATSAPP = ""
 # Email pengirim yang telah terverifikasi di Resend
-EMAIL_DARI = "DompetKu Support <support@dompetkuai.my.id>"
+EMAIL_DARI = "DompetKu Support <support@kibo.ai.id>"
 
 # Repo tempat rilis APK disimpan. Nilai ini HANYA ada di sisi server —
 # pelanggan tidak pernah melihatnya. Aplikasi meminta versi & file APK

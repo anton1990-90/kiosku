@@ -249,15 +249,6 @@
             </div>
             
             <div style="margin-bottom: 16px;">
-                <label style="font-size: 0.85rem; font-weight: 600; color: #475569; display: block; margin-bottom: 6px;">Punya Kode Kupon Diskon?</label>
-                <div style="display: flex; gap: 8px;">
-                    <input type="text" id="couponCode" placeholder="Masukkan Kupon (misal: KIBO26)" class="input-field" style="margin-bottom: 0;">
-                    <button type="button" class="cta-btn secondary-btn" onclick="applyCoupon()" style="padding: 10px 16px; font-size: 0.9rem;">Terapkan</button>
-                </div>
-                <p id="couponMessage" style="font-size: 0.82rem; margin-top: 6px; display: none;"></p>
-            </div>
-
-            <div style="margin-bottom: 16px;">
                 <label style="font-size: 0.85rem; font-weight: 600; color: #475569; display: block; margin-bottom: 6px;">Metode Pembayaran</label>
                 <select id="paymentMethod" class="input-field">
                     <option value="qris">QRIS (BCA, Mandiri, GoPay, OVO, ShopeePay)</option>
@@ -283,13 +274,11 @@
     <footer>
         <div class="container">
             <p style="color: #CBD5E1; font-weight: 600;">&copy; 2026 TokoKu POS by DompetkuAI. Seluruh hak cipta dilindungi.</p>
-            <p style="color: #64748B;">Aplikasi Kasir UMKM Offline-First Indonesia • Layanan Bantuan: support@dompetkuai.my.id</p>
+            <p style="color: #64748B;">Aplikasi Kasir UMKM Offline-First Indonesia • Layanan Bantuan: support@kibo.ai.id</p>
         </div>
     </footer>
 
     <script>
-        let currentAmount = 99000;
-
         function openModal() {
             document.getElementById('checkoutModal').style.display = 'block';
         }
@@ -297,24 +286,6 @@
         function closeModal() {
             document.getElementById('checkoutModal').style.display = 'none';
             if (window.pollInterval) clearInterval(window.pollInterval);
-        }
-
-        function applyCoupon() {
-            const code = document.getElementById('couponCode').value.trim().toUpperCase();
-            const msg = document.getElementById('couponMessage');
-            if (code === 'KIBO26') {
-                currentAmount = 59400; // Diskon 40%
-                document.getElementById('totalPayment').innerText = 'Rp ' + currentAmount.toLocaleString('id-ID');
-                msg.innerText = 'Kupon berhasil diterapkan! Anda hemat 40% (Rp 39.600).';
-                msg.style.color = '#0F6E56';
-                msg.style.display = 'block';
-            } else {
-                currentAmount = 99000;
-                document.getElementById('totalPayment').innerText = 'Rp 99.000';
-                msg.innerText = 'Kupon tidak valid.';
-                msg.style.color = '#E24B4A';
-                msg.style.display = 'block';
-            }
         }
 
         async function processCheckout() {
@@ -344,12 +315,12 @@
                 const response = await fetch('/api/checkout', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ name: name, email: email, amount: currentAmount, method: paymentMethod })
+                    body: JSON.stringify({ name: name, email: email, method: paymentMethod })
                 });
                 const data = await response.json();
 
                 if (data.payment_link) {
-                    const returnUrl = encodeURIComponent("https://tokoku.dompetkuai.my.id/download");
+                    const returnUrl = encodeURIComponent("https://tokoku.kibo.ai.id/download");
                     window.location.href = data.payment_link + "?redirect=" + returnUrl;
                 } else if (data.qr_string) {
                     const qrUrl = "https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=" + encodeURIComponent(data.qr_string);

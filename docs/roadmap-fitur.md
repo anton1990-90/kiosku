@@ -292,7 +292,9 @@ versi 9 (peran) dan versi 12 (PIN per akun).
 Terverifikasi ada di kode, supaya tidak diusulkan ulang:
 
 - Kasir: keranjang, multi metode bayar, hitung kembalian, scan barcode
-- Struk: printer termal Bluetooth, pilihan printer
+- Struk: printer termal Bluetooth, pilihan printer, **pratinjau struk sebelum
+  dicetak** (logo, nama toko, alamat, rincian barang) dengan tombol cetak,
+  bagikan gambar ke WhatsApp, dan simpan gambar
 - Produk: CRUD, barcode, emoji, stok minimum, supplier
 - Stok: penambahan/pengurangan, riwayat pergerakan, peringatan stok menipis
 - Laporan: harian/mingguan/bulanan, grafik, rincian per barang

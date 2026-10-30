@@ -18,10 +18,10 @@ sudah **berjalan**. Tidak ada lagi langkah persiapan yang tertinggal.
 |---|---|
 | Kode lisensi + aktivasi + cek pembaruan | Selesai |
 | Fitur hutang, catatan, laporan, scan barcode, profil toko | Selesai — versi **1.5.0** |
-| Portal aktivasi pelanggan + halaman admin penjual | Selesai — [buka portal](https://tokoku-lisensi.dompetkuai.workers.dev) |
-| Halaman unduh APK untuk pelanggan | Selesai — [buka halaman unduh](https://tokoku-lisensi.dompetkuai.workers.dev/unduh) |
+| Portal aktivasi pelanggan + halaman admin penjual | Selesai — [buka portal](https://lisensi.kibo.ai.id) |
+| Halaman unduh APK untuk pelanggan | Selesai — [buka halaman unduh](https://lisensi.kibo.ai.id/unduh) |
 | **Kunci tanda tangan (BAGIAN A)** | **Selesai** — 4 GitHub Secrets sudah terisi, APK ditandatangani kunci rilis |
-| **Server aktivasi (BAGIAN B)** | **Selesai** — berjalan di `https://tokoku-lisensi.dompetkuai.workers.dev` |
+| **Server aktivasi (BAGIAN B)** | **Selesai** — berjalan di `https://lisensi.kibo.ai.id` |
 | **Pesanan otomatis dari OrderHero (BAGIAN C-2)** | **Kode selesai & sudah terpasang di server** — tinggal 2 langkah milik Anda: beli domain untuk email, lalu sambungkan OrderHero |
 
 ### Akun GitHub Anda tidak lagi terlihat pelanggan
@@ -32,9 +32,9 @@ server aktivasi:
 
 | Keperluan | Alamat yang dipakai aplikasi |
 |---|---|
-| Unduh APK | `https://tokoku-lisensi.dompetkuai.workers.dev/unduh` |
-| Berkas APK-nya | `https://tokoku-lisensi.dompetkuai.workers.dev/unduh/apk` |
-| Cek versi terbaru | `https://tokoku-lisensi.dompetkuai.workers.dev/api/versi` |
+| Unduh APK | `https://lisensi.kibo.ai.id/unduh` |
+| Berkas APK-nya | `https://lisensi.kibo.ai.id/unduh/apk` |
+| Cek versi terbaru | `https://lisensi.kibo.ai.id/api/versi` |
 
 Server yang mengambilkan berkasnya dari rilis GitHub, jadi yang terlihat
 pelanggan hanya alamat server aktivasi. Nama akun GitHub Anda hanya tersimpan di
@@ -124,7 +124,7 @@ kalau kuncinya berubah nanti.
 ## BAGIAN B — Pasang server aktivasi (sekali saja) — SUDAH DIKERJAKAN
 
 > **Status: selesai.** Server sudah berjalan di
-> **`https://tokoku-lisensi.dompetkuai.workers.dev`** dan `activationServerUrl`
+> **`https://lisensi.kibo.ai.id`** dan `activationServerUrl`
 > di `lib/core/config/app_config.dart` sudah menunjuk ke sana. Langkah di bawah
 > disimpan kalau suatu saat server perlu dibuat ulang.
 
@@ -188,7 +188,7 @@ Cukup kirim **satu tautan** ini — pelanggan akan melihat halaman unduh yang
 ramah, lengkap dengan nomor versi terbaru:
 
 ```
-https://tokoku-lisensi.dompetkuai.workers.dev/unduh
+https://lisensi.kibo.ai.id/unduh
 ```
 
 Halaman itu punya tombol **Unduh APK** yang otomatis mengambil versi terbaru.
@@ -209,7 +209,7 @@ mengunduh **dan** mengaktifkan dari satu tempat.
 Buat sekaligus banyak, supaya tidak perlu repot setiap ada pembeli:
 
 ```bash
-export TOKOKU_URL="https://tokoku-lisensi.dompetkuai.workers.dev"
+export TOKOKU_URL="https://lisensi.kibo.ai.id"
 export TOKOKU_ADMIN_KEY="kunci-admin-Anda"
 ```
 
@@ -238,7 +238,7 @@ lalu isi kolom **Buat Voucher Baru**.
 Satu pembelian = satu Kode Voucher. Kirim lewat WhatsApp, atau cetak di kartu.
 Sertakan juga alamat portal:
 
-> Buka `https://tokoku-lisensi.dompetkuai.workers.dev`, masukkan Kode Perangkat
+> Buka `https://lisensi.kibo.ai.id`, masukkan Kode Perangkat
 > dari aplikasi dan Kode Voucher di bawah ini.
 
 ### 4. Pelanggan menyelesaikan sendiri
@@ -331,7 +331,7 @@ Buka dashboard OrderHero → **Plugin → Webhook**, lalu isi:
 
 | Kolom | Isi |
 |---|---|
-| URL | `https://tokoku-lisensi.dompetkuai.workers.dev/webhook/orderhero` |
+| URL | `https://lisensi.kibo.ai.id/webhook/orderhero` |
 | Event | centang `order_paid` (pesanan lunas) |
 | Secret | salin nilainya, lalu pakai sebagai `ORDERHERO_WEBHOOK_SECRET` di Langkah 2 |
 
@@ -454,7 +454,7 @@ nonaktifkan vouchernya (`"jenis":"voucher"`) — kodenya jadi tidak berguna.
 - [x] `ADMIN_KEY` sudah disimpan (ada di `release-signing/admin-key-tokoku.txt`)
 - [x] `app_config.dart` sudah diisi `activationServerUrl` — **selesai**
 - [ ] Sudah push, dan build GitHub Actions **hijau**
-- [ ] Halaman unduh `https://tokoku-lisensi.dompetkuai.workers.dev/unduh` bisa
+- [ ] Halaman unduh `https://lisensi.kibo.ai.id/unduh` bisa
       dibuka dan tombol **Unduh APK** benar-benar mengunduh berkasnya
 - [ ] Di halaman unduh dan portal, **tidak ada** kata "github" yang terlihat
 

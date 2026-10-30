@@ -130,7 +130,13 @@ export default {
         const body = await request.json();
         const customerName = (body.name || "").trim();
         const customerEmail = (body.email || "").trim();
-        const requestedAmount = body.amount || 99000;
+        // Harga dikunci di server, tidak lagi diambil dari `body.amount`.
+        //
+        // Selama nilainya datang dari klien, siapa pun bisa memesan lisensi
+        // seharga Rp 1.000 lewat devtools browser — dan kode kupon di halaman
+        // dulu justru bergantung pada kebebasan itu. Kupon sudah dihapus, jadi
+        // harga tidak boleh lagi bisa ditawar dari sisi peramban.
+        const requestedAmount = 99000;
         const requestedMethod = body.method || "payment_link";
 
         if (!customerName || !customerEmail) {
@@ -179,7 +185,7 @@ export default {
 
         // KABARI CRM
         try {
-          await fetch("https://lisensi.dompetkuai.my.id/webhook/internal-crm", {
+          await fetch("https://lisensi.kibo.ai.id/webhook/internal-crm", {
              method: "POST",
              headers: { "Content-Type": "application/json" },
              body: JSON.stringify({
@@ -188,7 +194,7 @@ export default {
                 name: customerName,
                 amount: requestedAmount,
                 order_id: orderId,
-                source: "tokoku.dompetkuai.my.id"
+                source: "tokoku.kibo.ai.id"
              })
           });
         } catch (e) {}
@@ -278,8 +284,8 @@ export default {
                   namaPembeli: order.customer_name,
                   kodeVoucher: voucherCode,
                   namaAplikasi: "TokoKu",
-                  halamanUnduh: "https://lisensi.dompetkuai.my.id/unduh",
-                  portal: "https://lisensi.dompetkuai.my.id"
+                  halamanUnduh: "https://lisensi.kibo.ai.id/unduh",
+                  portal: "https://lisensi.kibo.ai.id"
                 });
 
                 const resendResponse = await fetch('https://api.resend.com/emails', {
@@ -289,7 +295,7 @@ export default {
                     'Content-Type': 'application/json'
                   },
                   body: JSON.stringify({
-                    from: `TokoKu Support <support@dompetkuai.my.id>`,
+                    from: `TokoKu Support <support@kibo.ai.id>`,
                     to: [order.customer_email],
                     subject: emailContent.subject,
                     html: emailContent.html,

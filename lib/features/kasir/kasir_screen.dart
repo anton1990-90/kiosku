@@ -9,9 +9,6 @@ import '../../core/utils/formatters.dart';
 import '../../core/utils/satuan.dart';
 import '../../core/utils/responsive.dart';
 import '../../data/models/product_model.dart';
-import '../../data/models/sale_item_model.dart';
-import '../../data/models/sale_model.dart';
-import '../../data/models/user_model.dart';
 import '../../data/repositories/product_repository.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/cart_provider.dart';
@@ -19,9 +16,9 @@ import '../../providers/payment_method_provider.dart';
 import '../../providers/product_provider.dart';
 import '../../providers/sale_provider.dart';
 import '../../shared/services/barcode_wedge.dart';
-import '../../shared/services/receipt_printer.dart';
 import '../../shared/widgets/shared_widgets.dart';
 import 'barcode_scanner_screen.dart';
+import 'struk_pratinjau_screen.dart';
 
 /// Kasir (POS) — point of sale for making transactions.
 /// Fully offline: products, cart, and checkout all work without internet.
@@ -96,7 +93,19 @@ class _KasirScreenState extends ConsumerState<KasirScreen> {
       ref.read(productProvider.notifier).loadProducts();
 
       if (mounted) {
-        _showReceiptDialog(sale, saleItems, user);
+        // Struk ditampilkan lebih dulu sebagai pratinjau: kasir melihat
+        // bentuk struk yang akan tercetak, lalu memilih mencetak,
+        // membagikan ke WhatsApp, atau menyimpan gambarnya.
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => StrukPratinjauScreen(
+              sale: sale,
+              items: saleItems,
+              user: user,
+            ),
+          ),
+        );
       }
     }
   }
@@ -215,122 +224,6 @@ class _KasirScreenState extends ConsumerState<KasirScreen> {
         ),
       );
     }
-  }
-
-  /// Print the receipt to a Bluetooth thermal printer.
-  ///
-  /// Isi sebenarnya ada di `cetakStruk()` supaya jalur ini dan jalur cetak
-  /// ulang dari riwayat transaksi memakai kode yang sama persis.
-  Future<void> _printReceipt(
-    SaleModel sale,
-    List<SaleItemModel> items,
-    UserModel user,
-  ) {
-    return cetakStruk(
-      context: context,
-      sale: sale,
-      items: items,
-      user: user,
-    );
-  }
-
-  void _showReceiptDialog(
-    SaleModel sale,
-    List<SaleItemModel> items,
-    UserModel user,
-  ) {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-        ),
-        title: const Row(
-          children: [
-            Icon(Icons.check_circle, color: AppColors.success, size: 28),
-            SizedBox(width: 8),
-            Text('Transaksi Berhasil'),
-          ],
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Invoice: ${sale.invoiceNumber}',
-                style: const TextStyle(fontSize: 13, color: AppColors.textSecondary)),
-            const SizedBox(height: 8),
-            Text(
-              Formatters.rupiah(sale.totalAmount),
-              style: const TextStyle(
-                fontSize: 24,
-                fontWeight: FontWeight.w800,
-                color: AppColors.textMain,
-              ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              '${Formatters.jumlah(sale.totalItems)} item · '
-              '${sale.paymentMethod.toUpperCase()}',
-              style: const TextStyle(
-                  fontSize: 13, color: AppColors.textSecondary)),
-            // Kasir perlu melihat potongan yang benar-benar tersimpan, bukan
-            // hanya mengandalkan yang diketik di keranjang tadi.
-            if (sale.discount > 0) ...[
-              const SizedBox(height: 4),
-              Text(
-                'Potongan nota: ${Formatters.rupiah(sale.discount)}',
-                style: const TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.accentMid,
-                ),
-              ),
-            ],
-            if (sale.changeAmount > 0) ...[
-              const SizedBox(height: 8),
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: AppColors.successLight,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    const Text('Kembalian',
-                        style: TextStyle(color: AppColors.successMid)),
-                    Text(
-                      Formatters.rupiah(sale.changeAmount),
-                      style: const TextStyle(
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.successMid,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () {
-              Navigator.pop(context);
-            },
-            child: const Text('Selesai'),
-          ),
-          OutlinedButton.icon(
-            onPressed: () {
-              Navigator.pop(context);
-              _printReceipt(sale, items, user);
-            },
-            icon: const Icon(Icons.print, size: 18),
-            label: const Text('Cetak Struk'),
-          ),
-        ],
-      ),
-    );
   }
 
   @override

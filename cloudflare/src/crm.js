@@ -168,7 +168,7 @@ export async function tanganiCrmApp(request, env, url, metode, jalur) {
             const targetEmail = body.email;
             const targetName = body.name;
             const targetProduct = body.product;
-            const targetSource = body.source || 'dompetkuai.my.id';
+            const targetSource = body.source || 'kibo.ai.id';
             
             if (!targetEmail) return balasJson({ ok: false, reason: 'no_email' }, 400);
 

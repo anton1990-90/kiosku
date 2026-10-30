@@ -1,4 +1,4 @@
-# TokoKu — Aplikasi UMKM Toko Sembako & Penjualan (v1.25.0)
+# TokoKu — Aplikasi UMKM Toko Sembako & Penjualan (v1.28.0)
 
 Aplikasi mobile cross-platform (Android & iOS) untuk toko sembako UMKM. Dibuat dengan Flutter, bekerja **offline-first** dengan autentikasi email.
 
@@ -11,6 +11,7 @@ Aplikasi mobile cross-platform (Android & iOS) untuk toko sembako UMKM. Dibuat d
 - **Batal / retur transaksi**: Transaksi yang salah input bisa dibatalkan dari riwayat transaksi. Stok setiap barang dikembalikan, uang yang pernah masuk dikeluarkan lagi dari kas, dan piutang yang lahir dari transaksi itu dihapus — semuanya dalam **satu transaksi database**, jadi tidak ada pembatalan yang setengah jalan. Transaksinya **tidak dihapus**: statusnya berubah jadi "batal" dan jejaknya tetap bisa dilihat di Buku Kas dan Riwayat Stok, supaya pertanyaan "kenapa stok saya beda?" selalu bisa dijawab. Pembatalan ditolak kalau piutangnya sudah ada pembayarannya (uang itu benar-benar diterima, dan menghapusnya akan membuang riwayat bayar).
 - **Scan barcode**: Scan barcode produk (EAN-13/UPC) langsung dari kamera — untuk menambah barang ke keranjang maupun mengisi barcode saat menambah produk baru.
 - **Cetak struk thermal**: Cetak struk ke printer thermal Bluetooth 58mm/80mm setelah transaksi.
+- **Pratinjau struk setelah bayar**: Begitu kasir menekan **Bayar**, struk ditampilkan lebih dulu persis seperti hasil cetak — logo usaha, nama toko, alamat, sampai rincian tiap barang — sebelum kertasnya keluar. Dari layar itu ada tiga pilihan: **Cetak Struk**, **Bagikan ke WA** (struk ditangkap jadi gambar lalu dikirim lewat WhatsApp), dan **Simpan** (gambar struk disimpan ke penyimpanan HP). Jadi tidak ada lagi kertas terbuang karena salah input baru ketahuan setelah tercetak.
 - **Cetak ulang struk**: Struk transaksi lama bisa dicetak lagi kapan saja dari riwayat transaksi — berguna kalau kertas habis, printer mati, atau pelanggan minta salinan.
 - **Ucapan penutup struk bisa diubah**: Teks penutup di bawah struk ("Terima kasih atas kunjungan Anda!") bisa diganti dari **Profil → Info Toko** — misalnya dengan ucapan terima kasih, jam buka, atau nomor WhatsApp toko. Dikosongkan berarti kembali ke teks bawaan, bukan mencetak struk tanpa penutup.
 - **Beranda**: Tombol aksi cepat berikon untuk hal yang paling sering dipakai — Transaksi, Tambah Stok, Laporan, Laporan Keuangan, Hutang & Piutang, Cetak Ulang Struk, Buku Kas, **Buka/Tutup Kasir**, dan Catatan. Tombol kasir itu berubah sendiri mengikuti keadaan: menulis "Buka Kasir" kalau belum ada sesi, dan "Tutup Kasir" kalau sesi sedang berjalan.

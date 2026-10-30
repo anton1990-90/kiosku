@@ -70,28 +70,15 @@ body {
     color: var(--text-main);
 }
 
-/* Logo Kibo di navbar.
-   Sengaja tanpa kotak teal seperti lambang emoji sebelumnya: logo Kibo sudah
-   berwarna sendiri (magenta, kuning, sian, cokelat), jadi latar berwarna di
-   belakangnya hanya membuat lambangnya tenggelam. */
+/* Lambang Kibo di navbar — hanya lingkaran empat kuadran + huruf K, tanpa
+   wordmark "IBO": di ukuran 44 px, tulisan sepanjang itu tidak terbaca dan
+   hanya memakan ruang di samping nama produk.
+   Tanpa kotak teal seperti lambang emoji sebelumnya: logo Kibo sudah berwarna
+   sendiri, jadi latar berwarna di belakangnya hanya membuatnya tenggelam. */
 .brand-kibo {
-    height: 40px;
-    width: auto;
+    height: 44px;
+    width: 44px;
     display: block;
-}
-
-@media (max-width: 480px) {
-    .brand-kibo {
-        height: 30px;
-    }
-
-    .brand-logo {
-        gap: 8px;
-    }
-
-    .brand-name {
-        font-size: 1.1rem;
-    }
 }
 
 .brand-name {
@@ -103,6 +90,29 @@ body {
 
 .brand-name span {
     color: var(--accent);
+}
+
+/* Di layar HP, navbar harus muat: logo, nama produk, dan tombol beli dalam
+   satu baris. Pengecilan ini diletakkan SETELAH aturan dasarnya — kalau
+   ditulis lebih dulu, aturan dasar .brand-name di atasnya yang menang. */
+@media (max-width: 480px) {
+    .brand-kibo {
+        height: 32px;
+        width: 32px;
+    }
+
+    .brand-logo {
+        gap: 8px;
+    }
+
+    .brand-name {
+        font-size: 1.05rem;
+    }
+
+    .nav-cta {
+        padding: 8px 12px;
+        font-size: 0.8rem;
+    }
 }
 
 .nav-cta {

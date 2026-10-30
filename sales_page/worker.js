@@ -226,7 +226,11 @@ export default {
 
 
     // 2. TERIMA WEBHOOK DARI PAKASIR
-    if (request.method === "POST" && !url.pathname.includes("/api/checkout")) {
+    //
+    // Pengecualian /internal/ perlu disebut di sini: tanpa itu, permintaan
+    // POST ke halaman internal akan tercatat sebagai acara webhook palsu.
+    if (request.method === "POST" && !url.pathname.includes("/api/checkout")
+        && !url.pathname.startsWith("/internal/")) {
       const secretHeader = request.headers.get("X-Secret");
       const WEBHOOK_SECRET = (env.PAKASIR_WEBHOOK_SECRET || "").trim();
 
@@ -365,6 +369,41 @@ export default {
     // hidup: /unduh dilayani otomatis dari berkas unduh.html.
     if (request.method === "GET" && url.pathname === "/unduh/") {
       return Response.redirect(url.origin + "/unduh", 301);
+    }
+
+    // 4. HALAMAN INTERNAL — alat penjual, bukan untuk pelanggan
+    //
+    // Halaman ini tidak ditautkan dari mana pun. Isinya baru terbuka setelah
+    // kunci admin dimasukkan, dan kunci itu tidak pernah dikirim ke Worker
+    // ini: halaman memanggil API admin di server lisensi langsung dari
+    // peramban. Jadi yang perlu dijaga di sini hanya dua hal — alamatnya
+    // tidak diindeks mesin pencari, dan isinya tidak ikut tersimpan di cache.
+    if (url.pathname === "/internal" || url.pathname === "/internal/") {
+      return Response.redirect(url.origin + "/internal/voucher", 301);
+    }
+
+    if (url.pathname.startsWith("/internal/")) {
+      if (request.method !== "GET" && request.method !== "HEAD") {
+        return new Response("Metode tidak diizinkan", { status: 405 });
+      }
+      // Sama seperti penanganan aset di bawah: binding ASSETS bisa tidak ada
+      // kalau konfigurasi deploy berubah. Tanpa pemeriksaan ini, permintaan
+      // melempar galat dan Cloudflare menjawab 500.
+      if (!env.ASSETS) {
+        return new Response("Halaman internal belum tersedia", {
+          status: 404,
+          headers: { "Content-Type": "text/plain; charset=utf-8" }
+        });
+      }
+      const aset = await env.ASSETS.fetch(request);
+      // Hanya balasan yang benar-benar berisi yang perlu ditambahi header;
+      // balasan pengalihan dibiarkan apa adanya supaya tidak berputar.
+      if (aset.status !== 200) return aset;
+      const kepalaAset = new Headers(aset.headers);
+      kepalaAset.set("X-Robots-Tag", "noindex, nofollow, noarchive");
+      kepalaAset.set("Cache-Control", "no-store");
+      kepalaAset.set("Referrer-Policy", "no-referrer");
+      return new Response(aset.body, { status: 200, headers: kepalaAset });
     }
 
     // Jika bukan ke /api/checkout atau webhook, serahkan ke aset statis

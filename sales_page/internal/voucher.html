@@ -1,0 +1,1232 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<!--
+  Halaman INTERNAL untuk mengelola kode voucher.
+
+  Sengaja tidak ditautkan dari halaman mana pun dan tidak diindeks mesin
+  pencari. Isinya baru terbuka setelah kunci admin dimasukkan.
+
+  Kunci admin TIDAK pernah dikirim ke server halaman ini. Kunci hanya
+  disimpan di sessionStorage tab ini, lalu dipakai untuk memanggil API admin
+  di lisensi.kibo.ai.id lewat header x-admin-key. Artinya: kalau alamat
+  halaman ini bocor, yang bocor hanya halamannya — bukan datanya.
+-->
+<meta name="robots" content="noindex, nofollow, noarchive">
+<title>Kode Voucher — Internal</title>
+<link rel="icon" type="image/png" sizes="32x32" href="/favicon.png">
+<link rel="icon" type="image/png" sizes="192x192" href="/favicon-192.png">
+<meta name="theme-color" content="#0F6E56">
+<style>
+  *, *::before, *::after { box-sizing: border-box; }
+
+  :root {
+    --utama: #0F6E56;
+    --utama-mid: #1D9E75;
+    --utama-gelap: #085041;
+    --utama-lembut: #E1F5EE;
+    --aksen: #EF9F27;
+    --aksen-lembut: #FAEEDA;
+    --hal: #F4F6F8;
+    --kartu: #FFFFFF;
+    --garis: #E5E8EB;
+    --teks: #1A1A2E;
+    --teks-2: #64748B;
+    --teks-3: #94A3B8;
+    --merah: #A32D2D;
+    --merah-lembut: #FCEBEB;
+    --biru: #185FA5;
+    --biru-lembut: #E6F1FB;
+    --mono: ui-monospace, Menlo, Consolas, "Liberation Mono", monospace;
+  }
+
+  html, body { margin: 0; padding: 0; }
+
+  /*
+    Atribut `hidden` bawaan peramban hanya `display: none` dari gaya bawaan,
+    sehingga KALAH oleh aturan kelas yang menulis display (mis. .pil-baris
+    yang memakai flex, atau .tombol yang memakai inline-flex). Akibatnya
+    elemen yang seharusnya disembunyikan tetap tampil. Aturan ini menutup
+    celah itu untuk seluruh halaman.
+  */
+  [hidden] { display: none !important; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+      "Helvetica Neue", Arial, sans-serif;
+    background: var(--hal);
+    color: var(--teks);
+    font-size: 14px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ---------- kepala ---------- */
+  .kepala {
+    background: linear-gradient(135deg, #0F6E56 0%, #085041 100%);
+    color: #fff;
+  }
+  .kepala-dalam {
+    max-width: 1180px; margin: 0 auto; padding: 18px 20px;
+    display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+  }
+  .kepala img { height: 42px; width: 42px; display: block; }
+  .kepala-teks { flex: 1 1 240px; min-width: 0; }
+  .kepala h1 { margin: 0; font-size: 18px; font-weight: 800; letter-spacing: -0.01em; }
+  .kepala p { margin: 2px 0 0; font-size: 12.5px; color: rgba(255,255,255,.82); }
+  .kepala-aksi { display: flex; align-items: center; gap: 8px; }
+
+  .lencana {
+    display: inline-block; padding: 4px 11px; border-radius: 20px;
+    font-size: 11.5px; font-weight: 700; letter-spacing: .01em;
+    background: rgba(255,255,255,.16); color: #fff;
+    border: 1px solid rgba(255,255,255,.28);
+  }
+  .lencana.hidup { background: rgba(255,255,255,.94); color: var(--utama-gelap); border-color: transparent; }
+
+  /* ---------- tata letak ---------- */
+  .bungkus { max-width: 1180px; margin: 0 auto; padding: 18px 20px 80px; }
+
+  .kartu {
+    background: var(--kartu); border: 1px solid var(--garis);
+    border-radius: 14px; padding: 18px; margin-bottom: 14px;
+    box-shadow: 0 1px 2px rgba(16,24,40,.04);
+  }
+  .kartu-kepala {
+    display: flex; align-items: baseline; justify-content: space-between;
+    gap: 12px; flex-wrap: wrap; margin-bottom: 14px;
+  }
+  h2 { margin: 0; font-size: 15px; font-weight: 800; letter-spacing: -0.01em; }
+  .ket { margin: 0; font-size: 12.5px; color: var(--teks-2); }
+
+  /* ---------- formulir ---------- */
+  .baris { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; }
+  .baris > .bidang { flex: 1 1 150px; min-width: 0; }
+  .bidang.sempit { flex: 0 1 108px; }
+
+  label {
+    display: block; font-size: 11.5px; font-weight: 700;
+    color: var(--teks-2); margin-bottom: 5px; letter-spacing: .01em;
+  }
+  input, select {
+    width: 100%; padding: 10px 12px; font-size: 14px; font-family: inherit;
+    color: var(--teks); background: #F8F9FA; border: 1.5px solid var(--garis);
+    border-radius: 10px; outline: none; transition: border-color .12s, background .12s;
+  }
+  input:focus, select:focus { border-color: var(--utama); background: #fff; }
+  input::placeholder { color: var(--teks-3); }
+  input[type="number"] { -moz-appearance: textfield; }
+
+  .cek { display: flex; align-items: center; gap: 7px; font-size: 12.5px; color: var(--teks-2); font-weight: 600; }
+  .cek input { width: 15px; height: 15px; padding: 0; margin: 0; accent-color: var(--utama); }
+
+  /* ---------- tombol ---------- */
+  button { font-family: inherit; cursor: pointer; border: none; }
+  .tombol {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 10px 16px; font-size: 13.5px; font-weight: 700;
+    color: #fff; background: var(--utama); border-radius: 10px;
+    transition: background .12s, transform .08s;
+    white-space: nowrap;
+  }
+  .tombol:hover:not(:disabled) { background: #0B5B47; }
+  .tombol:active:not(:disabled) { transform: scale(.985); }
+  .tombol:disabled { background: #A9BDB7; cursor: default; }
+  .tombol.hantu { background: #fff; color: var(--teks-2); border: 1.5px solid var(--garis); }
+  .tombol.hantu:hover:not(:disabled) { background: #F1F3F5; color: var(--teks); }
+  .tombol.putih { background: rgba(255,255,255,.14); color: #fff; border: 1.5px solid rgba(255,255,255,.3); }
+  .tombol.putih:hover:not(:disabled) { background: rgba(255,255,255,.24); }
+  .tombol.kecil { padding: 7px 12px; font-size: 12.5px; border-radius: 9px; }
+  .tombol.bahaya { background: var(--merah-lembut); color: var(--merah); border: 1px solid #F3D3D3; }
+  .tombol.bahaya:hover:not(:disabled) { background: #F7DADA; }
+
+  .tautan-tbl {
+    background: none; border: none; padding: 2px 0; font-size: 12.5px;
+    font-weight: 700; color: var(--utama); cursor: pointer;
+  }
+  .tautan-tbl:hover { text-decoration: underline; }
+  .tautan-tbl.bahaya { color: var(--merah); }
+
+  /* ---------- gerbang ---------- */
+  .gerbang { max-width: 520px; margin: 40px auto 0; }
+  .gerbang h2 { font-size: 16px; }
+  .gerbang .ket { margin-top: 4px; margin-bottom: 16px; }
+
+  /* ---------- pesan ---------- */
+  .pesan { display: none; padding: 11px 13px; border-radius: 10px; font-size: 12.5px; margin-top: 12px; }
+  .pesan.tampil { display: block; }
+  .pesan.galat { background: var(--merah-lembut); color: var(--merah); }
+  .pesan.baik { background: var(--utama-lembut); color: var(--utama-gelap); }
+
+  /* ---------- ringkasan ---------- */
+  .ringkas { display: flex; flex-wrap: wrap; gap: 10px; }
+  .angka {
+    flex: 1 1 130px; background: #F8F9FA; border: 1px solid var(--garis);
+    border-radius: 12px; padding: 13px 15px;
+  }
+  .angka .nilai {
+    font-size: 26px; font-weight: 800; color: var(--utama-gelap);
+    line-height: 1.15; font-variant-numeric: tabular-nums;
+  }
+  .angka .label { font-size: 11.5px; color: var(--teks-2); margin-top: 2px; }
+  .angka.tandai .nilai { color: var(--aksen); }
+
+  /* ---------- kotak kode hasil ---------- */
+  .kotak-kode {
+    margin-top: 14px; padding: 14px; background: var(--utama-lembut);
+    border-radius: 11px; border: 1px solid #C9E9DC;
+  }
+  .kotak-kode .judul { font-size: 11.5px; font-weight: 700; color: var(--utama-gelap); margin-bottom: 8px; }
+  .daftar-kode {
+    font-family: var(--mono); font-size: 13.5px; font-weight: 700;
+    color: var(--utama-gelap); white-space: pre-wrap; word-break: break-all;
+    line-height: 1.9; max-height: 260px; overflow: auto;
+  }
+
+  /* ---------- alat daftar ---------- */
+  .alat {
+    display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-end;
+    padding-bottom: 14px; border-bottom: 1px solid var(--garis); margin-bottom: 12px;
+  }
+  .alat .cari { flex: 2 1 240px; }
+  .alat .saring { flex: 0 1 165px; }
+  .alat .aksi { display: flex; gap: 8px; flex-wrap: wrap; margin-left: auto; }
+
+  .pil-baris {
+    display: flex; flex-wrap: wrap; gap: 10px; align-items: center;
+    padding: 10px 12px; background: #F8F9FA; border: 1px solid var(--garis);
+    border-radius: 10px; margin-bottom: 12px; font-size: 12.5px; color: var(--teks-2);
+  }
+  .pil-baris b { color: var(--teks); }
+  .pil-baris .aksi { display: flex; gap: 8px; flex-wrap: wrap; margin-left: auto; }
+
+  /* ---------- tabel ---------- */
+  .tabel-bungkus { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+  th, td {
+    text-align: left; padding: 9px 10px; border-bottom: 1px solid #F0F2F4;
+    white-space: nowrap; vertical-align: middle;
+  }
+  th {
+    font-size: 10.5px; text-transform: uppercase; letter-spacing: .5px;
+    color: var(--teks-3); font-weight: 800; background: #FAFBFC;
+    position: sticky; top: 0; z-index: 1;
+  }
+  tbody tr:hover { background: #FBFCFD; }
+  tr:last-child td { border-bottom: none; }
+  td.mono { font-family: var(--mono); font-weight: 700; letter-spacing: -0.01em; }
+  td.kolom-cek, th.kolom-cek { width: 34px; padding-right: 0; }
+  td.kolom-cek input { width: 15px; height: 15px; accent-color: var(--utama); cursor: pointer; }
+  td.aksi { text-align: right; }
+  td.aksi button + button { margin-left: 8px; }
+
+  .tag {
+    display: inline-block; padding: 2px 9px; border-radius: 20px;
+    font-size: 11px; font-weight: 700; white-space: nowrap;
+  }
+  .tag.unused   { background: var(--utama-lembut); color: var(--utama-gelap); }
+  .tag.used     { background: var(--biru-lembut); color: var(--biru); }
+  .tag.active   { background: var(--utama-lembut); color: var(--utama-gelap); }
+  .tag.revoked  { background: var(--merah-lembut); color: var(--merah); }
+  .tag.pending  { background: var(--aksen-lembut); color: #8A5A06; }
+
+  .kosong { color: var(--teks-3); font-size: 12.5px; padding: 22px 10px; text-align: center; }
+
+  .kaki { font-size: 11.5px; color: var(--teks-3); text-align: center; margin-top: 26px; line-height: 1.7; }
+
+  /* ---------- pemberitahuan mengambang ---------- */
+  .toast {
+    position: fixed; left: 50%; bottom: 24px; transform: translate(-50%, 14px);
+    background: #16281F; color: #fff; padding: 11px 18px; border-radius: 11px;
+    font-size: 13px; font-weight: 600; box-shadow: 0 12px 30px rgba(0,0,0,.22);
+    opacity: 0; pointer-events: none; transition: opacity .18s, transform .18s;
+    z-index: 50; max-width: min(90vw, 420px); text-align: center;
+  }
+  .toast.tampil { opacity: 1; transform: translate(-50%, 0); }
+  .toast.galat { background: #7A1F1F; }
+
+  /* ---------- lembar cetak ---------- */
+  #lembar { display: none; }
+
+  @media print {
+    @page { margin: 12mm; }
+    body { background: #fff; }
+    .kepala, .bungkus { display: none !important; }
+    #lembar { display: block !important; }
+    .toast { display: none !important; }
+  }
+
+  @media (max-width: 640px) {
+    .bungkus { padding: 14px 12px 60px; }
+    .kartu { padding: 14px; border-radius: 12px; }
+    .kepala-dalam { padding: 14px 12px; }
+    /* Dua kolom, bukan tiga-lalu-satu: empat angka jadi kisi 2x2 yang rapi. */
+    .ringkas .angka { flex: 1 1 calc(50% - 5px); }
+    .alat .aksi { margin-left: 0; width: 100%; }
+    .alat .aksi .tombol { flex: 1 1 auto; justify-content: center; }
+    .pil-baris .aksi { margin-left: 0; width: 100%; }
+  }
+</style>
+</head>
+<body>
+
+<header class="kepala">
+  <div class="kepala-dalam">
+    <img src="/kibo-mark.png" alt="">
+    <div class="kepala-teks">
+      <h1>Kode Voucher</h1>
+      <p>Halaman internal — buat, saring, salin, dan cetak kode voucher.</p>
+    </div>
+    <div class="kepala-aksi">
+      <span id="lencanaKunci" class="lencana">Belum masuk</span>
+      <button id="tombolKeluar" class="tombol putih kecil" hidden>Keluar</button>
+    </div>
+  </div>
+</header>
+
+<div class="bungkus">
+
+  <!-- ============ GERBANG ============ -->
+  <section id="gerbang" class="kartu gerbang">
+    <h2>Masuk dengan Kunci Admin</h2>
+    <p class="ket">
+      Kunci ini sama dengan <code>ADMIN_KEY</code> di server lisensi.
+      Hanya disimpan di tab ini dan hilang begitu tab ditutup.
+    </p>
+    <div class="baris">
+      <div class="bidang" style="flex:2 1 220px">
+        <label for="kunci">Kunci admin</label>
+        <input id="kunci" type="password" autocomplete="current-password"
+               spellcheck="false" placeholder="tempel kunci admin">
+      </div>
+      <div class="bidang" style="flex:0 0 auto">
+        <button id="tombolMasuk" class="tombol">Masuk</button>
+      </div>
+    </div>
+    <div id="pesanGerbang" class="pesan"></div>
+  </section>
+
+  <!-- ============ ISI ============ -->
+  <div id="isi" hidden>
+
+    <!-- ringkasan -->
+    <section class="kartu">
+      <div class="kartu-kepala">
+        <h2>Ringkasan Stok</h2>
+        <p class="ket" id="waktuMuat">—</p>
+      </div>
+      <div class="ringkas">
+        <div class="angka">
+          <div id="rTersedia" class="nilai">0</div>
+          <div class="label">Belum terpakai</div>
+        </div>
+        <div class="angka">
+          <div id="rTerpakai" class="nilai">0</div>
+          <div class="label">Sudah terpakai</div>
+        </div>
+        <div class="angka">
+          <div id="rMati" class="nilai">0</div>
+          <div class="label">Dinonaktifkan</div>
+        </div>
+        <div class="angka tandai">
+          <div id="rPending" class="nilai">0</div>
+          <div class="label">Menunggu bayar</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- buat -->
+    <section class="kartu">
+      <div class="kartu-kepala">
+        <h2>Buat Voucher Baru</h2>
+        <p class="ket">Sekali buat maksimal 200 kode.</p>
+      </div>
+      <div class="baris">
+        <div class="bidang sempit">
+          <label for="jumlah">Jumlah</label>
+          <input id="jumlah" type="number" min="1" max="200" step="1" value="5">
+        </div>
+        <div class="bidang sempit">
+          <label for="awalan">Awalan</label>
+          <input id="awalan" type="text" maxlength="6" value="VC"
+                 spellcheck="false" autocapitalize="characters" placeholder="VC">
+        </div>
+        <div class="bidang">
+          <label for="kelompok">Kelompok (opsional)</label>
+          <input id="kelompok" type="text" maxlength="40" list="daftarKelompok"
+                 placeholder="Grosir-2026-11">
+          <datalist id="daftarKelompok"></datalist>
+        </div>
+        <div class="bidang">
+          <label for="pembeli">Nama pembeli (opsional)</label>
+          <input id="pembeli" type="text" maxlength="80" placeholder="Bu Siti">
+        </div>
+        <div class="bidang" style="flex:0 0 auto">
+          <button id="tombolBuat" class="tombol">Buat Voucher</button>
+        </div>
+      </div>
+      <div id="pesanBuat" class="pesan"></div>
+      <div id="hasilBuat"></div>
+    </section>
+
+    <!-- daftar -->
+    <section class="kartu">
+      <div class="kartu-kepala">
+        <h2>Daftar Voucher</h2>
+        <p class="ket" id="ketJumlah">—</p>
+      </div>
+
+      <div class="alat">
+        <div class="bidang cari">
+          <label for="cari">Cari</label>
+          <input id="cari" type="search" placeholder="kode, kelompok, pembeli, email, nomor pesanan" spellcheck="false">
+        </div>
+        <div class="bidang saring">
+          <label for="saringStatus">Status</label>
+          <select id="saringStatus">
+            <option value="">Semua status</option>
+            <option value="unused">Belum terpakai</option>
+            <option value="used">Sudah terpakai</option>
+            <option value="pending">Menunggu bayar</option>
+            <option value="revoked">Dinonaktifkan</option>
+          </select>
+        </div>
+        <div class="bidang saring">
+          <label for="saringKelompok">Kelompok</label>
+          <select id="saringKelompok">
+            <option value="">Semua kelompok</option>
+          </select>
+        </div>
+        <div class="aksi">
+          <button id="tombolMuat" class="tombol hantu kecil">Muat ulang</button>
+          <button id="tombolCsv" class="tombol hantu kecil">Ekspor CSV</button>
+        </div>
+      </div>
+
+      <div class="pil-baris">
+        <label class="cek">
+          <input id="sembunyiPending" type="checkbox" checked>
+          Sembunyikan yang menunggu bayar
+        </label>
+        <div class="aksi">
+          <button id="tombolSalinSemua" class="tombol hantu kecil">Salin semua kode</button>
+          <button id="tombolCetakSemua" class="tombol hantu kecil">Cetak lembar</button>
+        </div>
+      </div>
+
+      <div id="pilPilih" class="pil-baris" hidden>
+        <span><b id="jumlahPilih">0</b> kode dipilih</span>
+        <div class="aksi">
+          <button id="tombolSalinPilih" class="tombol hantu kecil">Salin terpilih</button>
+          <button id="tombolCetakPilih" class="tombol hantu kecil">Cetak terpilih</button>
+          <button id="tombolBatalPilih" class="tombol hantu kecil">Bersihkan</button>
+        </div>
+      </div>
+
+      <div class="tabel-bungkus">
+        <table>
+          <thead>
+            <tr>
+              <th class="kolom-cek"><input id="pilihSemua" type="checkbox" title="Pilih semua yang tampil"></th>
+              <th>Kode</th>
+              <th>Kelompok</th>
+              <th>Pembeli</th>
+              <th>Status</th>
+              <th>Kode aktivasi</th>
+              <th>Dibuat</th>
+              <th>Dipakai</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="isiTabel"></tbody>
+        </table>
+      </div>
+    </section>
+  </div>
+
+  <p class="kaki">
+    Halaman internal. Jangan ditautkan dari halaman publik.<br>
+    Data diambil langsung dari server lisensi saat halaman dibuka.
+  </p>
+</div>
+
+<!-- Lembar cetak: diisi saat tombol cetak ditekan -->
+<div id="lembar"></div>
+
+<div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+<script>
+(function () {
+  'use strict';
+
+  // ---------------------------------------------------------------------
+  // Alamat server lisensi. Halaman ini hanya kulit; semua data dan operasi
+  // tetap di server lisensi, di balik kunci admin.
+  // ---------------------------------------------------------------------
+  var SERVER = 'https://lisensi.kibo.ai.id';
+  var KUNCI_SIMPAN = 'kibo_kunci_voucher';
+  var NAMA_APLIKASI = 'TokoKu POS';
+  var ALAMAT_UNDUH = 'tokoku.kibo.ai.id/unduh';
+  var ALAMAT_PORTAL = 'lisensi.kibo.ai.id';
+  var BATAS_WAKTU = 20000;
+
+  var LABEL_STATUS = {
+    unused: 'belum terpakai',
+    used: 'terpakai',
+    revoked: 'nonaktif',
+    pending: 'menunggu bayar',
+    active: 'aktif'
+  };
+
+  // ---------------------------------------------------------------------
+  // Keadaan halaman
+  // ---------------------------------------------------------------------
+  var semua = [];        // seluruh voucher dari server
+  var terpilih = {};     // kode -> true
+  var kodeBaru = [];     // hasil pembuatan terakhir
+  var sudahMasuk = false;
+
+  // ---------------------------------------------------------------------
+  // Rujukan elemen
+  // ---------------------------------------------------------------------
+  function $(id) { return document.getElementById(id); }
+
+  var elGerbang = $('gerbang');
+  var elIsi = $('isi');
+  var elKunci = $('kunci');
+  var elPesanGerbang = $('pesanGerbang');
+  var elLencana = $('lencanaKunci');
+  var elKeluar = $('tombolKeluar');
+  var elTombolMasuk = $('tombolMasuk');
+  var elTombolBuat = $('tombolBuat');
+  var elPesanBuat = $('pesanBuat');
+  var elHasilBuat = $('hasilBuat');
+  var elTabel = $('isiTabel');
+  var elCari = $('cari');
+  var elStatus = $('saringStatus');
+  var elKelompok = $('saringKelompok');
+  var elSembunyiPending = $('sembunyiPending');
+  var elPilPilih = $('pilPilih');
+  var elJumlahPilih = $('jumlahPilih');
+  var elPilihSemua = $('pilihSemua');
+  var elToast = $('toast');
+  var elKetJumlah = $('ketJumlah');
+  var elWaktuMuat = $('waktuMuat');
+  var elDaftarKelompok = $('daftarKelompok');
+
+  // ---------------------------------------------------------------------
+  // Alat bantu umum
+  // ---------------------------------------------------------------------
+  function kunci() { return sessionStorage.getItem(KUNCI_SIMPAN) || ''; }
+
+  function pesan(el, teks, jenis) {
+    el.textContent = teks;
+    el.className = 'pesan ' + (jenis || 'galat') + ' tampil';
+  }
+  function sembunyikan(el) { el.className = 'pesan'; el.textContent = ''; }
+
+  var jamToast = null;
+  function toast(teks, jenis) {
+    elToast.textContent = teks;
+    elToast.className = 'toast tampil' + (jenis === 'galat' ? ' galat' : '');
+    if (jamToast) clearTimeout(jamToast);
+    jamToast = setTimeout(function () {
+      elToast.className = 'toast' + (jenis === 'galat' ? ' galat' : '');
+    }, 2600);
+  }
+
+  function tanggal(nilai, pendek) {
+    if (!nilai) return '—';
+    var d = new Date(nilai);
+    if (isNaN(d.getTime())) return String(nilai);
+    if (pendek) {
+      return d.toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: '2-digit' });
+    }
+    return d.toLocaleString('id-ID', {
+      day: '2-digit', month: 'short', year: 'numeric',
+      hour: '2-digit', minute: '2-digit'
+    });
+  }
+
+  function angka(n) {
+    var v = Number(n) || 0;
+    return v.toLocaleString('id-ID');
+  }
+
+  /** Panggil API admin di server lisensi. Selalu menyertakan x-admin-key. */
+  function panggil(jalur, opsi) {
+    opsi = opsi || {};
+    var kepala = {
+      'Content-Type': 'application/json',
+      'x-admin-key': kunci()
+    };
+    var kendali = new AbortController();
+    var jam = setTimeout(function () { kendali.abort(); }, BATAS_WAKTU);
+
+    return fetch(SERVER + jalur, {
+      method: opsi.method || 'GET',
+      headers: kepala,
+      body: opsi.body,
+      credentials: 'omit',
+      signal: kendali.signal
+    }).then(function (r) {
+      return r.text().then(function (teks) {
+        var data = null;
+        try { data = JSON.parse(teks); } catch (e) { data = null; }
+        return { status: r.status, data: data };
+      });
+    }).then(function (hasil) {
+      clearTimeout(jam);
+      return hasil;
+    }, function (galat) {
+      clearTimeout(jam);
+      throw galat;
+    });
+  }
+
+  function salin(teks) {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      return navigator.clipboard.writeText(teks).then(function () { return true; },
+        function () { return salinLama(teks); });
+    }
+    return Promise.resolve(salinLama(teks));
+  }
+
+  function salinLama(teks) {
+    var ta = document.createElement('textarea');
+    ta.value = teks;
+    ta.setAttribute('readonly', '');
+    ta.style.position = 'fixed';
+    ta.style.top = '-1000px';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.select();
+    var ok = false;
+    try { ok = document.execCommand('copy'); } catch (e) { ok = false; }
+    document.body.removeChild(ta);
+    return ok;
+  }
+
+  // ---------------------------------------------------------------------
+  // Masuk / keluar
+  // ---------------------------------------------------------------------
+  function tampilkanMasuk() {
+    sudahMasuk = false;
+    elGerbang.hidden = false;
+    elIsi.hidden = true;
+    elLencana.textContent = 'Belum masuk';
+    elLencana.className = 'lencana';
+    elKeluar.hidden = true;
+  }
+
+  function tampilkanIsi() {
+    sudahMasuk = true;
+    elGerbang.hidden = true;
+    elIsi.hidden = false;
+    elLencana.textContent = 'Masuk';
+    elLencana.className = 'lencana hidup';
+    elKeluar.hidden = false;
+    sembunyikan(elPesanGerbang);
+  }
+
+  function keluarSesi(alasan) {
+    sessionStorage.removeItem(KUNCI_SIMPAN);
+    terpilih = {};
+    semua = [];
+    tampilkanMasuk();
+    if (alasan) pesan(elPesanGerbang, alasan, 'galat');
+    elKunci.focus();
+  }
+
+  elTombolMasuk.addEventListener('click', function () {
+    var nilai = elKunci.value.trim();
+    if (!nilai) {
+      pesan(elPesanGerbang, 'Masukkan kunci admin dulu.', 'galat');
+      return;
+    }
+    sessionStorage.setItem(KUNCI_SIMPAN, nilai);
+    elTombolMasuk.disabled = true;
+    elTombolMasuk.textContent = 'Memeriksa...';
+    muat().then(function () {
+      elTombolMasuk.disabled = false;
+      elTombolMasuk.textContent = 'Masuk';
+    });
+  });
+
+  elKunci.addEventListener('keydown', function (e) {
+    if (e.key === 'Enter') elTombolMasuk.click();
+  });
+
+  elKeluar.addEventListener('click', function () {
+    if (!confirm('Keluar dari halaman ini? Kunci admin akan dihapus dari tab ini.')) return;
+    elKunci.value = '';
+    keluarSesi('');
+  });
+
+  // ---------------------------------------------------------------------
+  // Muat data
+  // ---------------------------------------------------------------------
+  function muat() {
+    var tombolMuat = $('tombolMuat');
+    tombolMuat.disabled = true;
+    tombolMuat.textContent = 'Memuat...';
+
+    return panggil('/admin/data', { method: 'GET' })
+      .then(function (hasil) {
+        if (hasil.status === 401) {
+          keluarSesi('Kunci admin salah. Periksa kembali.');
+          return;
+        }
+        if (!hasil.data || !hasil.data.ok) {
+          if (sudahMasuk) toast('Server menolak permintaan. Coba muat ulang.', 'galat');
+          else pesan(elPesanGerbang, 'Gagal memuat data dari server lisensi.', 'galat');
+          return;
+        }
+
+        semua = hasil.data.vouchers || [];
+        tampilkanIsi();
+        gambarRingkasan(hasil.data.ringkas || {});
+        isiPilihanKelompok();
+        gambarTabel();
+        elWaktuMuat.textContent = 'Dimuat ' + tanggal(new Date().toISOString());
+      })
+      .catch(function () {
+        if (sudahMasuk) toast('Tidak bisa menghubungi server lisensi.', 'galat');
+        else pesan(elPesanGerbang, 'Tidak bisa menghubungi server lisensi. Periksa koneksi.', 'galat');
+      })
+      .then(function () {
+        tombolMuat.disabled = false;
+        tombolMuat.textContent = 'Muat ulang';
+      });
+  }
+
+  function gambarRingkasan(r) {
+    $('rTersedia').textContent = angka(r.voucher_tersedia);
+    $('rTerpakai').textContent = angka(r.voucher_terpakai);
+    $('rMati').textContent = angka(r.voucher_mati);
+
+    // Server tidak menghitung "pending" di ringkasannya, jadi dihitung di
+    // sini dari daftar yang sudah dimuat. Angkanya tetap benar karena daftar
+    // voucher dikirim sekaligus (maksimal 500 baris terbaru).
+    var pending = 0;
+    for (var i = 0; i < semua.length; i += 1) {
+      if (semua[i].status === 'pending') pending += 1;
+    }
+    $('rPending').textContent = angka(pending);
+  }
+
+  function isiPilihanKelompok() {
+    var terlihat = {};
+    var urut = [];
+    semua.forEach(function (v) {
+      var b = String(v.batch || '').trim();
+      if (b === '' || terlihat[b]) return;
+      terlihat[b] = true;
+      urut.push(b);
+    });
+    urut.sort(function (a, b) { return a.localeCompare(b, 'id'); });
+
+    // Datalist untuk formulir
+    elDaftarKelompok.textContent = '';
+    urut.forEach(function (b) {
+      var o = document.createElement('option');
+      o.value = b;
+      elDaftarKelompok.appendChild(o);
+    });
+
+    // Select untuk penyaringan — nilai yang sedang dipilih dipertahankan.
+    var dipilih = elKelompok.value;
+    elKelompok.textContent = '';
+    var semuaOpsi = document.createElement('option');
+    semuaOpsi.value = '';
+    semuaOpsi.textContent = 'Semua kelompok';
+    elKelompok.appendChild(semuaOpsi);
+
+    urut.forEach(function (b) {
+      var o = document.createElement('option');
+      o.value = b;
+      o.textContent = b;
+      elKelompok.appendChild(o);
+    });
+
+    elKelompok.value = terlihat[dipilih] ? dipilih : '';
+  }
+
+  // ---------------------------------------------------------------------
+  // Penyaringan
+  // ---------------------------------------------------------------------
+  function cocok(v, kata, status, kelompok) {
+    if (status && String(v.status) !== status) return false;
+    if (kelompok && String(v.batch || '') !== kelompok) return false;
+    if (elSembunyiPending.checked && v.status === 'pending') return false;
+    if (kata === '') return true;
+
+    var gabung = [
+      v.code, v.batch, v.customer_name, v.customer_email,
+      v.order_ref, v.license_code, v.status
+    ].join(' ').toLowerCase();
+
+    // Setiap kata kunci harus muncul, urutannya bebas.
+    var bagian = kata.split(/\s+/);
+    for (var i = 0; i < bagian.length; i += 1) {
+      if (gabung.indexOf(bagian[i]) === -1) return false;
+    }
+    return true;
+  }
+
+  function hasilSaring() {
+    var kata = elCari.value.trim().toLowerCase();
+    var status = elStatus.value;
+    var kelompok = elKelompok.value;
+    return semua.filter(function (v) { return cocok(v, kata, status, kelompok); });
+  }
+
+  // ---------------------------------------------------------------------
+  // Tabel
+  // ---------------------------------------------------------------------
+  function sel(teks, kelas) {
+    var td = document.createElement('td');
+    td.textContent = teks;
+    if (kelas) td.className = kelas;
+    return td;
+  }
+
+  function selTag(status) {
+    var td = document.createElement('td');
+    var span = document.createElement('span');
+    var s = String(status || '');
+    span.className = 'tag ' + s;
+    span.textContent = LABEL_STATUS[s] || s || '—';
+    td.appendChild(span);
+    return td;
+  }
+
+  function tombolKecil(teks, bahaya, aksi) {
+    var b = document.createElement('button');
+    b.className = 'tautan-tbl' + (bahaya ? ' bahaya' : '');
+    b.type = 'button';
+    b.textContent = teks;
+    b.addEventListener('click', aksi);
+    return b;
+  }
+
+  function gambarTabel() {
+    var baris = hasilSaring();
+    elTabel.textContent = '';
+
+    // Buang pilihan yang kodenya sudah tidak ada di data terbaru.
+    var ada = {};
+    semua.forEach(function (v) { ada[v.code] = true; });
+    Object.keys(terpilih).forEach(function (k) {
+      if (!ada[k]) delete terpilih[k];
+    });
+
+    if (baris.length === 0) {
+      var tr = document.createElement('tr');
+      var td = document.createElement('td');
+      td.colSpan = 9;
+      td.className = 'kosong';
+      td.textContent = semua.length === 0
+        ? 'Belum ada voucher. Buat yang pertama di atas.'
+        : 'Tidak ada voucher yang cocok dengan saringan ini.';
+      tr.appendChild(td);
+      elTabel.appendChild(tr);
+      elKetJumlah.textContent = '0 dari ' + angka(semua.length) + ' voucher';
+      segarkanPilihan();
+      return;
+    }
+
+    var potongan = document.createDocumentFragment();
+
+    baris.forEach(function (v) {
+      var tr = document.createElement('tr');
+
+      var tdCek = document.createElement('td');
+      tdCek.className = 'kolom-cek';
+      var cek = document.createElement('input');
+      cek.type = 'checkbox';
+      cek.checked = !!terpilih[v.code];
+      cek.setAttribute('aria-label', 'Pilih ' + v.code);
+      cek.addEventListener('change', function () {
+        if (cek.checked) terpilih[v.code] = true;
+        else delete terpilih[v.code];
+        segarkanPilihan();
+      });
+      tdCek.appendChild(cek);
+      tr.appendChild(tdCek);
+
+      tr.appendChild(sel(v.code, 'mono'));
+      tr.appendChild(sel(v.batch || '—'));
+      tr.appendChild(sel(v.customer_name || '—'));
+      tr.appendChild(selTag(v.status));
+      tr.appendChild(sel(v.license_code || '—', 'mono'));
+      tr.appendChild(sel(tanggal(v.created_at, true)));
+      tr.appendChild(sel(tanggal(v.used_at, true)));
+
+      var tdAksi = document.createElement('td');
+      tdAksi.className = 'aksi';
+
+      if (v.status !== 'pending') {
+        tdAksi.appendChild(tombolKecil('Salin', false, function () {
+          salin(v.code).then(function (ok) {
+            toast(ok ? 'Kode disalin: ' + v.code : 'Gagal menyalin', ok ? '' : 'galat');
+          });
+        }));
+      }
+
+      if (v.status !== 'revoked') {
+        tdAksi.appendChild(tombolKecil('Nonaktifkan', true, function () {
+          nonaktifkan(v);
+        }));
+      }
+
+      tr.appendChild(tdAksi);
+      potongan.appendChild(tr);
+    });
+
+    elTabel.appendChild(potongan);
+    elKetJumlah.textContent = angka(baris.length) + ' dari ' + angka(semua.length) + ' voucher';
+    segarkanPilihan();
+  }
+
+  function segarkanPilihan() {
+    var n = Object.keys(terpilih).length;
+    elJumlahPilih.textContent = angka(n);
+    elPilPilih.hidden = n === 0;
+
+    var tampil = hasilSaring();
+    var semuaTerpilih = tampil.length > 0 && tampil.every(function (v) { return terpilih[v.code]; });
+    elPilihSemua.checked = semuaTerpilih;
+  }
+
+  elPilihSemua.addEventListener('change', function () {
+    var tampil = hasilSaring();
+    if (elPilihSemua.checked) {
+      tampil.forEach(function (v) { terpilih[v.code] = true; });
+    } else {
+      tampil.forEach(function (v) { delete terpilih[v.code]; });
+    }
+    gambarTabel();
+  });
+
+  elCari.addEventListener('input', gambarTabel);
+  elStatus.addEventListener('change', gambarTabel);
+  elKelompok.addEventListener('change', gambarTabel);
+  elSembunyiPending.addEventListener('change', gambarTabel);
+  $('tombolMuat').addEventListener('click', muat);
+
+  // ---------------------------------------------------------------------
+  // Buat voucher
+  // ---------------------------------------------------------------------
+  elTombolBuat.addEventListener('click', function () {
+    sembunyikan(elPesanBuat);
+    elHasilBuat.textContent = '';
+
+    var jumlah = parseInt($('jumlah').value, 10);
+    if (!(jumlah >= 1 && jumlah <= 200)) {
+      pesan(elPesanBuat, 'Jumlah harus antara 1 dan 200.', 'galat');
+      return;
+    }
+
+    var awalan = ($('awalan').value || 'VC').trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
+    if (awalan === '') awalan = 'VC';
+
+    elTombolBuat.disabled = true;
+    elTombolBuat.textContent = 'Membuat...';
+
+    panggil('/admin/vouchers', {
+      method: 'POST',
+      body: JSON.stringify({
+        jumlah: jumlah,
+        awalan: awalan,
+        batch: $('kelompok').value,
+        customer_name: $('pembeli').value
+      })
+    })
+      .then(function (hasil) {
+        if (hasil.status === 401) {
+          keluarSesi('Kunci admin salah. Periksa kembali.');
+          return;
+        }
+        if (!hasil.data || !hasil.data.ok) {
+          pesan(elPesanBuat, 'Gagal membuat voucher. Coba lagi.', 'galat');
+          return;
+        }
+
+        kodeBaru = hasil.data.vouchers || [];
+        pesan(elPesanBuat, 'Berhasil membuat ' + kodeBaru.length + ' voucher.', 'baik');
+        gambarHasilBuat(kodeBaru);
+        return muat();
+      })
+      .catch(function () {
+        pesan(elPesanBuat, 'Tidak bisa menghubungi server lisensi.', 'galat');
+      })
+      .then(function () {
+        elTombolBuat.disabled = false;
+        elTombolBuat.textContent = 'Buat Voucher';
+      });
+  });
+
+  function gambarHasilBuat(daftar) {
+    elHasilBuat.textContent = '';
+    if (!daftar.length) return;
+
+    var kotak = document.createElement('div');
+    kotak.className = 'kotak-kode';
+
+    var judul = document.createElement('div');
+    judul.className = 'judul';
+    judul.textContent = daftar.length + ' kode baru — salin atau cetak sekarang';
+    kotak.appendChild(judul);
+
+    var isi = document.createElement('div');
+    isi.className = 'daftar-kode';
+    isi.textContent = daftar.join('\n');
+    kotak.appendChild(isi);
+
+    var aksi = document.createElement('div');
+    aksi.style.marginTop = '12px';
+    aksi.style.display = 'flex';
+    aksi.style.gap = '8px';
+    aksi.style.flexWrap = 'wrap';
+
+    var bSalin = document.createElement('button');
+    bSalin.className = 'tombol kecil';
+    bSalin.type = 'button';
+    bSalin.textContent = 'Salin semua';
+    bSalin.addEventListener('click', function () {
+      salin(daftar.join('\n')).then(function (ok) {
+        toast(ok ? daftar.length + ' kode disalin' : 'Gagal menyalin', ok ? '' : 'galat');
+      });
+    });
+    aksi.appendChild(bSalin);
+
+    var bCetak = document.createElement('button');
+    bCetak.className = 'tombol hantu kecil';
+    bCetak.type = 'button';
+    bCetak.textContent = 'Cetak lembar';
+    bCetak.addEventListener('click', function () { cetak(daftar); });
+    aksi.appendChild(bCetak);
+
+    kotak.appendChild(aksi);
+    elHasilBuat.appendChild(kotak);
+  }
+
+  // ---------------------------------------------------------------------
+  // Nonaktifkan
+  // ---------------------------------------------------------------------
+  function nonaktifkan(v) {
+    var pesanKonfirmasi = v.status === 'used'
+      ? 'Voucher ' + v.code + ' sudah terpakai.\n\nMenonaktifkannya TIDAK mematikan lisensi ' +
+        (v.license_code || '') + ' yang sudah aktif. Untuk mematikan lisensi, pakai halaman admin lisensi.\n\nLanjut nonaktifkan vouchernya?'
+      : 'Nonaktifkan voucher ' + v.code + '?\n\nKode ini tidak akan bisa ditukar lagi.';
+
+    if (!confirm(pesanKonfirmasi)) return;
+
+    panggil('/admin/revoke', {
+      method: 'POST',
+      body: JSON.stringify({ code: v.code, jenis: 'voucher' })
+    })
+      .then(function (hasil) {
+        if (hasil.status === 401) { keluarSesi('Kunci admin salah. Periksa kembali.'); return; }
+        if (hasil.data && hasil.data.ok) {
+          toast('Voucher ' + v.code + ' dinonaktifkan');
+          delete terpilih[v.code];
+          return muat();
+        }
+        toast('Gagal menonaktifkan voucher.', 'galat');
+      })
+      .catch(function () { toast('Tidak bisa menghubungi server lisensi.', 'galat'); });
+  }
+
+  // ---------------------------------------------------------------------
+  // Salin massal
+  // ---------------------------------------------------------------------
+  function kodeDari(daftar) {
+    return daftar
+      .filter(function (v) { return v.status === 'unused'; })
+      .map(function (v) { return v.code; });
+  }
+
+  $('tombolSalinSemua').addEventListener('click', function () {
+    var kode = kodeDari(hasilSaring());
+    if (!kode.length) { toast('Tidak ada kode belum terpakai pada saringan ini.', 'galat'); return; }
+    salin(kode.join('\n')).then(function (ok) {
+      toast(ok ? kode.length + ' kode disalin' : 'Gagal menyalin', ok ? '' : 'galat');
+    });
+  });
+
+  $('tombolSalinPilih').addEventListener('click', function () {
+    var kode = Object.keys(terpilih);
+    if (!kode.length) return;
+    salin(kode.join('\n')).then(function (ok) {
+      toast(ok ? kode.length + ' kode disalin' : 'Gagal menyalin', ok ? '' : 'galat');
+    });
+  });
+
+  $('tombolBatalPilih').addEventListener('click', function () {
+    terpilih = {};
+    gambarTabel();
+  });
+
+  // ---------------------------------------------------------------------
+  // Ekspor CSV
+  // ---------------------------------------------------------------------
+  function selCsv(nilai) {
+    var s = String(nilai === null || nilai === undefined ? '' : nilai);
+    return '"' + s.replace(/"/g, '""') + '"';
+  }
+
+  $('tombolCsv').addEventListener('click', function () {
+    var baris = hasilSaring();
+    if (!baris.length) { toast('Tidak ada data untuk diekspor.', 'galat'); return; }
+
+    var kepala = ['kode', 'kelompok', 'pembeli', 'email', 'nomor_pesanan',
+                  'status', 'kode_aktivasi', 'dibuat', 'dipakai'];
+
+    var isi = [kepala.join(',')];
+    baris.forEach(function (v) {
+      isi.push([
+        selCsv(v.code), selCsv(v.batch), selCsv(v.customer_name),
+        selCsv(v.customer_email), selCsv(v.order_ref), selCsv(v.status),
+        selCsv(v.license_code), selCsv(v.created_at), selCsv(v.used_at)
+      ].join(','));
+    });
+
+    // BOM supaya Excel membaca huruf beraksen dengan benar; "sep=," supaya
+    // Excel memakai koma sebagai pemisah, bukan titik koma.
+    var teks = '\ufeffsep=,\r\n' + isi.join('\r\n') + '\r\n';
+    var blob = new Blob([teks], { type: 'text/csv;charset=utf-8' });
+    var alamat = URL.createObjectURL(blob);
+
+    var a = document.createElement('a');
+    a.href = alamat;
+    a.download = 'voucher-' + capWaktu() + '.csv';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(function () { URL.revokeObjectURL(alamat); }, 2000);
+
+    toast(baris.length + ' baris diekspor');
+  });
+
+  function capWaktu() {
+    var d = new Date();
+    function dua(n) { return (n < 10 ? '0' : '') + n; }
+    return d.getFullYear() + dua(d.getMonth() + 1) + dua(d.getDate()) +
+      '-' + dua(d.getHours()) + dua(d.getMinutes());
+  }
+
+  // ---------------------------------------------------------------------
+  // Cetak lembar voucher
+  // ---------------------------------------------------------------------
+  $('tombolCetakSemua').addEventListener('click', function () {
+    var kode = kodeDari(hasilSaring());
+    if (!kode.length) { toast('Tidak ada kode belum terpakai pada saringan ini.', 'galat'); return; }
+    cetak(kode);
+  });
+
+  $('tombolCetakPilih').addEventListener('click', function () {
+    var kode = Object.keys(terpilih);
+    if (!kode.length) return;
+    cetak(kode);
+  });
+
+  function cetak(daftarKode) {
+    if (!daftarKode.length) return;
+
+    var elLembar = $('lembar');
+    elLembar.textContent = '';
+
+    var gaya = document.createElement('style');
+    // Jangan menulis aturan "#lembar { display: block }" di sini: berkas gaya
+    // ini berlaku untuk seluruh halaman, jadi lembar cetak akan ikut muncul
+    // di layar setelah tombol cetak ditekan sekali. Tampil-sembunyinya sudah
+    // diatur @media print di atas.
+    gaya.textContent = [
+      '.lm-kepala { font-size: 10px; color: #666; margin-bottom: 8px; }',
+      '.lm-grid { display: flex; flex-wrap: wrap; gap: 6mm; }',
+      '.lm-kartu {',
+      '  width: calc(50% - 3mm); border: 1px dashed #999; border-radius: 3mm;',
+      '  padding: 6mm 5mm; break-inside: avoid; page-break-inside: avoid;',
+      '}',
+      '.lm-merek { font-size: 8.5pt; font-weight: 700; letter-spacing: .08em;',
+      '  text-transform: uppercase; color: #0F6E56; }',
+      '.lm-judul { font-size: 7.5pt; color: #666; margin-top: 1mm; }',
+      '.lm-kode { font-family: ui-monospace, Menlo, Consolas, monospace;',
+      '  font-size: 17pt; font-weight: 700; letter-spacing: .05em;',
+      '  margin: 3mm 0; padding: 2.5mm 0; text-align: center; color: #111;',
+      '  background: #F1F8F5; border: 1px solid #CFE7DC; border-radius: 2mm; }',
+      '.lm-langkah { font-size: 7.5pt; color: #333; line-height: 1.55; }',
+      '.lm-langkah b { color: #111; }',
+      '.lm-kaki { font-size: 7pt; color: #888; margin-top: 2.5mm;',
+      '  border-top: 1px solid #ddd; padding-top: 1.5mm; }'
+    ].join('\n');
+    elLembar.appendChild(gaya);
+
+    var kepala = document.createElement('div');
+    kepala.className = 'lm-kepala';
+    kepala.textContent = NAMA_APLIKASI + ' — ' + daftarKode.length +
+      ' lembar voucher — dicetak ' + tanggal(new Date().toISOString());
+    elLembar.appendChild(kepala);
+
+    var grid = document.createElement('div');
+    grid.className = 'lm-grid';
+
+    daftarKode.forEach(function (kode) {
+      var kartu = document.createElement('div');
+      kartu.className = 'lm-kartu';
+
+      var merek = document.createElement('div');
+      merek.className = 'lm-merek';
+      merek.textContent = NAMA_APLIKASI;
+      kartu.appendChild(merek);
+
+      var judul = document.createElement('div');
+      judul.className = 'lm-judul';
+      judul.textContent = 'Kode Voucher — sekali pakai, untuk satu HP';
+      kartu.appendChild(judul);
+
+      var kodeEl = document.createElement('div');
+      kodeEl.className = 'lm-kode';
+      kodeEl.textContent = kode;
+      kartu.appendChild(kodeEl);
+
+      var langkah = document.createElement('div');
+      langkah.className = 'lm-langkah';
+      langkah.innerHTML =
+        '1. Unduh aplikasi: <b>' + ALAMAT_UNDUH + '</b><br>' +
+        '2. Buka <b>' + ALAMAT_PORTAL + '</b> di HP, masukkan Kode Perangkat dan kode di atas.<br>' +
+        '3. Tempel Kode Aktivasi yang muncul ke dalam aplikasi.';
+      kartu.appendChild(langkah);
+
+      var kaki = document.createElement('div');
+      kaki.className = 'lm-kaki';
+      kaki.textContent = 'Simpan kode ini. Voucher hanya bisa ditukar satu kali.';
+      kartu.appendChild(kaki);
+
+      grid.appendChild(kartu);
+    });
+
+    elLembar.appendChild(grid);
+
+    // Beri satu putaran render supaya tata letak cetak sudah siap.
+    setTimeout(function () { window.print(); }, 60);
+  }
+
+  // ---------------------------------------------------------------------
+  // Mulai
+  // ---------------------------------------------------------------------
+  if (kunci()) {
+    elKunci.value = kunci();
+    muat();
+  } else {
+    tampilkanMasuk();
+    elKunci.focus();
+  }
+})();
+</script>
+</body>
+</html>

@@ -426,17 +426,34 @@ class ReceiptService {
   static const int _ambangGelap = 150;
 
   /// Ratakan latar transparan ke putih, lalu ambangkan ke hitam/putih.
+  ///
+  /// Memakai `getPixel`/`setPixelRgba` milik paket `image` 3.x. Ketiganya
+  /// bekerja pada satu angka warna terpaket (0xAABBGGRR), bukan objek piksel —
+  /// `Pixel` hanya ada di `image` 4.x, dan `setPixelRgb` memang tidak ada di
+  /// versi yang dipakai proyek ini.
   static void _jadikanHitamPutih(img.Image gambar) {
+    // JPEG dan sebagian PNG tidak menyimpan alfa sama sekali. Membacanya tetap
+    // mengembalikan angka (biasanya 0), dan kalau dipercaya begitu saja seluruh
+    // gambar akan dianggap transparan lalu tercetak putih kosong.
+    final adaAlfa = gambar.channels == img.Channels.rgba;
+
     for (var y = 0; y < gambar.height; y++) {
       for (var x = 0; x < gambar.width; x++) {
-        final piksel = gambar.getPixel(x, y);
-        final alfa = (piksel.a / 255).clamp(0.0, 1.0).toDouble();
-        final merah = piksel.r * alfa + 255 * (1 - alfa);
-        final hijau = piksel.g * alfa + 255 * (1 - alfa);
-        final biru = piksel.b * alfa + 255 * (1 - alfa);
+        final warna = gambar.getPixel(x, y);
+        var merah = img.getRed(warna).toDouble();
+        var hijau = img.getGreen(warna).toDouble();
+        var biru = img.getBlue(warna).toDouble();
+
+        if (adaAlfa) {
+          final alfa = img.getAlpha(warna) / 255;
+          merah = merah * alfa + 255 * (1 - alfa);
+          hijau = hijau * alfa + 255 * (1 - alfa);
+          biru = biru * alfa + 255 * (1 - alfa);
+        }
+
         final terang = 0.299 * merah + 0.587 * hijau + 0.114 * biru;
         final nilai = terang >= _ambangGelap ? 255 : 0;
-        gambar.setPixelRgb(x, y, nilai, nilai, nilai);
+        gambar.setPixelRgba(x, y, nilai, nilai, nilai);
       }
     }
   }

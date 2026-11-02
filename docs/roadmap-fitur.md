@@ -634,6 +634,98 @@ ikut menampilkan jaraknya.
 
 ---
 
+## Fitur v1.30.0 — pemindai 1D/2D: Bluetooth, kabel USB, nirkabel, dan pengaturannya
+
+Keluhan yang mendasari: "scanner 2D saya tidak terbaca". Setelah diperiksa,
+masalahnya bukan jenis barcodenya, melainkan tiga batas yang dipaku di kode
+sejak v1.23.0 dan tidak pernah bisa disesuaikan pemakai.
+
+### 1. Ketiga jenis alat ternyata satu jalur
+
+Scanner Bluetooth, scanner kabel USB (lewat adaptor OTG), dan scanner nirkabel
+2,4 GHz **semuanya** tampil ke Android sebagai keyboard fisik (HID). Tidak ada
+Bluetooth API, tidak ada izin USB, dan tidak ada layar "cari alat" yang perlu
+dibuat — memasangkannya dilakukan sekali di Pengaturan Android, atau cukup
+dicolok untuk USB. Yang berbeda hanya cara gagalnya:
+
+  * Bluetooth gagal karena belum dipasangkan atau alatnya masih mode SPP;
+  * USB gagal karena alatnya berada di mode COM/serial (lampunya menyala,
+    Android menyebutnya terpasang, tetapi tidak ada satu karakter pun yang
+    sampai ke aplikasi);
+  * dongle gagal karena tidak tercolok atau belum dipasangkan ke alatnya.
+
+Karena itu dukungan "2D/1D" di sini bukan menambah pustaka baru, melainkan
+membuang batas lama dan membuat kegagalan itu bisa dilihat.
+
+### 2. Tiga batas yang dipaku
+
+  * **Panjang maksimum 64 karakter.** Barcode 1D hanya 8–30 karakter, tetapi
+    QR, Data Matrix, PDF417, dan Aztec bisa ratusan. Kode yang lebih panjang
+    **dipotong** di 64 lalu diterima dalam keadaan terpotong — tidak pernah
+    cocok dengan data mana pun, tanpa pesan apa pun. Sekarang bawaannya 256
+    (bisa sampai 512), dan kode yang melewati batas **ditolak dengan alasan**,
+    bukan dipotong.
+  * **Jeda antar karakter 120 ms.** Scanner murah bisa berjeda 150–250 ms, dan
+    kodenya terpotong di tengah. Sekarang bisa diatur 30–500 ms.
+  * **Penanda akhir hanya Enter dan Tab.** Scanner yang tidak mengirim keduanya
+    tidak pernah menutup kumpulan. Sekarang penandanya bisa dipilih, termasuk
+    "Tanpa penanda" yang menutup karena jeda diam.
+
+### 3. Kesalahan lama di jalur "tanpa penanda"
+
+Durasi kumpulan dihitung sampai **saat kumpulan ditutup**, bukan sampai
+karakter terakhir. Karena penutupan terjadi 250 ms setelah karakter terakhir,
+setiap kumpulan dinilai 250 ms lebih lambat daripada kenyataannya — dan dengan
+batas 300 ms, kode enam karakter yang dikirim dalam 150 ms tetap ditolak.
+Artinya jalur tanpa-penanda praktis tidak pernah menerima apa pun sejak
+v1.23.0. Sekarang durasinya dihitung dari karakter pertama ke karakter
+terakhir.
+
+Batas waktu untuk jalur ini sengaja **tidak** mengikuti jeda yang diatur
+pengguna: kalau ikut, menaikkan jeda untuk scanner lambat justru membuat
+ketikan tangan ikut terbaca. Konsekuensinya disengaja dan dijelaskan di layar:
+scanner yang sangat lambat **dan** tidak mengirim penanda akhir tidak bisa
+dibedakan dari ketikan manusia, jadi penyelesaiannya adalah mengatur alatnya
+supaya mengirim Enter — bukan menaikkan jeda.
+
+### 4. Halaman Pengaturan Pemindai (`/profile/pemindai`)
+
+Terbuka untuk kasir, sama seperti Pengaturan Cetak: yang memindai adalah kasir,
+dan alat baru di mejanya tidak boleh menunggu pemilik toko datang.
+
+  * saklar **Pemindai aktif**;
+  * **area uji** yang menampilkan tombol apa adanya (`<Enter>`, `<Tab>`,
+    karakter) berikut hasilnya: kode, panjang, durasi, atau alasan penolakan
+    beserta angka yang harus diubah;
+  * jenis alat (Bluetooth / USB / nirkabel / kamera) beserta panduan yang
+    berbeda untuk tiap jenis;
+  * jeda antar karakter, penanda akhir, panjang minimum & maksimum;
+  * buang awalan/akhiran (mis. penanda AIM `]C1`);
+  * getar dan bunyi saat kode terbaca — keduanya lewat `flutter/services`,
+    jadi tidak menambah paket maupun izin;
+  * kartu **alat USB terdeteksi** yang membedakan HID (siap) dari mode
+    COM/serial (salah mode).
+
+Area uji menangkap tombolnya sendiri dan mengembalikan `handled`, supaya Tab
+tidak memindahkan fokus dan Enter tidak menekan tombol di layar. Karena itu
+event-nya diteruskan manual lewat `BarcodeWedgeScanner.teruskan()` — tanpa itu,
+`handled` membuat scanner tampak mati justru di halaman yang mengujinya.
+
+### 5. Deteksi alat USB (native)
+
+`tools/android/ScannerUsb.kt` membaca `UsbManager.deviceList` dan
+mengelompokkan tiap alat menurut kelas antarmukanya (HID / COM / penyimpanan).
+Daftar itu **tidak** dipakai untuk menerima hasil scan — kalau berkas ini
+hilang, scanner tetap bekerja. Gunanya hanya membedakan "belum dicolok" dari
+"tercolok dalam mode COM", dua keadaan yang dari sisi Flutter sama-sama berarti
+"tidak ada ketikan". `tools/ci_patch.py` menyalinnya setiap build dan
+mendaftarkan kanalnya di `MainActivity`, dengan penjagaan agar aman dijalankan
+dua kali.
+
+Versi 1.30.0+51. Skema database tetap v12.
+
+---
+
 ## Catatan teknis untuk pengerjaan nanti
 
 Semua usulan di atas menambah tabel/kolom. Saat dokumen ini disusun semuanya

@@ -371,37 +371,68 @@ def install_icon():
             notes.append("icon: android:roundIcon sudah ada, dilewati")
 
 
-def install_printer_channel():
-    """Pasang jembatan Bluetooth Classic (SPP) untuk printer termal.
+# Berkas Kotlin yang disalin ke folder android/ setiap build, beserta objek
+# yang kanalnya harus didaftarkan di MainActivity.
+NATIVE_FILES = [
+    ("PrinterSpp.kt", "PrinterSpp"),
+    ("ScannerUsb.kt", "ScannerUsb"),
+]
 
-    `flutter_blue_plus` hanya bisa BLE, sedangkan printer thermal 58 mm seperti
-    RPP02N memakai Bluetooth Classic SPP. Perangkat Classic TIDAK PERNAH muncul
-    di pemindaian BLE, jadi jalurnya dibuat native di tools/android/PrinterSpp.kt
-    lalu disalin ke folder android/ setiap build.
+IZIN_BLOK = """
+    override fun onRequestPermissionsResult(
+        requestCode: Int,
+        permissions: Array<String>,
+        grantResults: IntArray
+    ) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        PrinterSpp.terimaIzin(requestCode, grantResults)
+    }
+"""
 
-    Kalau berkas sumbernya hilang, ini dianggap FATAL: APK tanpa kanal ini akan
-    kembali ke bug lama (printer tidak pernah ditemukan) tanpa gejala apa pun,
-    dan tidak ada cara melihatnya dari luar.
+
+def install_native_channels():
+    """Pasang jembatan native: printer Classic SPP + daftar alat USB.
+
+    Keduanya tidak bisa dibuat di Dart:
+
+      * PrinterSpp -- printer thermal 58 mm seperti RPP02N memakai Bluetooth
+        Classic SPP, sedangkan flutter_blue_plus hanya BLE. Perangkat Classic
+        TIDAK PERNAH muncul di pemindaian BLE.
+      * ScannerUsb -- daftar alat USB hanya terbaca lewat UsbManager. Scanner
+        USB sendiri tetap bekerja tanpa ini (Android meneruskan ketikannya
+        sebagai keyboard), tetapi tanpa daftar alat tidak ada cara membedakan
+        "belum dicolok" dari "tercolok dalam mode COM".
+
+    Kalau salah satu berkas sumbernya hilang, ini FATAL: APK tanpa PrinterSpp
+    kembali ke bug lama (printer tidak pernah ditemukan), dan APK tanpa
+    ScannerUsb selalu berkata "tidak ada alat" -- dua-duanya tanpa gejala yang
+    bisa dilihat dari luar.
     """
-    sumber = Path("tools") / "android" / "PrinterSpp.kt"
-    if not sumber.exists():
-        fatal.append(
-            "tools/android/PrinterSpp.kt tidak ada — dukungan printer Classic "
-            "SPP tidak akan ikut ke APK"
-        )
-        return
-
     tujuan_dir = Path("android/app/src/main/kotlin") / Path(*APP_ID.split("."))
     tujuan_dir.mkdir(parents=True, exist_ok=True)
-    tujuan = tujuan_dir / "PrinterSpp.kt"
-    shutil.copy2(sumber, tujuan)
-    notes.append("printer: PrinterSpp.kt disalin ke " + tujuan.as_posix())
 
-    patch_main_activity()
+    terpasang = []
+    for nama, objek in NATIVE_FILES:
+        sumber = Path("tools") / "android" / nama
+        if not sumber.exists():
+            fatal.append(
+                "tools/android/%s tidak ada - dukungan %s tidak akan ikut ke APK"
+                % (nama, objek)
+            )
+            continue
+        tujuan = tujuan_dir / nama
+        shutil.copy2(sumber, tujuan)
+        terpasang.append(objek)
+        notes.append("native: %s disalin ke %s" % (nama, tujuan.as_posix()))
+
+    if not terpasang:
+        return
+
+    patch_main_activity(terpasang)
 
 
-def patch_main_activity():
-    """Daftarkan kanal printer di MainActivity hasil `flutter create`."""
+def patch_main_activity(kelas):
+    """Daftarkan kanal native di MainActivity hasil `flutter create`."""
     path = (
         Path("android/app/src/main/kotlin")
         / Path(*APP_ID.split("."))
@@ -409,15 +440,19 @@ def patch_main_activity():
     )
     if not path.exists():
         fatal.append(
-            "MainActivity.kt tidak ditemukan di %s — kanal printer tidak "
-            "terdaftar dan printer Classic tetap tidak bisa dipakai"
-            % path.as_posix()
+            "MainActivity.kt tidak ditemukan di %s - kanal native tidak "
+            "terdaftar dan printer Classic maupun daftar alat USB tidak bisa "
+            "dipakai" % path.as_posix()
         )
         return
 
     teks = read(path)
-    if "PrinterSpp" in teks:
-        notes.append("printer: MainActivity sudah mendaftarkan PrinterSpp, dilewati")
+
+    kurang = [k for k in kelas if ("%s.daftarkan" % k) not in teks]
+    butuh_izin = "PrinterSpp" in kelas and "PrinterSpp.terimaIzin" not in teks
+
+    if not kurang and not butuh_izin:
+        notes.append("native: MainActivity sudah mendaftarkan semua kanal, dilewati")
         return
 
     if "import io.flutter.embedding.engine.FlutterEngine" not in teks:
@@ -432,53 +467,88 @@ def patch_main_activity():
             fatal.append("baris package MainActivity tidak ditemukan, impor gagal")
             return
 
-    kelas = re.search(r"class\s+MainActivity\s*:\s*FlutterActivity\s*\(\s*\)", teks)
-    if not kelas:
-        fatal.append(
-            "bentuk kelas MainActivity tidak dikenali (bukan "
-            "'class MainActivity: FlutterActivity()') — kanal printer gagal didaftarkan"
+    daftar_baris = "".join(
+        "        %s.daftarkan(this, flutterEngine.dartExecutor.binaryMessenger)\n" % k
+        for k in kurang
+    )
+
+    if "override fun configureFlutterEngine" in teks:
+        # MainActivity yang sudah pernah dipatch: menambah override kedua dengan
+        # nama yang sama tidak bisa dikompilasi, jadi barisnya disisipkan ke
+        # override yang sudah ada.
+        pola = re.compile(r"super\.configureFlutterEngine\s*\([^)]*\)[ \t]*\r?\n")
+        cocok = pola.search(teks)
+        if not cocok:
+            fatal.append(
+                "configureFlutterEngine sudah ada tetapi baris super-nya tidak "
+                "ditemukan - kanal native gagal didaftarkan"
+            )
+            return
+        teks = teks[: cocok.end()] + daftar_baris + teks[cocok.end() :]
+        notes.append(
+            "native: %d kanal disisipkan ke configureFlutterEngine yang ada"
+            % len(kurang)
         )
-        return
-
-    sisip = """
-    override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
-        super.configureFlutterEngine(flutterEngine)
-        PrinterSpp.daftarkan(this, flutterEngine.dartExecutor.binaryMessenger)
-    }
-
-    override fun onRequestPermissionsResult(
-        requestCode: Int,
-        permissions: Array<String>,
-        grantResults: IntArray
-    ) {
-        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-        PrinterSpp.terimaIzin(requestCode, grantResults)
-    }
-"""
-
-    # DUA bentuk kelas harus ditangani:
-    #
-    #   Flutter 3.27 (template sekarang):  class MainActivity: FlutterActivity()
-    #   Flutter lama:                      class MainActivity: FlutterActivity() { }
-    #
-    # Template 3.27 TIDAK menulis kurung kurawal sama sekali. Percobaan pertama
-    # hanya menangani bentuk ber-kurung, sehingga build v1.28.2 berhenti di sini
-    # dengan "bentuk kelas MainActivity tidak dikenali".
-    sisa = teks[kelas.end():]
-    spasi = re.match(r"[ \t\r\n]*", sisa)
-    awal = kelas.end() + (spasi.end() if spasi else 0)
-
-    if teks[awal:awal + 1] == "{":
-        teks = teks[:awal + 1] + sisip + teks[awal + 1:]
-        notes.append("printer: badan kelas sudah ada, overrides disisipkan di dalamnya")
     else:
-        teks = teks[:kelas.end()] + " {" + sisip + "}" + teks[kelas.end():]
-        notes.append("printer: kelas tanpa badan ditambahi badan + overrides")
+        kelas_re = re.search(
+            r"class\s+MainActivity\s*:\s*FlutterActivity\s*\(\s*\)", teks
+        )
+        if not kelas_re:
+            fatal.append(
+                "bentuk kelas MainActivity tidak dikenali (bukan "
+                "'class MainActivity: FlutterActivity()') - kanal native gagal "
+                "didaftarkan"
+            )
+            return
+
+        sisip = (
+            "\n    override fun configureFlutterEngine(flutterEngine: FlutterEngine) {\n"
+            "        super.configureFlutterEngine(flutterEngine)\n"
+            + daftar_baris
+            + "    }\n"
+        )
+        if butuh_izin:
+            sisip += IZIN_BLOK
+
+        # DUA bentuk kelas harus ditangani:
+        #
+        #   Flutter 3.27 (template sekarang):  class MainActivity: FlutterActivity()
+        #   Flutter lama:                      class MainActivity: FlutterActivity() { }
+        #
+        # Template 3.27 TIDAK menulis kurung kurawal sama sekali. Percobaan
+        # pertama hanya menangani bentuk ber-kurung, sehingga build v1.28.2
+        # berhenti di sini dengan "bentuk kelas MainActivity tidak dikenali".
+        sisa = teks[kelas_re.end() :]
+        spasi = re.match(r"[ \t\r\n]*", sisa)
+        awal = kelas_re.end() + (spasi.end() if spasi else 0)
+
+        if teks[awal : awal + 1] == "{":
+            teks = teks[: awal + 1] + sisip + teks[awal + 1 :]
+            notes.append(
+                "native: badan kelas sudah ada, overrides disisipkan di dalamnya"
+            )
+        else:
+            teks = teks[: kelas_re.end()] + " {" + sisip + "}" + teks[kelas_re.end() :]
+            notes.append("native: kelas tanpa badan ditambahi badan + overrides")
+
+        # Blok izin sudah ikut di dalam `sisip`.
+        butuh_izin = False
+
+    if butuh_izin:
+        if "override fun onRequestPermissionsResult" in teks:
+            notes.append("native: onRequestPermissionsResult sudah ada, dilewati")
+        else:
+            pos = teks.rfind("}")
+            if pos == -1:
+                fatal.append("penutup kelas MainActivity tidak ditemukan")
+                return
+            teks = teks[:pos] + IZIN_BLOK + teks[pos:]
+            notes.append(
+                "native: onRequestPermissionsResult disisipkan sebelum penutup kelas"
+            )
 
     write(path, teks)
-    notes.append(
-        "printer: configureFlutterEngine + onRequestPermissionsResult terpasang"
-    )
+    notes.append("native: kanal terdaftar (%s)" % ", ".join(kelas))
 
 
 def main():
@@ -489,7 +559,7 @@ def main():
     patch_manifest()
     patch_gradle()
     move_main_activity()
-    install_printer_channel()
+    install_native_channels()
     install_icon()
 
     print("=" * 60)

@@ -23,6 +23,7 @@ import '../features/kas/kas_screen.dart';
 import '../features/kas/tutup_kasir_screen.dart';
 import '../features/kasir/kasir_screen.dart';
 import '../features/kasir/printer_settings_screen.dart';
+import '../features/kasir/scanner_settings_screen.dart';
 import '../features/produk/produk_screen.dart';
 import '../features/profile/customer_screen.dart';
 import '../features/profile/help_screen.dart';
@@ -264,6 +265,16 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/profile/cetak',
         name: 'pengaturanCetak',
         builder: (context, state) => const PrinterSettingsScreen(),
+      ),
+      // Pengaturan pemindai — juga TIDAK masuk [_rutePemilik], dengan alasan
+      // yang sama seperti pengaturan cetak: yang memindai barcode adalah kasir,
+      // dan scanner di mejanya harus bisa dibetulkan oleh orang yang memakainya.
+      // Menutupnya untuk kasir berarti setiap alat baru harus menunggu pemilik
+      // toko datang.
+      GoRoute(
+        path: '/profile/pemindai',
+        name: 'pengaturanPemindai',
+        builder: (context, state) => const ScannerSettingsScreen(),
       ),
       GoRoute(
         path: '/profile/supplier',

@@ -1290,7 +1290,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                     // kasir, dan ukuran kertas harus bisa dibetulkan di HP
                     // yang dipakai mencetak.
                     _MenuAccordion(
-                      title: 'Printer & struk',
+                      title: 'Printer & pemindai',
                       children: [
                         _MenuItem(
                           icon: Icons.print_outlined,
@@ -1299,6 +1299,15 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                           subtitle: 'Ukuran kertas, logo, dan printer Bluetooth',
                           trailing: Icons.chevron_right,
                           onTap: () => context.push('/profile/cetak'),
+                        ),
+                        _MenuItem(
+                          icon: Icons.qr_code_scanner,
+                          color: AppColors.infoMid,
+                          title: 'Pengaturan pemindai',
+                          subtitle:
+                              'Barcode 1D/2D: Bluetooth, kabel USB, nirkabel',
+                          trailing: Icons.chevron_right,
+                          onTap: () => context.push('/profile/pemindai'),
                         ),
                       ],
                     ),

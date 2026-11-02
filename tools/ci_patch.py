@@ -45,6 +45,24 @@ QUERIES_INTENT = """        <intent>
 
 QUERIES_BLOCK = "    <queries>\n" + QUERIES_INTENT + "    </queries>\n"
 
+
+def baris_izin(nama):
+    """Satu baris <uses-permission> untuk AndroidManifest.
+
+    BLUETOOTH_SCAN wajib diberi penanda `neverForLocation`. Tanpa penanda itu,
+    Android 12+ menuntut izin lokasi untuk memindai perangkat Bluetooth. Aplikasi
+    ini tidak pernah meminta lokasi, jadi pemindaian akan berhasil tanpa pesan
+    galat tetapi selalu mengembalikan nol perangkat — persis keluhan "printer
+    tidak ditemukan".
+    """
+    if nama == "android.permission.BLUETOOTH_SCAN":
+        return (
+            '    <uses-permission android:name="%s"\n'
+            '        android:usesPermissionFlags="neverForLocation" />\n' % nama
+        )
+    return '    <uses-permission android:name="%s" />\n' % nama
+
+
 fatal = []
 notes = []
 
@@ -92,13 +110,10 @@ def patch_manifest():
     if "<uses-permission" in content:
         notes.append("manifest: izin sudah ada, dilewati")
     else:
-        # Baris pertama tanpa indentasi: teks asli sudah punya 4 spasi sebelum
-        # "<application", jadi indentasi baris pertama datang dari situ.
-        perms = "<uses-permission android:name=\"%s\" />\n" % PERMISSIONS[0]
-        perms += "".join(
-            '    <uses-permission android:name="%s" />\n' % p
-            for p in PERMISSIONS[1:]
-        )
+        # Blok izin disisipkan tepat sebelum <application>, di dalam <manifest>.
+        # Indentasi baris pertama dibuang karena template sudah menyisakan 4
+        # spasi di depan "<application" — tanpa itu barisnya menjorok 8 spasi.
+        perms = "".join(baris_izin(p) for p in PERMISSIONS).lstrip()
         content = content.replace("<application", perms + "    <application", 1)
         notes.append("manifest: %d izin disuntikkan" % len(PERMISSIONS))
 
@@ -356,6 +371,97 @@ def install_icon():
             notes.append("icon: android:roundIcon sudah ada, dilewati")
 
 
+def install_printer_channel():
+    """Pasang jembatan Bluetooth Classic (SPP) untuk printer termal.
+
+    `flutter_blue_plus` hanya bisa BLE, sedangkan printer thermal 58 mm seperti
+    RPP02N memakai Bluetooth Classic SPP. Perangkat Classic TIDAK PERNAH muncul
+    di pemindaian BLE, jadi jalurnya dibuat native di tools/android/PrinterSpp.kt
+    lalu disalin ke folder android/ setiap build.
+
+    Kalau berkas sumbernya hilang, ini dianggap FATAL: APK tanpa kanal ini akan
+    kembali ke bug lama (printer tidak pernah ditemukan) tanpa gejala apa pun,
+    dan tidak ada cara melihatnya dari luar.
+    """
+    sumber = Path("tools") / "android" / "PrinterSpp.kt"
+    if not sumber.exists():
+        fatal.append(
+            "tools/android/PrinterSpp.kt tidak ada — dukungan printer Classic "
+            "SPP tidak akan ikut ke APK"
+        )
+        return
+
+    tujuan_dir = Path("android/app/src/main/kotlin") / Path(*APP_ID.split("."))
+    tujuan_dir.mkdir(parents=True, exist_ok=True)
+    tujuan = tujuan_dir / "PrinterSpp.kt"
+    shutil.copy2(sumber, tujuan)
+    notes.append("printer: PrinterSpp.kt disalin ke " + tujuan.as_posix())
+
+    patch_main_activity()
+
+
+def patch_main_activity():
+    """Daftarkan kanal printer di MainActivity hasil `flutter create`."""
+    path = (
+        Path("android/app/src/main/kotlin")
+        / Path(*APP_ID.split("."))
+        / "MainActivity.kt"
+    )
+    if not path.exists():
+        fatal.append(
+            "MainActivity.kt tidak ditemukan di %s — kanal printer tidak "
+            "terdaftar dan printer Classic tetap tidak bisa dipakai"
+            % path.as_posix()
+        )
+        return
+
+    teks = read(path)
+    if "PrinterSpp" in teks:
+        notes.append("printer: MainActivity sudah mendaftarkan PrinterSpp, dilewati")
+        return
+
+    if "import io.flutter.embedding.engine.FlutterEngine" not in teks:
+        teks, n = re.subn(
+            r"^package\s+[\w.]+[ \t]*$",
+            "\\g<0>\n\nimport io.flutter.embedding.engine.FlutterEngine",
+            teks,
+            count=1,
+            flags=re.M,
+        )
+        if n == 0:
+            fatal.append("baris package MainActivity tidak ditemukan, impor gagal")
+            return
+
+    kelas = re.search(r"class\s+MainActivity\s*:\s*FlutterActivity\s*\(\s*\)\s*\{", teks)
+    if not kelas:
+        fatal.append(
+            "bentuk kelas MainActivity tidak dikenali (bukan "
+            "'class MainActivity: FlutterActivity()') — kanal printer gagal didaftarkan"
+        )
+        return
+
+    sisip = """
+    override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
+        super.configureFlutterEngine(flutterEngine)
+        PrinterSpp.daftarkan(this, flutterEngine.dartExecutor.binaryMessenger)
+    }
+
+    override fun onRequestPermissionsResult(
+        requestCode: Int,
+        permissions: Array<String>,
+        grantResults: IntArray
+    ) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        PrinterSpp.terimaIzin(requestCode, grantResults)
+    }
+"""
+    teks = teks[: kelas.end()] + sisip + teks[kelas.end():]
+    write(path, teks)
+    notes.append(
+        "printer: configureFlutterEngine + onRequestPermissionsResult disuntikkan"
+    )
+
+
 def main():
     if not Path("android").exists():
         print("ERROR: folder android/ belum ada. Jalankan `flutter create . --platforms android` dulu.")
@@ -364,6 +470,7 @@ def main():
     patch_manifest()
     patch_gradle()
     move_main_activity()
+    install_printer_channel()
     install_icon()
 
     print("=" * 60)

@@ -25,12 +25,12 @@ Future<bool> cetakStruk({
   required List<SaleItemModel> items,
   required UserModel user,
 }) async {
-  final device = await Navigator.push(
+  final printer = await Navigator.push<PrinterDevice>(
     context,
     MaterialPageRoute(builder: (_) => const PrinterSelectionScreen()),
   );
 
-  if (device == null) return false;
+  if (printer == null) return false;
 
   try {
     final bytes = await ReceiptService.instance.generateReceipt(
@@ -46,8 +46,8 @@ Future<bool> cetakStruk({
       bankAccountName: user.bankAccountName,
       receiptFooter: user.receiptFooter,
     );
-    await BluetoothPrinterService.instance.printBytes(device, bytes);
-    await BluetoothPrinterService.instance.disconnect(device);
+    await BluetoothPrinterService.instance.cetak(printer, bytes);
+    await BluetoothPrinterService.instance.putus(printer);
 
     if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(

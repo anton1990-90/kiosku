@@ -478,6 +478,67 @@ menutup layar Kasir, jadi gejalanya sama-sama muncul di sana.
 
 ---
 
+## Perbaikan v1.28.2 — printer thermal Bluetooth tidak pernah ditemukan
+
+**Gejala yang dilaporkan.** "Print ke mini print Bluetooth saya test tidak bisa,
+saya scan juga tidak menemukan printer." Printernya RPP02N. Tidak ada pesan
+galat apa pun — daftarnya memang kosong.
+
+**Ada dua sebab, dan keduanya harus diperbaiki.**
+
+### 1. Transport-nya salah: BLE dipakai untuk perangkat Classic
+
+`flutter_blue_plus` hanya bisa **BLE** (Bluetooth Low Energy / GATT). Printer
+thermal 58 mm — RPP02N, Xprinter, Goojprt, MPT-II — memakai **Bluetooth Classic
+SPP** (RFCOMM). Perangkat Classic tidak pernah muncul di pemindaian BLE, jadi
+layar "Pilih Printer" akan selalu kosong betapa pun printernya menyala dan sudah
+dipasangkan.
+
+Komentar di `bluetooth_printer_service.dart` versi lama justru menulis
+sebaliknya ("`flutter_blue_plus` dapat menemukan dan berkomunikasi dengan
+perangkat tersebut"), dan komentar itulah yang menyesatkan. `barcode_wedge.dart`
+sudah menulis hal yang benar sejak v1.23.0 — jadi pengetahuannya ada, hanya tidak
+sampai ke layanan printer.
+
+**Perbaikannya** jalur native di `tools/android/PrinterSpp.kt` (MethodChannel
+`tokoku/printer_spp` + EventChannel untuk hasil pindai). Tidak ada paket pub
+baru: paket Classic yang ada (`flutter_bluetooth_serial`, `blue_thermal_printer`,
+`esc_pos_bluetooth`) sudah tidak dirawat dan tidak punya `namespace` Gradle
+sehingga gagal dengan AGP 8.
+
+Penyambungannya mencoba tiga tingkat, dari yang paling standar: SPP resmi lalu
+UUID cadangan pabrikan, SPP tidak aman, dan terakhir RFCOMM kanal 1 tanpa SDP
+(lewat refleksi). Tingkat terakhir itu yang menyelamatkan printer murah yang
+tidak mengumumkan layanannya dengan benar.
+
+### 2. Izin runtime tidak pernah diminta
+
+Izin `BLUETOOTH_SCAN` dan `BLUETOOTH_CONNECT` memang sudah tertulis di manifes
+lewat `tools/ci_patch.py`, tetapi sejak Android 12 keduanya **izin runtime**.
+Aplikasi tidak pernah memintanya — tidak ada `permission_handler` dan tidak ada
+kode permintaan izin sama sekali. Akibatnya pemindaian dijawab "tidak ada
+perangkat" tanpa galat, bukan ditolak dengan jelas.
+
+**Perbaikannya** permintaan izin dilakukan di kanal native yang sama
+(`mintaIzin`, hasilnya diteruskan lewat `onRequestPermissionsResult` di
+`MainActivity`). Ini juga yang membuat pemindaian BLE berfungsi, sebab
+`flutter_blue_plus` memakai izin yang sama.
+
+Satu jebakan lagi: `BLUETOOTH_SCAN` **wajib** diberi
+`android:usesPermissionFlags="neverForLocation"`. Tanpa penanda itu Android 12+
+menuntut izin lokasi untuk memindai, dan aplikasi ini tidak pernah meminta
+lokasi — hasilnya nol perangkat, lagi-lagi tanpa galat.
+
+**Skema database tidak berubah** (tetap v12). Tidak ada asersi baru: yang
+berubah adalah jalur native dan lapisan layanan, bukan aturan data. Verifikasi
+yang dipakai: `tools/ci_patch.py` dijalankan pada tiruan hasil `flutter create`
+(manifest sah, 7 izin, `neverForLocation` terpasang, `MainActivity` tertambal
+sekali walau dijalankan tiga kali), ditambah pemeriksaan struktur Dart/Kotlin.
+Kompilasi sungguhan tetap terjadi di CI, karena repo ini tidak menyimpan folder
+`android/`.
+
+---
+
 ## Catatan teknis untuk pengerjaan nanti
 
 Semua usulan di atas menambah tabel/kolom. Saat dokumen ini disusun semuanya

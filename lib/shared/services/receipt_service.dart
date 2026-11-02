@@ -5,6 +5,7 @@ import 'package:esc_pos_utils/esc_pos_utils.dart';
 import 'package:image/image.dart' as img;
 
 import '../../core/utils/formatters.dart';
+import '../../data/models/print_settings_model.dart';
 import '../../data/models/sale_item_model.dart';
 import '../../data/models/sale_model.dart';
 
@@ -21,6 +22,49 @@ class ReceiptService {
 
   /// Lebar kertas dalam titik (dot): 58mm = 384, 80mm = 576.
   static int _lebarKertas(int paperWidth) => paperWidth == 80 ? 576 : 384;
+
+  /// Jumlah karakter huruf normal yang muat dalam satu baris.
+  ///
+  /// 384 dot / 12 dot per karakter = 32 karakter (58 mm), 576 / 12 = 48
+  /// karakter (80 mm). Angka inilah yang dipakai **semua** perhitungan kolom
+  /// di struk. Sebelumnya kolom dihitung oleh `generator.row()` yang memakai
+  /// pembagian 12 bagian tanpa tahu ukuran huruf, sehingga baris TOTAL berhuruf
+  /// dua kali lipat kelebihan lebar dan printer memotong ekornya —
+  /// "Rp 30.000" tercetak "Rp 30.0".
+  static int karakterPerBaris(int paperWidth) => paperWidth == 80 ? 48 : 32;
+
+  /// Susun dua kolom dalam satu baris selebar [lebar] karakter.
+  ///
+  /// Teks kiri dipangkas kalau tidak muat, tetapi teks kanan **tidak pernah**
+  /// dipotong: nominal uang yang terpotong lebih berbahaya daripada nama barang
+  /// yang terpotong. Pemanggil yang butuh jaminan penuh memakai
+  /// [barisDuaKolom], yang memindahkan nominal ke barisnya sendiri kalau
+  /// keduanya tidak muat.
+  static String duaKolom(String kiri, String kanan, int lebar) {
+    if (kanan.isEmpty) return kiri;
+    final ruang = lebar - kanan.length;
+    if (ruang <= 1) return kanan;
+    var teksKiri = kiri;
+    if (teksKiri.length > ruang - 1) {
+      teksKiri = teksKiri.substring(0, ruang - 1);
+    }
+    final spasi = lebar - teksKiri.length - kanan.length;
+    if (spasi < 1) return '$teksKiri $kanan';
+    return '$teksKiri${' ' * spasi}$kanan';
+  }
+
+  /// Satu baris dua kolom, atau dua baris kalau memang tidak muat.
+  ///
+  /// Dipakai untuk baris barang dan baris TOTAL: kalau "2 pcs x Rp 1.250.000"
+  /// dan "Rp 2.500.000" tidak bisa duduk bersama dalam 32 karakter, nominal
+  /// dipindah ke baris berikutnya rata kanan — bukan dipotong.
+  static List<String> barisDuaKolom(String kiri, String kanan, int lebar) {
+    if (kanan.isEmpty) return [kiri];
+    if (kiri.length + kanan.length + 1 <= lebar) {
+      return [duaKolom(kiri, kanan, lebar)];
+    }
+    return [kiri, duaKolom('', kanan, lebar)];
+  }
 
   /// Ucapan penutup bawaan, dipakai selama pemilik toko belum mengubahnya.
   ///
@@ -55,15 +99,24 @@ class ReceiptService {
     String? bankAccountName,
     String? receiptFooter,
     int paperWidth = 58,
+    bool cetakLogo = true,
+    bool cetakQris = true,
+    GayaTotal gayaTotal = GayaTotal.besar,
+    int barisKosong = 3,
   }) async {
     final profile = await CapabilityProfile.load();
     final paper = paperWidth == 80 ? PaperSize.mm80 : PaperSize.mm58;
-    final lebar = _lebarKertas(paperWidth);
+    final lebarDot = _lebarKertas(paperWidth);
+    final lebar = karakterPerBaris(paperWidth);
+    final garis = '-' * lebar;
     final generator = Generator(paper, profile);
     List<int> bytes = [];
 
-    // Logo usaha — paling atas, di tengah.
-    bytes += await _gambar(generator, logoPath, lebar, 240);
+    // Logo usaha — paling atas, di tengah. Bisa dimatikan lewat Pengaturan
+    // Cetak kalau printernya lambat atau gambarnya sering gagal.
+    if (cetakLogo) {
+      bytes += await _gambar(generator, logoPath, lebarDot, 240);
+    }
 
     // Header — store name
     bytes += generator.text(
@@ -88,7 +141,7 @@ class ReceiptService {
       );
     }
     bytes += generator.text(
-      '--------------------------------',
+      garis,
       styles: const PosStyles(align: PosAlign.center),
     );
     bytes += generator.text(
@@ -96,92 +149,96 @@ class ReceiptService {
       styles: const PosStyles(bold: true, align: PosAlign.center),
     );
     bytes += generator.text(
-      '--------------------------------',
+      garis,
       styles: const PosStyles(align: PosAlign.center),
     );
 
-    // Transaction meta
-    bytes += generator.row([
-      PosColumn(text: 'No: ${sale.invoiceNumber}', width: 8),
-      PosColumn(
-        text: Formatters.dateTime(sale.createdAt),
-        width: 4,
-        styles: const PosStyles(align: PosAlign.right),
-      ),
-    ]);
+    // Transaction meta.
+    //
+    // Nomor, tanggal, dan jam dicetak di baris terpisah. Sebelumnya ketiganya
+    // dipaksa satu baris lewat `generator.row()` dengan kolom 8/12 dan 4/12:
+    // kolom kanan hanya kebagian 10 karakter di kertas 58 mm, jadi
+    // "02 Nov 2026, 13:59" terpotong menjadi tanggalnya saja dan jamnya hilang.
+    bytes += generator.text('No: ${sale.invoiceNumber}');
+    bytes += generator.text('Tanggal: ${Formatters.date(sale.createdAt)}');
+    bytes += generator.text('Jam: ${Formatters.time(sale.createdAt)}');
 
     if (sale.customerName != null && sale.customerName!.isNotEmpty) {
       bytes += generator.text('Pelanggan: ${sale.customerName}');
     }
     bytes += generator.text(
-      '--------------------------------',
+      garis,
       styles: const PosStyles(align: PosAlign.center),
     );
 
     // Items
     for (final item in items) {
       bytes += generator.text(item.productName);
-      bytes += generator.row([
-        PosColumn(
-          text: '${Formatters.jumlah(item.quantity)} ${item.unit} x '
-              '${Formatters.rupiah(item.sellPrice)}',
-          width: 7,
-        ),
-        PosColumn(
-          text: Formatters.rupiah(item.subtotal),
-          width: 5,
-          styles: const PosStyles(align: PosAlign.right),
-        ),
-      ]);
+      // Rincian kuantitas di kiri, nominal di kanan. Kalau keduanya tidak muat
+      // satu baris, nominal pindah ke baris berikutnya — tidak pernah dipotong.
+      for (final baris in barisDuaKolom(
+        '${Formatters.jumlah(item.quantity)} ${item.unit} x '
+        '${Formatters.rupiah(item.sellPrice)}',
+        Formatters.rupiah(item.subtotal),
+        lebar,
+      )) {
+        bytes += generator.text(baris);
+      }
       // Baris potongan hanya muncul kalau kasir memang memberi potongan untuk
       // barang ini — kalau tidak, struk biasa tidak bertambah panjang.
       if (item.discount > 0) {
-        bytes += generator.row([
-          PosColumn(text: '  Potongan', width: 7),
-          PosColumn(
-            text: '-${Formatters.rupiah(item.discount)}',
-            width: 5,
-            styles: const PosStyles(align: PosAlign.right),
-          ),
-        ]);
+        for (final baris in barisDuaKolom(
+          '  Potongan',
+          '-${Formatters.rupiah(item.discount)}',
+          lebar,
+        )) {
+          bytes += generator.text(baris);
+        }
       }
     }
 
     bytes += generator.text(
-      '--------------------------------',
+      garis,
       styles: const PosStyles(align: PosAlign.center),
     );
 
     // Potongan nota, di luar potongan per baris yang sudah dicetak di atas.
     if (sale.discount > 0) {
-      bytes += generator.row([
-        PosColumn(text: 'Potongan nota', width: 7),
-        PosColumn(
-          text: '-${Formatters.rupiah(sale.discount)}',
-          width: 5,
-          styles: const PosStyles(align: PosAlign.right),
-        ),
-      ]);
+      for (final baris in barisDuaKolom(
+        'Potongan nota',
+        '-${Formatters.rupiah(sale.discount)}',
+        lebar,
+      )) {
+        bytes += generator.text(baris);
+      }
     }
 
-    // Totals
-    bytes += generator.row([
-      PosColumn(
-        text: 'TOTAL',
-        width: 6,
-        styles: const PosStyles(bold: true, height: PosTextSize.size2, width: PosTextSize.size2),
-      ),
-      PosColumn(
-        text: Formatters.rupiah(sale.totalAmount),
-        width: 6,
+    // Totals.
+    //
+    // Dua gaya, dipilih di Pengaturan Cetak. Gaya "angka besar" menaruh label
+    // dan nominal di baris terpisah: huruf dua kali lipat hanya menyisakan 16
+    // karakter per baris di kertas 58 mm, dan pasangan "TOTAL" + nominal
+    // langsung kelebihan lebar. Itulah sebab "Rp 30.000" dulu terpotong.
+    if (gayaTotal == GayaTotal.besar) {
+      bytes += generator.text('TOTAL', styles: const PosStyles(bold: true));
+      bytes += generator.text(
+        Formatters.rupiah(sale.totalAmount),
         styles: const PosStyles(
           bold: true,
           align: PosAlign.right,
           height: PosTextSize.size2,
           width: PosTextSize.size2,
         ),
-      ),
-    ]);
+      );
+    } else {
+      for (final baris in barisDuaKolom(
+        'TOTAL',
+        Formatters.rupiah(sale.totalAmount),
+        lebar,
+      )) {
+        bytes += generator.text(baris, styles: const PosStyles(bold: true));
+      }
+    }
     bytes += generator.text('Tunai: ${Formatters.rupiah(sale.paidAmount)}');
     bytes += generator.text('Kembali: ${Formatters.rupiah(sale.changeAmount)}');
     bytes += generator.text('Bayar: ${sale.paymentMethod.toUpperCase()}');
@@ -196,7 +253,7 @@ class ReceiptService {
     }
 
     bytes += generator.text(
-      '--------------------------------',
+      garis,
       styles: const PosStyles(align: PosAlign.center),
     );
 
@@ -208,7 +265,9 @@ class ReceiptService {
       bankName: bankName,
       bankAccountNumber: bankAccountNumber,
       bankAccountName: bankAccountName,
-      lebarKertas: lebar,
+      lebarKertas: lebarDot,
+      garis: garis,
+      cetakQris: cetakQris,
     );
 
     // Footer — ucapan pemilik toko kalau sudah diatur di Info Toko, teks
@@ -223,7 +282,7 @@ class ReceiptService {
       styles: const PosStyles(align: PosAlign.center),
     );
 
-    bytes += generator.feed(3);
+    bytes += generator.feed(barisKosong < 0 ? 0 : barisKosong);
     bytes += generator.cut();
 
     return bytes;
@@ -241,11 +300,16 @@ class ReceiptService {
     required String? bankAccountNumber,
     required String? bankAccountName,
     required int lebarKertas,
+    required String garis,
+    required bool cetakQris,
   }) async {
     final metode = sale.paymentMethod.toLowerCase();
     List<int> bytes = [];
 
-    if (metode == 'qris' && qrisPath != null && qrisPath.isNotEmpty) {
+    if (metode == 'qris' &&
+        cetakQris &&
+        qrisPath != null &&
+        qrisPath.isNotEmpty) {
       bytes += generator.text(
         'PEMBAYARAN QRIS',
         styles: const PosStyles(bold: true, align: PosAlign.center),
@@ -258,7 +322,7 @@ class ReceiptService {
         styles: const PosStyles(align: PosAlign.center),
       );
       bytes += generator.text(
-        '--------------------------------',
+        garis,
         styles: const PosStyles(align: PosAlign.center),
       );
     }
@@ -277,7 +341,7 @@ class ReceiptService {
         bytes += generator.text('a.n.    : ${bankAccountName!.trim()}');
       }
       bytes += generator.text(
-        '--------------------------------',
+        garis,
         styles: const PosStyles(align: PosAlign.center),
       );
     }
@@ -311,8 +375,18 @@ class ReceiptService {
     }
   }
 
-  /// Baca gambar lalu kecilkan agar muat di kertas, tanpa mengubah
-  /// perbandingan sisi.
+  /// Baca gambar, kecilkan agar muat di kertas, lalu jadikan **hitam putih**.
+  ///
+  /// Dua hal terjadi di sini dan keduanya wajib:
+  ///
+  ///  1. **Latar transparan diratakan ke putih.** PNG logo hampir selalu punya
+  ///     latar transparan, dan piksel transparan itu bernilai RGB 0,0,0. Tanpa
+  ///     diratakan, seluruh kotak latar tercetak sebagai blok hitam pekat.
+  ///  2. **Warna diubah ke abu-abu lalu diambangkan.** Printer termal hanya
+  ///     punya satu warna tinta; logo berwarna yang dikirim apa adanya
+  ///     menghasilkan abu-abu acak yang tercetak belang-belang. Setelah
+  ///     diambangkan, setiap piksel hanya hitam atau putih — hasilnya bersih
+  ///     dan tidak bergantung pada merek printer.
   static img.Image? _siapkanGambar(
     Uint8List data,
     int maxWidth,
@@ -336,8 +410,35 @@ class ReceiptService {
     if (lebar < 1) lebar = 1;
     if (tinggi < 1) tinggi = 1;
 
-    if (lebar == asli.width && tinggi == asli.height) return asli;
-    return img.copyResize(asli, width: lebar, height: tinggi);
+    final gambar = (lebar == asli.width && tinggi == asli.height)
+        ? asli
+        : img.copyResize(asli, width: lebar, height: tinggi);
+
+    _jadikanHitamPutih(gambar);
+    return gambar;
+  }
+
+  /// Ambang gelap/terang (0–255).
+  ///
+  /// 150, bukan 128: warna yang tidak pekat — biru muda, kuning, oranye —
+  /// punya nilai kecerahan di atas 128 dan akan hilang sama sekali kalau
+  /// ambangnya terlalu rendah. Akibatnya logo "hilang separuh" saat dicetak.
+  static const int _ambangGelap = 150;
+
+  /// Ratakan latar transparan ke putih, lalu ambangkan ke hitam/putih.
+  static void _jadikanHitamPutih(img.Image gambar) {
+    for (var y = 0; y < gambar.height; y++) {
+      for (var x = 0; x < gambar.width; x++) {
+        final piksel = gambar.getPixel(x, y);
+        final alfa = (piksel.a / 255).clamp(0.0, 1.0).toDouble();
+        final merah = piksel.r * alfa + 255 * (1 - alfa);
+        final hijau = piksel.g * alfa + 255 * (1 - alfa);
+        final biru = piksel.b * alfa + 255 * (1 - alfa);
+        final terang = 0.299 * merah + 0.587 * hijau + 0.114 * biru;
+        final nilai = terang >= _ambangGelap ? 255 : 0;
+        gambar.setPixelRgb(x, y, nilai, nilai, nilai);
+      }
+    }
   }
 
   /// Plain-text receipt for sharing/saving (fallback when no printer).

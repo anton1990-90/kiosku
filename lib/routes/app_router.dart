@@ -22,6 +22,7 @@ import '../features/dashboard/dashboard_screen.dart';
 import '../features/kas/kas_screen.dart';
 import '../features/kas/tutup_kasir_screen.dart';
 import '../features/kasir/kasir_screen.dart';
+import '../features/kasir/printer_settings_screen.dart';
 import '../features/produk/produk_screen.dart';
 import '../features/profile/customer_screen.dart';
 import '../features/profile/help_screen.dart';
@@ -254,6 +255,15 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/profile/pembayaran',
         name: 'paymentMethods',
         builder: (context, state) => const PaymentMethodsScreen(),
+      ),
+      // Pengaturan cetak — sengaja TIDAK masuk [_rutePemilik]: yang mencetak
+      // struk adalah kasir, dan ukuran kertas harus bisa disesuaikan di HP
+      // yang dipakai mencetak. Menutupnya untuk kasir berarti printer di meja
+      // kasir tidak bisa dibetulkan oleh orang yang memakainya.
+      GoRoute(
+        path: '/profile/cetak',
+        name: 'pengaturanCetak',
+        builder: (context, state) => const PrinterSettingsScreen(),
       ),
       GoRoute(
         path: '/profile/supplier',

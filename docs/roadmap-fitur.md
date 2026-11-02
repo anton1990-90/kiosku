@@ -539,6 +539,79 @@ Kompilasi sungguhan tetap terjadi di CI, karena repo ini tidak menyimpan folder
 
 ---
 
+## Perbaikan v1.29.0 — nominal terpotong, jam hilang, logo berwarna, dan pengaturan cetak
+
+Tiga keluhan datang bersamaan setelah printer akhirnya bisa tersambung:
+nominal TOTAL tercetak "Rp 30.0" (bukan "Rp 30.000"), jam hilang sehingga
+struk hanya memuat tanggal, dan logo berwarna tercetak sebagai blok gelap.
+
+### 1. Akar masalahnya satu: `generator.row()` mengabaikan ukuran huruf
+
+`esc_pos_utils` membagi satu baris menjadi 12 bagian menurut **jumlah
+karakter**, bukan lebar titik. Baris TOTAL dulu memakai kolom 6/12 dengan
+`height`/`width: size2` pada kedua kolom. Huruf dua kali lipat berarti tiap
+karakter memakan dua kolom, sehingga isi baris menjadi dua kali lebih lebar
+dari kertas — dan printer **memotong** sisanya, bukan membungkusnya. Karena
+itulah "Rp 30.000" (9 karakter) berubah menjadi "Rp 30.0".
+
+Hal yang sama menjelaskan jam yang hilang: `dateTime` ditaruh di kolom 4/12,
+yang hanya kebagian 10 karakter di kertas 58 mm. "02 Nov 2026, 13:59" (17
+karakter) terpotong tepat setelah tanggalnya.
+
+**Perbaikannya** bukan mengecilkan huruf sedikit, melainkan berhenti memakai
+`generator.row()` untuk baris yang memuat nominal:
+
+- `ReceiptService.karakterPerBaris()` menjadi satu-satunya sumber lebar
+  (58 mm = 32, 80 mm = 48 karakter).
+- `duaKolom()` menyusun kiri/kanan dengan hitungan karakter yang sama, dan
+  `barisDuaKolom()` memindahkan nominal ke baris berikutnya kalau keduanya
+  tidak muat — nominal **tidak pernah** dipotong.
+- Nomor nota, tanggal, dan jam dicetak di tiga baris terpisah.
+- Baris TOTAL punya dua gaya: "angka besar" (label TOTAL, lalu nominal dua
+  kali lipat di baris berikutnya) dan "satu baris" (keduanya sekaligus).
+
+### 2. Logo berwarna: latar transparan dan warna
+
+PNG logo hampir selalu berlatar transparan, dan piksel transparan bernilai
+RGB 0,0,0. Tanpa diratakan, seluruh kotak latar tercetak sebagai blok hitam.
+Selain itu printer termal hanya punya satu warna tinta, jadi logo berwarna
+dikirim apa adanya menghasilkan abu-abu acak yang tercetak belang.
+
+Sekarang `_siapkanGambar()` meratakan alfa ke putih lebih dulu, lalu
+mengubah ke abu-abu dan mengambangkannya pada nilai 150 (bukan 128 — warna
+muda seperti kuning dan biru muda akan hilang kalau ambangnya terlalu
+rendah). Hasilnya setiap piksel hanya hitam atau putih.
+
+### 3. Halaman Pengaturan Cetak
+
+Printer termal tidak seragam: "58 mm" ada yang 32 dan ada yang 33 karakter,
+dan sebagian printer "80 mm" hanya mencetak 40 karakter. Karena itu ukuran
+kertas tidak boleh dipatok di kode. Layar baru
+`/profile/cetak` (`PrinterSettingsScreen`) menyediakan:
+
+- ukuran kertas 58/80 mm, dengan jumlah karakter per baris ditampilkan;
+- gaya baris TOTAL (angka besar / satu baris);
+- cetak logo dan cetak gambar QRIS (bisa dimatikan kalau printer lambat);
+- jumlah baris kosong sebelum kertas dipotong;
+- ingat printer terakhir (sambung otomatis, dengan mundur ke layar pilih
+  kalau printer mati);
+- **Cetak contoh struk** berisi Rp 10.000 × 3 = Rp 30.000 — nominal yang
+  dulu terpotong, jadi hasilnya langsung membuktikan pengaturannya cocok.
+
+Pengaturan disimpan di `SharedPreferences`, bukan di database: ini pengaturan
+**perangkat**, dan dua HP dengan akun toko yang sama boleh memakai printer
+berbeda. Rutenya sengaja **tidak** masuk `_rutePemilik` — yang mencetak struk
+adalah kasir.
+
+**Skema database tidak berubah** (tetap v12). `StrukPratinjauScreen` ikut
+diubah supaya pratinjaunya tidak berbohong: nomor/tanggal/jam di baris
+terpisah, baris pemisah mengikuti lebar kertas, gaya TOTAL mengikuti
+pengaturan, dan logo/QRIS ikut dimatikan kalau dimatikan.
+
+---
+
+
+
 ## Catatan teknis untuk pengerjaan nanti
 
 Semua usulan di atas menambah tabel/kolom. Saat dokumen ini disusun semuanya

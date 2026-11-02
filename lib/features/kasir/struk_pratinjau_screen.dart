@@ -4,13 +4,16 @@ import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path_provider/path_provider.dart';
 
 import '../../core/constants/app_colors.dart';
 import '../../core/utils/formatters.dart';
+import '../../data/models/print_settings_model.dart';
 import '../../data/models/sale_item_model.dart';
 import '../../data/models/sale_model.dart';
 import '../../data/models/user_model.dart';
+import '../../providers/print_settings_provider.dart';
 import '../../shared/services/export_service.dart';
 import '../../shared/services/receipt_printer.dart';
 import '../../shared/services/receipt_service.dart';
@@ -31,7 +34,7 @@ import '../../shared/services/receipt_service.dart';
 ///   dibagikan lewat menu bagikan Android (pilih WhatsApp). Teks struk ikut
 ///   disertakan supaya tetap terbaca walau gambarnya tidak terkirim.
 /// * **Simpan** — gambar struk disimpan ke folder dokumen aplikasi.
-class StrukPratinjauScreen extends StatefulWidget {
+class StrukPratinjauScreen extends ConsumerStatefulWidget {
   const StrukPratinjauScreen({
     super.key,
     required this.sale,
@@ -44,10 +47,11 @@ class StrukPratinjauScreen extends StatefulWidget {
   final UserModel user;
 
   @override
-  State<StrukPratinjauScreen> createState() => _StrukPratinjauScreenState();
+  ConsumerState<StrukPratinjauScreen> createState() =>
+      _StrukPratinjauScreenState();
 }
 
-class _StrukPratinjauScreenState extends State<StrukPratinjauScreen> {
+class _StrukPratinjauScreenState extends ConsumerState<StrukPratinjauScreen> {
   /// Kunci penanda kertas struk, dipakai saat menangkapnya menjadi gambar.
   final GlobalKey _kunciKertas = GlobalKey();
 
@@ -55,25 +59,27 @@ class _StrukPratinjauScreenState extends State<StrukPratinjauScreen> {
   /// cepat akan menghasilkan dua berkas serta dua menu bagikan.
   bool _sibuk = false;
 
+  /// Ukuran huruf kertas pratinjau.
+  ///
+  /// Kertas 80 mm memuat 48 karakter per baris, bukan 32. Kalau hurufnya
+  /// dibiarkan sama, baris pemisah 48 karakter melebihi lebar kertas di layar
+  /// dan pratinjaunya jadi bergaris kuning — bukan lagi gambaran hasil cetak.
+  double get _ukuranHuruf =>
+      ref.read(printSettingsProvider).lebarKertas == 80 ? 7.8 : 10.5;
+
   /// Gaya huruf kertas struk.
   ///
   /// Monospace dipilih bukan karena bagus, tapi karena printer termal
   /// mencetak dengan huruf berlebar tetap — kolom harga di kanan baru
   /// sejajar kalau layarnya memakai huruf yang sama.
-  static const TextStyle _gaya = TextStyle(
-    fontFamily: 'monospace',
-    fontSize: 10.5,
-    height: 1.35,
-    color: Color(0xFF111111),
-  );
+  TextStyle get _gaya => TextStyle(
+        fontFamily: 'monospace',
+        fontSize: _ukuranHuruf,
+        height: 1.35,
+        color: const Color(0xFF111111),
+      );
 
-  static const TextStyle _gayaTebal = TextStyle(
-    fontFamily: 'monospace',
-    fontSize: 10.5,
-    height: 1.35,
-    fontWeight: FontWeight.w700,
-    color: Color(0xFF111111),
-  );
+  TextStyle get _gayaTebal => _gaya.copyWith(fontWeight: FontWeight.w700);
 
   @override
   Widget build(BuildContext context) {
@@ -161,11 +167,14 @@ class _StrukPratinjauScreenState extends State<StrukPratinjauScreen> {
   List<Widget> _isiStruk() {
     final sale = widget.sale;
     final user = widget.user;
+    // Pratinjau wajib memakai pengaturan yang sama dengan jalur cetak.
+    final pengaturan = ref.watch(printSettingsProvider);
+    final lebar = ReceiptService.karakterPerBaris(pengaturan.lebarKertas);
     final baris = <Widget>[];
 
     // Logo usaha — paling atas, di tengah.
     final logo = (user.logoPath ?? '').trim();
-    if (logo.isNotEmpty && File(logo).existsSync()) {
+    if (pengaturan.cetakLogo && logo.isNotEmpty && File(logo).existsSync()) {
       baris.add(
         Center(
           child: Image.file(
@@ -183,7 +192,10 @@ class _StrukPratinjauScreenState extends State<StrukPratinjauScreen> {
       Text(
         user.storeName,
         textAlign: TextAlign.center,
-        style: _gaya.copyWith(fontSize: 15, fontWeight: FontWeight.w800),
+        style: _gaya.copyWith(
+          fontSize: _ukuranHuruf * 1.45,
+          fontWeight: FontWeight.w800,
+        ),
       ),
     );
 
@@ -208,16 +220,12 @@ class _StrukPratinjauScreenState extends State<StrukPratinjauScreen> {
     );
     baris.add(_garis());
 
-    // Nomor nota di kiri, tanggal & jam di kanan.
-    baris.add(
-      Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Expanded(child: Text('No: ${sale.invoiceNumber}', style: _gaya)),
-          Text(Formatters.dateTime(sale.createdAt), style: _gaya),
-        ],
-      ),
-    );
+    // Nomor, tanggal, dan jam dicetak di baris terpisah — sama seperti struk
+    // termal. Dulu ketiganya dipaksa satu baris, dan di kertas 58 mm jamnya
+    // yang terpotong.
+    baris.add(Text('No: ${sale.invoiceNumber}', style: _gaya));
+    baris.add(Text('Tanggal: ${Formatters.date(sale.createdAt)}', style: _gaya));
+    baris.add(Text('Jam: ${Formatters.time(sale.createdAt)}', style: _gaya));
 
     final pelanggan = (sale.customerName ?? '').trim();
     if (pelanggan.isNotEmpty) {
@@ -279,24 +287,44 @@ class _StrukPratinjauScreenState extends State<StrukPratinjauScreen> {
       );
     }
 
-    // Total — paling besar, supaya langsung terbaca.
-    baris.add(
-      Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Expanded(
-            child: Text(
-              'TOTAL',
-              style: _gaya.copyWith(fontSize: 14, fontWeight: FontWeight.w800),
-            ),
+    // Total — mengikuti gaya yang dipilih di Pengaturan Cetak. Gaya "angka
+    // besar" menaruh label dan nominal di baris terpisah supaya nominalnya
+    // tidak terpotong, persis seperti yang dicetak printer.
+    if (pengaturan.gayaTotal == GayaTotal.besar) {
+      baris.add(
+        Text(
+          'TOTAL',
+          style: _gaya.copyWith(
+            fontSize: _ukuranHuruf * 1.35,
+            fontWeight: FontWeight.w800,
           ),
-          Text(
+        ),
+      );
+      baris.add(
+        Text(
+          Formatters.rupiah(sale.totalAmount),
+          textAlign: TextAlign.right,
+          style: _gaya.copyWith(
+            fontSize: _ukuranHuruf * 1.7,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+      );
+    } else {
+      baris.add(
+        Text(
+          ReceiptService.duaKolom(
+            'TOTAL',
             Formatters.rupiah(sale.totalAmount),
-            style: _gaya.copyWith(fontSize: 14, fontWeight: FontWeight.w800),
+            lebar,
           ),
-        ],
-      ),
-    );
+          style: _gaya.copyWith(
+            fontSize: _ukuranHuruf * 1.35,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+      );
+    }
     baris.add(Text('Tunai: ${Formatters.rupiah(sale.paidAmount)}', style: _gaya));
     baris.add(
       Text('Kembali: ${Formatters.rupiah(sale.changeAmount)}', style: _gaya),
@@ -319,7 +347,10 @@ class _StrukPratinjauScreenState extends State<StrukPratinjauScreen> {
     // Cara bayar non-tunai — sama seperti yang dicetak.
     final metode = sale.paymentMethod.toLowerCase();
     final qris = (user.qrisPath ?? '').trim();
-    if (metode == 'qris' && qris.isNotEmpty && File(qris).existsSync()) {
+    if (metode == 'qris' &&
+        pengaturan.cetakQris &&
+        qris.isNotEmpty &&
+        File(qris).existsSync()) {
       baris.add(
         Text(
           'PEMBAYARAN QRIS',
@@ -379,23 +410,28 @@ class _StrukPratinjauScreenState extends State<StrukPratinjauScreen> {
       Text(
         'Powered by TokoKu',
         textAlign: TextAlign.center,
-        style: _gaya.copyWith(fontSize: 9, color: const Color(0xFF555555)),
+        style: _gaya.copyWith(
+          fontSize: _ukuranHuruf * 0.85,
+          color: const Color(0xFF555555),
+        ),
       ),
     );
 
     return baris;
   }
 
-  /// Garis pemisah 32 karakter — sama dengan yang dicetak printer 58mm.
+  /// Garis pemisah selebar kertas yang sedang dipakai (32 atau 48 karakter).
   Widget _garis() {
-    return const Text(
-      '--------------------------------',
+    final lebar =
+        ReceiptService.karakterPerBaris(ref.read(printSettingsProvider).lebarKertas);
+    return Text(
+      '-' * lebar,
       textAlign: TextAlign.center,
       style: TextStyle(
         fontFamily: 'monospace',
-        fontSize: 10.5,
+        fontSize: _ukuranHuruf,
         height: 1.2,
-        color: Color(0xFF111111),
+        color: const Color(0xFF111111),
       ),
     );
   }

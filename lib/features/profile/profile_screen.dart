@@ -1286,6 +1286,23 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                       ],
                     ),
                     const SizedBox(height: 20),
+                    // Terbuka untuk kasir juga: yang mencetak struk adalah
+                    // kasir, dan ukuran kertas harus bisa dibetulkan di HP
+                    // yang dipakai mencetak.
+                    _MenuAccordion(
+                      title: 'Printer & struk',
+                      children: [
+                        _MenuItem(
+                          icon: Icons.print_outlined,
+                          color: AppColors.primaryMid,
+                          title: 'Pengaturan cetak',
+                          subtitle: 'Ukuran kertas, logo, dan printer Bluetooth',
+                          trailing: Icons.chevron_right,
+                          onTap: () => context.push('/profile/cetak'),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 20),
                     if (pemilik) _MenuAccordion(
                       title: 'Preferensi',
                       children: [

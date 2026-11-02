@@ -18,6 +18,7 @@ class PrintSettingsService {
   static const String _kLogo = 'cetak_logo';
   static const String _kQris = 'cetak_qris';
   static const String _kBarisKosong = 'cetak_baris_kosong';
+  static const String _kMarginKanan = 'cetak_margin_kanan';
   static const String _kIngatPrinter = 'cetak_ingat_printer';
   static const String _kPrinterId = 'cetak_printer_id';
   static const String _kPrinterNama = 'cetak_printer_nama';
@@ -32,12 +33,14 @@ class PrintSettingsService {
       final prefs = await SharedPreferences.getInstance();
       final lebar = prefs.getInt(_kLebar) ?? 58;
       final baris = prefs.getInt(_kBarisKosong) ?? 3;
+      final margin = prefs.getInt(_kMarginKanan) ?? 2;
       return PrintSettings(
         lebarKertas: lebarDidukung.contains(lebar) ? lebar : 58,
         gayaTotal: GayaTotal.dariKode(prefs.getString(_kGayaTotal)),
         cetakLogo: prefs.getBool(_kLogo) ?? true,
         cetakQris: prefs.getBool(_kQris) ?? true,
         barisKosong: baris < 0 ? 0 : (baris > 8 ? 8 : baris),
+        marginKanan: margin < 0 ? 0 : (margin > 6 ? 6 : margin),
         ingatPrinter: prefs.getBool(_kIngatPrinter) ?? false,
         printerId: prefs.getString(_kPrinterId),
         printerNama: prefs.getString(_kPrinterNama),
@@ -58,6 +61,7 @@ class PrintSettingsService {
       await prefs.setBool(_kLogo, pengaturan.cetakLogo);
       await prefs.setBool(_kQris, pengaturan.cetakQris);
       await prefs.setInt(_kBarisKosong, pengaturan.barisKosong);
+      await prefs.setInt(_kMarginKanan, pengaturan.marginKanan);
       await prefs.setBool(_kIngatPrinter, pengaturan.ingatPrinter);
       await prefs.setString(_kPrinterJenis, pengaturan.printerJenis);
       if (pengaturan.adaPrinterTersimpan) {

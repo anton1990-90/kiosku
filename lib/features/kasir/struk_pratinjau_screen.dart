@@ -138,11 +138,19 @@ class _StrukPratinjauScreenState extends ConsumerState<StrukPratinjauScreen> {
   /// [RepaintBoundary] membungkus seluruh isi kertas supaya bisa ditangkap
   /// menjadi satu gambar utuh — bukan potongan yang sedang terlihat di layar.
   Widget _kertasStruk() {
+    final pengaturan = ref.read(printSettingsProvider);
     return RepaintBoundary(
       key: _kunciKertas,
       child: Container(
         width: 300,
-        padding: const EdgeInsets.fromLTRB(14, 16, 14, 18),
+        // Padding kanan mengikuti "jarak dari tepi kanan" di Pengaturan Cetak,
+        // supaya pratinjau menunjukkan nominal yang tidak menempel di tepi.
+        padding: EdgeInsets.fromLTRB(
+          14,
+          16,
+          14 + pengaturan.marginKanan * _ukuranHuruf * 0.6,
+          18,
+        ),
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(3),
@@ -169,7 +177,10 @@ class _StrukPratinjauScreenState extends ConsumerState<StrukPratinjauScreen> {
     final user = widget.user;
     // Pratinjau wajib memakai pengaturan yang sama dengan jalur cetak.
     final pengaturan = ref.watch(printSettingsProvider);
-    final lebar = ReceiptService.karakterPerBaris(pengaturan.lebarKertas);
+    final lebar = ReceiptService.lebarTeks(
+      ReceiptService.karakterPerBaris(pengaturan.lebarKertas),
+      pengaturan.marginKanan,
+    );
     final baris = <Widget>[];
 
     // Logo usaha — paling atas, di tengah.
@@ -420,10 +431,14 @@ class _StrukPratinjauScreenState extends ConsumerState<StrukPratinjauScreen> {
     return baris;
   }
 
-  /// Garis pemisah selebar kertas yang sedang dipakai (32 atau 48 karakter).
+  /// Garis pemisah selebar kertas yang sedang dipakai (32 atau 48 karakter,
+  /// dikurangi margin kanan).
   Widget _garis() {
-    final lebar =
-        ReceiptService.karakterPerBaris(ref.read(printSettingsProvider).lebarKertas);
+    final pengaturan = ref.read(printSettingsProvider);
+    final lebar = ReceiptService.lebarTeks(
+      ReceiptService.karakterPerBaris(pengaturan.lebarKertas),
+      pengaturan.marginKanan,
+    );
     return Text(
       '-' * lebar,
       textAlign: TextAlign.center,

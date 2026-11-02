@@ -87,6 +87,7 @@ class _PrinterSettingsScreenState extends ConsumerState<PrinterSettingsScreen> {
         cetakQris: pengaturan.cetakQris,
         gayaTotal: pengaturan.gayaTotal,
         barisKosong: pengaturan.barisKosong,
+        marginKanan: pengaturan.marginKanan,
       );
       await BluetoothPrinterService.instance.cetak(printer, bytes);
       await BluetoothPrinterService.instance.putus(printer);
@@ -249,6 +250,8 @@ class _PrinterSettingsScreenState extends ConsumerState<PrinterSettingsScreen> {
                 ),
                 const SizedBox(height: 14),
                 _barisKosong(pengaturan),
+                const Divider(height: 20, color: AppColors.border),
+                _marginKanan(pengaturan),
               ],
             ),
           ),
@@ -544,9 +547,71 @@ class _PrinterSettingsScreenState extends ConsumerState<PrinterSettingsScreen> {
     );
   }
 
+  /// Pengatur jarak nominal dari tepi kanan kertas.
+  ///
+  /// Ini obat untuk keluhan "nominal terpotong di ujung". Kalau dua karakter
+  /// masih kurang, pemilik bisa menaikkannya sendiri tanpa menunggu rilis
+  /// baru — setiap printer punya selisih tepi yang berbeda.
+  Widget _marginKanan(PrintSettings pengaturan) {
+    final nilai = pengaturan.marginKanan;
+    return Row(
+      children: [
+        const Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Jarak dari tepi kanan',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.textMain,
+                ),
+              ),
+              SizedBox(height: 2),
+              Text(
+                'Naikkan kalau ujung nominal masih terpotong',
+                style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+              ),
+            ],
+          ),
+        ),
+        IconButton(
+          onPressed: nilai <= 0
+              ? null
+              : () => _ubah(pengaturan.copyWith(marginKanan: nilai - 1)),
+          icon: const Icon(Icons.remove_circle_outline),
+          color: AppColors.textSecondary,
+        ),
+        SizedBox(
+          width: 34,
+          child: Text(
+            '$nilai',
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.w700,
+              color: AppColors.textMain,
+            ),
+          ),
+        ),
+        IconButton(
+          onPressed: nilai >= 6
+              ? null
+              : () => _ubah(pengaturan.copyWith(marginKanan: nilai + 1)),
+          icon: const Icon(Icons.add_circle_outline),
+          color: AppColors.primary,
+        ),
+      ],
+    );
+  }
+
   /// Kertas pratinjau — susunannya mengikuti `ReceiptService.generateReceipt`.
   Widget _pratinjau(PrintSettings pengaturan, UserModel? user) {
-    final lebar = ReceiptService.karakterPerBaris(pengaturan.lebarKertas);
+    final lebar = ReceiptService.lebarTeks(
+      ReceiptService.karakterPerBaris(pengaturan.lebarKertas),
+      pengaturan.marginKanan,
+    );
     final ukuran = pengaturan.lebarKertas == 80 ? 8.0 : 10.0;
     const warna = Color(0xFF111111);
     final gaya = TextStyle(
@@ -655,7 +720,14 @@ class _PrinterSettingsScreenState extends ConsumerState<PrinterSettingsScreen> {
     return Center(
       child: Container(
         width: 300,
-        padding: const EdgeInsets.fromLTRB(12, 14, 12, 16),
+        // Padding kanan mengikuti margin yang dipilih, supaya pratinjau
+        // memperlihatkan jarak nominal ke tepi kertas — bukan hanya teksnya.
+        padding: EdgeInsets.fromLTRB(
+          12,
+          14,
+          12 + pengaturan.marginKanan * ukuran * 0.6,
+          16,
+        ),
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(3),

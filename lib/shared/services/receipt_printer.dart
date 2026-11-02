@@ -56,6 +56,7 @@ Future<bool> cetakStruk({
       cetakQris: pengaturan.cetakQris,
       gayaTotal: pengaturan.gayaTotal,
       barisKosong: pengaturan.barisKosong,
+      marginKanan: pengaturan.marginKanan,
     );
     await BluetoothPrinterService.instance.cetak(printer, bytes);
     await BluetoothPrinterService.instance.putus(printer);

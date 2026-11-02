@@ -612,6 +612,28 @@ pengaturan, dan logo/QRIS ikut dimatikan kalau dimatikan.
 
 
 
+## Perbaikan v1.29.1 — nominal diberi jarak dari tepi kanan
+
+Setelah v1.29.0 dipasang, nominal tidak lagi terpotong karena lebar kolom,
+tetapi masih ada keluhan yang sama di ujung kertas. Penyebabnya berbeda: baris
+yang panjangnya **tepat** selebar kertas (32 karakter di 58 mm) menyentuh tepi
+area cetak. Kepala cetak printer murah tidak selalu tepat di tengah kertas, dan
+sebagian printer membungkus karakter terakhir ke baris berikutnya — digit
+terakhir nominal, bagian yang paling penting, yang hilang lebih dulu.
+
+Perbaikannya: `ReceiptService.lebarTeks()` mengurangi lebar kertas dengan
+**margin kanan** (bawaan 2 karakter, bisa 0–6). Semua baris dua kolom, garis
+pemisah, dan nominal besar memakai lebar itu. Nominal gaya "angka besar" kini
+dirata kanan dengan spasi yang dihitung sendiri, bukan `align: right` milik
+printer — perataan printer berhenti tepat di tepi, dan tepi itulah masalahnya.
+
+Margin bisa diubah di Pengaturan Cetak (Printer & struk → Pengaturan cetak →
+"Jarak dari tepi kanan"), jadi pemilik tidak perlu menunggu rilis baru kalau
+printernya butuh jarak lebih lebar. Pratinjau di layar itu dan di layar struk
+ikut menampilkan jaraknya.
+
+---
+
 ## Catatan teknis untuk pengerjaan nanti
 
 Semua usulan di atas menambah tabel/kolom. Saat dokumen ini disusun semuanya

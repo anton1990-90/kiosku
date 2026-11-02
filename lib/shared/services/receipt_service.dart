@@ -33,6 +33,21 @@ class ReceiptService {
   /// "Rp 30.000" tercetak "Rp 30.0".
   static int karakterPerBaris(int paperWidth) => paperWidth == 80 ? 48 : 32;
 
+  /// Lebar teks yang benar-benar dipakai, setelah margin kanan dibuang.
+  ///
+  /// Margin ini bukan hiasan. Baris yang panjangnya **tepat** selebar kertas
+  /// mudah kehilangan ujungnya: kepala cetak printer murah tidak selalu tepat
+  /// di tengah kertas, dan sebagian printer membungkus karakter terakhir ke
+  /// baris berikutnya. Akibatnya digit terakhir nominal — bagian yang paling
+  /// penting — yang hilang. Dengan margin, nominal selalu berhenti sebelum
+  /// tepi kertas.
+  static int lebarTeks(int lebarKertas, int marginKanan) {
+    final margin = marginKanan < 0 ? 0 : marginKanan;
+    final sisa = lebarKertas - margin;
+    // Jangan sampai margin memakan seluruh baris kalau nilainya rusak.
+    return sisa < 8 ? lebarKertas : sisa;
+  }
+
   /// Susun dua kolom dalam satu baris selebar [lebar] karakter.
   ///
   /// Teks kiri dipangkas kalau tidak muat, tetapi teks kanan **tidak pernah**
@@ -103,12 +118,14 @@ class ReceiptService {
     bool cetakQris = true,
     GayaTotal gayaTotal = GayaTotal.besar,
     int barisKosong = 3,
+    int marginKanan = 2,
   }) async {
     final profile = await CapabilityProfile.load();
     final paper = paperWidth == 80 ? PaperSize.mm80 : PaperSize.mm58;
     final lebarDot = _lebarKertas(paperWidth);
     final lebar = karakterPerBaris(paperWidth);
-    final garis = '-' * lebar;
+    final lebarIsi = lebarTeks(lebar, marginKanan);
+    final garis = '-' * lebarIsi;
     final generator = Generator(paper, profile);
     List<int> bytes = [];
 
@@ -180,7 +197,7 @@ class ReceiptService {
         '${Formatters.jumlah(item.quantity)} ${item.unit} x '
         '${Formatters.rupiah(item.sellPrice)}',
         Formatters.rupiah(item.subtotal),
-        lebar,
+        lebarIsi,
       )) {
         bytes += generator.text(baris);
       }
@@ -190,7 +207,7 @@ class ReceiptService {
         for (final baris in barisDuaKolom(
           '  Potongan',
           '-${Formatters.rupiah(item.discount)}',
-          lebar,
+          lebarIsi,
         )) {
           bytes += generator.text(baris);
         }
@@ -207,7 +224,7 @@ class ReceiptService {
       for (final baris in barisDuaKolom(
         'Potongan nota',
         '-${Formatters.rupiah(sale.discount)}',
-        lebar,
+        lebarIsi,
       )) {
         bytes += generator.text(baris);
       }
@@ -221,11 +238,17 @@ class ReceiptService {
     // langsung kelebihan lebar. Itulah sebab "Rp 30.000" dulu terpotong.
     if (gayaTotal == GayaTotal.besar) {
       bytes += generator.text('TOTAL', styles: const PosStyles(bold: true));
+      // Nominal besar dirata kanan dengan spasi yang dihitung sendiri, bukan
+      // `align: right` milik printer. Perataan printer berhenti tepat di tepi
+      // area cetaknya — dan tepi itulah yang sering terpotong. Dengan spasi
+      // manual, ujung nominal berhenti [marginKanan] karakter sebelum tepi.
+      final nominal = Formatters.rupiah(sale.totalAmount);
+      final muat = lebarIsi ~/ 2; // huruf dua kali lipat = separuh kolom
+      final spasi = muat - nominal.length;
       bytes += generator.text(
-        Formatters.rupiah(sale.totalAmount),
+        '${spasi > 0 ? ' ' * spasi : ''}$nominal',
         styles: const PosStyles(
           bold: true,
-          align: PosAlign.right,
           height: PosTextSize.size2,
           width: PosTextSize.size2,
         ),
@@ -234,7 +257,7 @@ class ReceiptService {
       for (final baris in barisDuaKolom(
         'TOTAL',
         Formatters.rupiah(sale.totalAmount),
-        lebar,
+        lebarIsi,
       )) {
         bytes += generator.text(baris, styles: const PosStyles(bold: true));
       }

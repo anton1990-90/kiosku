@@ -45,6 +45,7 @@ class PrintSettings {
     this.cetakLogo = true,
     this.cetakQris = true,
     this.barisKosong = 3,
+    this.marginKanan = 2,
     this.ingatPrinter = false,
     this.printerId,
     this.printerNama,
@@ -66,6 +67,15 @@ class PrintSettings {
   /// Baris kosong sebelum kertas dipotong — memberi ruang sobek.
   final int barisKosong;
 
+  /// Berapa karakter ruang kosong yang disisakan di tepi kanan (0–6).
+  ///
+  /// Nominal yang rata ke tepi kertas mudah terpotong: kepala cetak printer
+  /// murah sering tidak tepat di tengah kertas, dan baris yang panjangnya
+  /// **tepat** selebar kertas kadang dibungkus printer ke baris berikutnya
+  /// sehingga digit terakhirnya hilang. Menyisakan dua karakter membuat
+  /// nominal selalu berhenti sebelum tepi.
+  final int marginKanan;
+
   /// Sambung otomatis ke printer terakhir tanpa menampilkan layar pilih.
   final bool ingatPrinter;
 
@@ -83,6 +93,7 @@ class PrintSettings {
     bool? cetakLogo,
     bool? cetakQris,
     int? barisKosong,
+    int? marginKanan,
     bool? ingatPrinter,
     String? printerId,
     String? printerNama,
@@ -94,6 +105,7 @@ class PrintSettings {
       cetakLogo: cetakLogo ?? this.cetakLogo,
       cetakQris: cetakQris ?? this.cetakQris,
       barisKosong: barisKosong ?? this.barisKosong,
+      marginKanan: marginKanan ?? this.marginKanan,
       ingatPrinter: ingatPrinter ?? this.ingatPrinter,
       printerId: printerId ?? this.printerId,
       printerNama: printerNama ?? this.printerNama,
@@ -112,6 +124,7 @@ class PrintSettings {
       cetakLogo: cetakLogo,
       cetakQris: cetakQris,
       barisKosong: barisKosong,
+      marginKanan: marginKanan,
       ingatPrinter: ingatPrinter,
       printerId: null,
       printerNama: null,

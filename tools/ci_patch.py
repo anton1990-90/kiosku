@@ -432,7 +432,7 @@ def patch_main_activity():
             fatal.append("baris package MainActivity tidak ditemukan, impor gagal")
             return
 
-    kelas = re.search(r"class\s+MainActivity\s*:\s*FlutterActivity\s*\(\s*\)\s*\{", teks)
+    kelas = re.search(r"class\s+MainActivity\s*:\s*FlutterActivity\s*\(\s*\)", teks)
     if not kelas:
         fatal.append(
             "bentuk kelas MainActivity tidak dikenali (bukan "
@@ -455,10 +455,29 @@ def patch_main_activity():
         PrinterSpp.terimaIzin(requestCode, grantResults)
     }
 """
-    teks = teks[: kelas.end()] + sisip + teks[kelas.end():]
+
+    # DUA bentuk kelas harus ditangani:
+    #
+    #   Flutter 3.27 (template sekarang):  class MainActivity: FlutterActivity()
+    #   Flutter lama:                      class MainActivity: FlutterActivity() { }
+    #
+    # Template 3.27 TIDAK menulis kurung kurawal sama sekali. Percobaan pertama
+    # hanya menangani bentuk ber-kurung, sehingga build v1.28.2 berhenti di sini
+    # dengan "bentuk kelas MainActivity tidak dikenali".
+    sisa = teks[kelas.end():]
+    spasi = re.match(r"[ \t\r\n]*", sisa)
+    awal = kelas.end() + (spasi.end() if spasi else 0)
+
+    if teks[awal:awal + 1] == "{":
+        teks = teks[:awal + 1] + sisip + teks[awal + 1:]
+        notes.append("printer: badan kelas sudah ada, overrides disisipkan di dalamnya")
+    else:
+        teks = teks[:kelas.end()] + " {" + sisip + "}" + teks[kelas.end():]
+        notes.append("printer: kelas tanpa badan ditambahi badan + overrides")
+
     write(path, teks)
     notes.append(
-        "printer: configureFlutterEngine + onRequestPermissionsResult disuntikkan"
+        "printer: configureFlutterEngine + onRequestPermissionsResult terpasang"
     )
 
 

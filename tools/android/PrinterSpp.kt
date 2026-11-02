@@ -139,6 +139,7 @@ object PrinterSpp {
     // Status & izin
     // ---------------------------------------------------------------------
 
+    @SuppressLint("MissingPermission")
     private fun status(): Map<String, Any?> {
         val konteks = aktivitas
         val ad = adaptor()

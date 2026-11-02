@@ -97,7 +97,21 @@ jobs:
         # diabaikan, dan build baru gagal tiga menit kemudian di dalam Gradle
         # dengan pesan yang jauh lebih samar. Analisa yang tidak bisa menggagalkan
         # apa pun bukan pemeriksaan, melainkan hiasan.
-        run: flutter analyze lib/ --no-fatal-infos --no-fatal-warnings
+        # Pesan galatnya diterbitkan sebagai anotasi, bukan hanya tercetak di
+        # log. Log mentah sebuah job hanya bisa diunduh pemilik repo yang
+        # sedang login; anotasi terbaca lewat API publik. Tanpa ini, build
+        # merah hanya berkata "exit code 1" dan penyebabnya harus ditebak.
+        run: |
+          set +e
+          flutter analyze lib/ --no-fatal-infos --no-fatal-warnings > /tmp/analisa.txt 2>&1
+          status=$?
+          cat /tmp/analisa.txt
+          if [ "$status" -ne 0 ]; then
+            while IFS= read -r baris; do
+              echo "::error::${baris}"
+            done < <(grep -E '^[[:space:]]*error' /tmp/analisa.txt)
+          fi
+          exit $status
 
       - name: Build APK release
         # PENTING: ci_patch.py menulis `System.getenv("KEYSTORE_PASSWORD")` dan

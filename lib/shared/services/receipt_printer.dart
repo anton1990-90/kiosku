@@ -117,10 +117,12 @@ Future<PrinterDevice?> _printerSiap(
       // Printer mati, di luar jangkauan, atau sudah dipasangkan ulang.
       // Jatuh ke pemilihan manual — bukan galat yang perlu ditampilkan.
     }
+    if (!context.mounted) return null;
   }
 
-  return Navigator.push<PrinterDevice>(
+  final hasil = await Navigator.push<PrinterDevice>(
     context,
     MaterialPageRoute(builder: (_) => const PrinterSelectionScreen()),
   );
+  return hasil;
 }

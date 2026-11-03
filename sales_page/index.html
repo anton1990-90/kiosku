@@ -261,7 +261,7 @@
             </div>
 
             <p style="font-size: 0.78rem; color: #94A3B8; margin: 14px 0 0 0; text-align: center; line-height: 1.5;">
-                Metode pembayaran (QRIS, Virtual Account, e-wallet) dipilih di halaman DOKU yang aman.
+                Pembayaran lewat Virtual Account (transfer bank) di halaman DOKU yang aman.
             </p>
         </div>
     </div>
@@ -321,16 +321,17 @@
                     return;
                 }
 
-                // DOKU Checkout: pembeli memilih sendiri metodenya (QRIS, Virtual
-                // Account, e-wallet) di halaman DOKU, lalu dikembalikan ke
-                // /download setelah selesai. Tombol tetap ditampilkan supaya
-                // pembeli tidak buntu kalau pengalihan otomatis diblokir peramban.
+                // DOKU Checkout: pembeli memilih sendiri metodenya (untuk
+                // sementara hanya Virtual Account — QRIS belum aktif), lalu
+                // dikembalikan ke /download setelah selesai. Tombol tetap
+                // ditampilkan supaya pembeli tidak buntu kalau pengalihan
+                // otomatis diblokir peramban.
                 document.querySelector('.modal-content').innerHTML = `
                     <span class="close-btn" onclick="closeModal()">&times;</span>
                     <h2 style="text-align: center; margin-bottom: 6px; font-size: 1.4rem;">Mengalihkan ke Pembayaran</h2>
                     <p style="text-align: center; color: #64748B; margin-bottom: 18px; font-size: 0.9rem;">
                         Anda akan diarahkan ke halaman pembayaran DOKU yang aman.
-                        Pilih QRIS, Virtual Account, atau e-wallet di sana.
+                        Pilih bank Virtual Account di sana, lalu transfer sesuai nomor yang muncul.
                     </p>
                     <div style="text-align: center;">
                         <a href="${data.payment_link}" style="display: inline-block; background: #0F6E56; color: #fff; text-decoration: none; padding: 12px 22px; border-radius: 10px; font-weight: 800;">

@@ -14,13 +14,13 @@
     // jadi setiap kode yang memanggilnya diam-diam jatuh ke cabang cadangan.
     "binding": "ASSETS",
     // Worker HARUS berjalan lebih dulu untuk SEMUA alamat, bukan hanya
-    // /internal/*. Alasannya: webhook Pakasir datang sebagai POST ke "/" —
-    // dan "/" punya berkas statis (index.html). Kalau aset dilayani lebih
-    // dulu, Cloudflare menjawab 405 Method Not Allowed untuk POST itu dan
-    // worker tidak pernah dipanggil: pembayaran masuk, lisensi tidak pernah
-    // terbit. Nilai `true` juga tetap memaksa header noindex di /internal/*
-    // terpasang. Worker sendiri tetap menyerahkan berkas statis ke
-    // env.ASSETS di cabang terakhir.
+    // /internal/*. Alasannya: notifikasi DOKU datang sebagai POST ke
+    // /api/doku-notification (dan dulu webhook Pakasir ke "/" yang punya
+    // index.html). Kalau aset dilayani lebih dulu, Cloudflare menjawab
+    // 405 Method Not Allowed untuk POST itu dan worker tidak pernah dipanggil:
+    // pembayaran masuk, lisensi tidak pernah terbit. Nilai `true` juga tetap
+    // memaksa header noindex di /internal/* terpasang. Worker sendiri tetap
+    // menyerahkan berkas statis ke env.ASSETS di cabang terakhir.
     "run_worker_first": true
   },
   "d1_databases": [
@@ -29,5 +29,14 @@
       "database_name": "tokoku-lisensi",
       "database_id": "7b228966-1656-4c35-9ed8-f8e3e3f88377"
     }
-  ]
+  ],
+  "vars": {
+    // Channel yang ditampilkan di halaman pembayaran DOKU (dipisah koma).
+    //
+    // QRIS belum aktif di akun merchant ini, jadi sementara hanya Virtual
+    // Account. Begitu QRIS aktif di Back Office DOKU, tambahkan "QRIS" di
+    // awal daftar lalu deploy ulang — tidak perlu mengubah kode.
+    // Dikosongkan ("") = DOKU menampilkan semua channel yang aktif.
+    "DOKU_PAYMENT_METHODS": "VIRTUAL_ACCOUNT_BRI,VIRTUAL_ACCOUNT_BANK_MANDIRI,VIRTUAL_ACCOUNT_BANK_CIMB,VIRTUAL_ACCOUNT_BANK_DANAMON,VIRTUAL_ACCOUNT_MAYBANK,VIRTUAL_ACCOUNT_DOKU,VIRTUAL_ACCOUNT_BANK_SYARIAH_MANDIRI"
+  }
 }

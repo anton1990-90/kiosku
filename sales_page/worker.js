@@ -580,16 +580,33 @@ function dokuSiap(env) {
 }
 
 /**
- * Buat pembayaran lewat DOKU Checkout.
+ * Daftar channel yang ditampilkan di halaman DOKU, dari env
+ * `DOKU_PAYMENT_METHODS` (dipisah koma). Kosong = DOKU menampilkan semua
+ * channel yang aktif di akun merchant.
  *
- * Channel sengaja TIDAK dibatasi (`payment_method_types` tidak dikirim):
- * daftar channel aktif berbeda tiap akun dan bisa berubah dari Back Office,
- * sedangkan channel yang tidak aktif ditolak DOKU dengan
- * "PAYMENT CHANNEL IS INACTIVE". Dengan cara ini DOKU menampilkan semua
- * metode yang benar-benar aktif (QRIS, VA, e-wallet) dan pembeli memilih.
+ * Kenapa diatur lewat env, bukan dipaku di kode: aktivasi channel dilakukan
+ * di Back Office DOKU dan waktunya tidak selalu bersamaan. QRIS akun ini
+ * belum aktif, jadi sementara hanya Virtual Account yang ditawarkan —
+ * pembeli yang memilih QRIS akan ditolak DOKU dengan
+ * "PAYMENT CHANNEL IS INACTIVE". Begitu QRIS aktif, cukup tambahkan "QRIS"
+ * di daftar itu lalu deploy ulang; tidak perlu menyentuh kode.
+ */
+function daftarChannelDoku(env) {
+  const mentah = String(env.DOKU_PAYMENT_METHODS || "").trim();
+  if (!mentah) return [];
+  return mentah
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+}
+
+/**
+ * Buat pembayaran lewat DOKU Checkout.
  */
 async function buatPembayaranDoku(env, o) {
   if (!dokuSiap(env)) return { error: "doku_belum_diatur" };
+
+  const channel = daftarChannelDoku(env);
 
   const body = {
     order: {
@@ -601,7 +618,11 @@ async function buatPembayaranDoku(env, o) {
       auto_redirect: true,
       language: "ID",
     },
-    payment: { payment_due_date: 1440, type: "SALE" },
+    payment: {
+      payment_due_date: 1440,
+      type: "SALE",
+      ...(channel.length ? { payment_method_types: channel } : {}),
+    },
     customer: { name: o.nama, email: o.email },
     additional_info: { override_notification_url: o.notifikasiUrl },
   };

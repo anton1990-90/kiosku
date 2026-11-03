@@ -24,6 +24,7 @@ create table if not exists vouchers (
   customer_name  text not null default '',       -- nama pembeli (opsional, diisi saat buat)
   customer_email text not null default '',       -- email pembeli (diisi webhook pesanan)
   order_ref      text not null default '',       -- nomor pesanan platform, mis. FO25ABCD1234
+  txn_id         text not null default '',       -- id transaksi gateway (Pakasir), untuk cek status
   status         text not null default 'unused', -- unused | used | revoked
   license_code   text,                           -- Kode Aktivasi hasil penukaran (AK-...)
   created_at     text not null,

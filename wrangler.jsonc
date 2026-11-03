@@ -13,11 +13,15 @@
     // permintaan biasa, tetapi env.ASSETS di dalam Worker bernilai undefined —
     // jadi setiap kode yang memanggilnya diam-diam jatuh ke cabang cadangan.
     "binding": "ASSETS",
-    // Tanpa ini, berkas statis dilayani SEBELUM Worker berjalan — jadi
-    // penanganan /internal/* di sales_page/worker.js tidak pernah dieksekusi
-    // dan header noindex-nya tidak pernah terpasang. Pola di bawah memaksa
-    // Worker berjalan lebih dulu khusus untuk alamat internal.
-    "run_worker_first": ["/internal", "/internal/*"]
+    // Worker HARUS berjalan lebih dulu untuk SEMUA alamat, bukan hanya
+    // /internal/*. Alasannya: webhook Pakasir datang sebagai POST ke "/" —
+    // dan "/" punya berkas statis (index.html). Kalau aset dilayani lebih
+    // dulu, Cloudflare menjawab 405 Method Not Allowed untuk POST itu dan
+    // worker tidak pernah dipanggil: pembayaran masuk, lisensi tidak pernah
+    // terbit. Nilai `true` juga tetap memaksa header noindex di /internal/*
+    // terpasang. Worker sendiri tetap menyerahkan berkas statis ke
+    // env.ASSETS di cabang terakhir.
+    "run_worker_first": true
   },
   "d1_databases": [
     {

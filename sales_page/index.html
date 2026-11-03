@@ -239,29 +239,17 @@
         </div>
     </section>
 
-    <!-- Modal Checkout Pakasir -->
+    <!-- Modal Checkout DOKU -->
     <div id="checkoutModal" class="modal">
         <div class="modal-content">
             <span class="close-btn" onclick="closeModal()">&times;</span>
             <h2 style="font-size: 1.45rem; font-weight: 800; margin-bottom: 8px;">Detail Pembayaran Lisensi</h2>
             <p style="font-size: 0.9rem; color: #64748B; margin-bottom: 20px;">Lisensi otomatis dikirim ke email setelah pembayaran terverifikasi.</p>
-            
+
             <div style="background: #F8FAFC; padding: 16px; border-radius: 14px; border: 1px solid #E2E8F0; margin-bottom: 18px;">
                 <p style="margin-bottom: 4px;"><strong>Produk:</strong> TokoKu POS Lifetime (1 Perangkat)</p>
                 <p style="margin-bottom: 4px; color: #94A3B8;"><strong>Harga Normal:</strong> <s>Rp 299.000</s></p>
                 <p style="margin: 0;"><strong>Total Pembayaran:</strong> <span id="totalPayment" style="font-size: 1.3rem; font-weight: 800; color: #0F6E56;">Rp 99.000</span></p>
-            </div>
-            
-            <div style="margin-bottom: 16px;">
-                <label style="font-size: 0.85rem; font-weight: 600; color: #475569; display: block; margin-bottom: 6px;">Metode Pembayaran</label>
-                <select id="paymentMethod" class="input-field">
-                    <option value="qris">QRIS (BCA, Mandiri, GoPay, OVO, ShopeePay)</option>
-                    <option value="bri_va">BRI Virtual Account</option>
-                    <option value="bni_va">BNI Virtual Account</option>
-                    <option value="cimb_niaga_va">CIMB Niaga Virtual Account</option>
-                    <option value="permata_va">Permata Virtual Account</option>
-                    <option value="maybank_va">Maybank Virtual Account</option>
-                </select>
             </div>
 
             <div class="checkout-form" style="margin-top: 18px; margin-bottom: 0;">
@@ -271,6 +259,10 @@
                     Lanjutkan ke Pembayaran
                 </button>
             </div>
+
+            <p style="font-size: 0.78rem; color: #94A3B8; margin: 14px 0 0 0; text-align: center; line-height: 1.5;">
+                Metode pembayaran (QRIS, Virtual Account, e-wallet) dipilih di halaman DOKU yang aman.
+            </p>
         </div>
     </div>
 
@@ -296,8 +288,7 @@
             const nameInput = document.getElementById('cust-name-modal');
             const emailInput = document.getElementById('cust-email-modal');
             const btn = document.getElementById('btn-process-checkout');
-            const paymentMethod = document.getElementById('paymentMethod').value;
-            
+
             const name = nameInput.value.trim();
             const email = emailInput.value.trim();
 
@@ -319,123 +310,42 @@
                 const response = await fetch('/api/checkout', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ name: name, email: email, method: paymentMethod })
+                    body: JSON.stringify({ name: name, email: email })
                 });
                 const data = await response.json();
 
-                if (data.payment_link) {
-                    const returnUrl = encodeURIComponent("https://tokoku.kibo.ai.id/download");
-                    window.location.href = data.payment_link + "?redirect=" + returnUrl;
-                } else if (data.qr_string) {
-                    // Gambar QR dibuat lewat layanan pihak ketiga. Kalau layanan
-                    // itu diblokir atau sedang mati, pembeli tidak boleh buntu:
-                    // selalu ada tautan halaman pembayaran Pakasir sebagai
-                    // cadangan (di sana QR-nya digambar oleh Pakasir sendiri).
-                    const qrUrl = "https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=" + encodeURIComponent(data.qr_string);
-                    const linkBayar = data.txn_id ? "https://app.pakasir.com/pay-v2/" + data.txn_id + "?qris_only=1" : "";
-                    document.querySelector('.modal-content').innerHTML = `
-                        <span class="close-btn" onclick="closeModal()">&times;</span>
-                        <h2 style="text-align: center; margin-bottom: 6px; font-size: 1.4rem;">Scan QRIS Pembayaran</h2>
-                        <p style="text-align: center; color: #64748B; margin-bottom: 16px; font-size: 0.9rem;">Gunakan M-Banking (BCA, Mandiri, BRI, BNI) atau e-Wallet (GoPay, OVO, ShopeePay, DANA).</p>
-                        <div style="text-align: center;">
-                            <img src="${qrUrl}" alt="QRIS" onerror="document.getElementById('qrisCadangan').hidden = false;" style="max-width: 220px; border-radius: 12px; border: 1px solid #E2E8F0; padding: 12px; background: #fff;">
-                        </div>
-                        <div style="text-align: center; margin-top: 12px;">
-                            <button onclick="downloadQR('${qrUrl}')" style="background: #0F6E56; color: #fff; border: none; padding: 9px 18px; border-radius: 8px; cursor: pointer; font-size: 0.9rem; font-weight: 700;">⬇ Unduh Gambar QRIS</button>
-                        </div>
-                        <p id="qrisCadangan" hidden style="text-align: center; margin-top: 12px; font-size: 0.85rem; color: #B45309;">
-                            Gambar QR gagal dimuat. ${linkBayar ? `<a href="${linkBayar}" target="_blank" style="color: #0F6E56; font-weight: 700;">Buka halaman pembayaran QRIS</a>` : 'Muat ulang halaman ini.'}
-                        </p>
-                        ${linkBayar ? `<p style="text-align: center; margin-top: 8px; font-size: 0.8rem;"><a href="${linkBayar}" target="_blank" style="color: #64748B;">Buka di aplikasi bank / e-wallet</a></p>` : ''}
-                        <h3 style="text-align: center; margin-top: 16px; color: #0F6E56; font-size: 1.4rem;">Total: Rp ${data.total_payment.toLocaleString('id-ID')}</h3>
-                        <p style="text-align: center; font-size: 0.85rem; margin-top: 10px; color: #64748B;" id="paymentStatusText">Menunggu pembayaran... Setelah Anda bayar, kode lisensi akan otomatis dikirimkan ke email Anda dalam hitungan detik.</p>
-                    `;
-                    
-                    window.downloadQR = function(url) {
-                        fetch(url)
-                            .then(res => res.blob())
-                            .then(blob => {
-                                const link = document.createElement('a');
-                                link.href = URL.createObjectURL(blob);
-                                link.download = 'QRIS-Pembayaran-TokoKu.png';
-                                document.body.appendChild(link);
-                                link.click();
-                                document.body.removeChild(link);
-                            }).catch(() => {
-                                window.open(url, '_blank');
-                            });
-                    };
-
-                } else if (data.va_number) {
-                    document.querySelector('.modal-content').innerHTML = `
-                        <span class="close-btn" onclick="closeModal()">&times;</span>
-                        <h2 style="text-align: center; margin-bottom: 6px; font-size: 1.4rem;">Transfer Virtual Account</h2>
-                        <p style="text-align: center; color: #64748B; margin-bottom: 16px; font-size: 0.9rem;">Bank ${data.payment_method.replace('_va', '').toUpperCase()}</p>
-                        <div style="background: #F1F5F9; padding: 18px; border-radius: 14px; text-align: center; border: 1px dashed #CBD5E1;">
-                            <h1 style="letter-spacing: 2px; color: #0F6E56; margin-bottom: 4px; font-size: 2rem;">${data.va_number}</h1>
-                            <p style="font-size: 0.85rem; color: #64748B;">a.n. Pakasir - TokoKu POS</p>
-                        </div>
-                        <h3 style="text-align: center; margin-top: 14px; color: #0F6E56; font-size: 1.4rem;">Total: Rp ${data.total_payment.toLocaleString('id-ID')}</h3>
-                        <p style="text-align: center; font-size: 0.85rem; margin-top: 10px; color: #64748B;" id="paymentStatusText">Menunggu transfer masuk... Kode lisensi akan dikirim otomatis ke email Anda.</p>
-                    `;
-
-                } else {
+                if (!data.payment_link) {
                     alert('Gagal membuat transaksi: ' + (data.error || 'Terjadi kesalahan sistem.'));
                     btn.innerText = originalText;
                     btn.disabled = false;
+                    return;
                 }
 
-                if (data.qr_string || data.va_number) {
-                    if (window.pollInterval) clearInterval(window.pollInterval);
-                    let sudahSelesai = false;
-                    window.pollInterval = setInterval(async () => {
-                        if (sudahSelesai) return;
-                        try {
-                            const res = await fetch('/api/check-payment?order_id=' + encodeURIComponent(data.order_id));
-                            const checkData = await res.json();
-                            const status = checkData.status;
-                            if (!status || status === 'pending') return;
+                // DOKU Checkout: pembeli memilih sendiri metodenya (QRIS, Virtual
+                // Account, e-wallet) di halaman DOKU, lalu dikembalikan ke
+                // /download setelah selesai. Tombol tetap ditampilkan supaya
+                // pembeli tidak buntu kalau pengalihan otomatis diblokir peramban.
+                document.querySelector('.modal-content').innerHTML = `
+                    <span class="close-btn" onclick="closeModal()">&times;</span>
+                    <h2 style="text-align: center; margin-bottom: 6px; font-size: 1.4rem;">Mengalihkan ke Pembayaran</h2>
+                    <p style="text-align: center; color: #64748B; margin-bottom: 18px; font-size: 0.9rem;">
+                        Anda akan diarahkan ke halaman pembayaran DOKU yang aman.
+                        Pilih QRIS, Virtual Account, atau e-wallet di sana.
+                    </p>
+                    <div style="text-align: center;">
+                        <a href="${data.payment_link}" style="display: inline-block; background: #0F6E56; color: #fff; text-decoration: none; padding: 12px 22px; border-radius: 10px; font-weight: 800;">
+                            Lanjut ke Pembayaran
+                        </a>
+                    </div>
+                    <p style="text-align: center; font-size: 0.8rem; margin-top: 14px; color: #64748B;">
+                        Nomor pesanan: <b>${data.order_id}</b>
+                    </p>
+                    <p style="text-align: center; font-size: 0.8rem; margin-top: 6px; color: #94A3B8;">
+                        Kode lisensi dikirim ke email Anda setelah pembayaran terkonfirmasi.
+                    </p>
+                `;
 
-                            const teks = document.getElementById('paymentStatusText');
-                            if (!teks) return;
-
-                            // Kedaluwarsa: jangan arahkan ke halaman unduh —
-                            // pembeli yang belum membayar tidak boleh melihat
-                            // halaman "terima kasih".
-                            if (status === 'canceled') {
-                                sudahSelesai = true;
-                                clearInterval(window.pollInterval);
-                                teks.innerText = "Pembayaran kedaluwarsa atau dibatalkan. Silakan tutup jendela ini lalu buat pesanan baru.";
-                                teks.style.color = "#B45309";
-                                return;
-                            }
-
-                            // Uang masuk tetapi email gagal: jangan bilang
-                            // "berhasil" begitu saja — beri nomor pesanan dan
-                            // alamat bantuan supaya pembeli bisa menagih.
-                            if (status === 'paid_email_gagal') {
-                                sudahSelesai = true;
-                                clearInterval(window.pollInterval);
-                                teks.innerText = "Pembayaran diterima, tetapi email lisensi gagal dikirim. Hubungi support@kibo.ai.id dengan nomor pesanan " + data.order_id + ".";
-                                teks.style.color = "#B45309";
-                                return;
-                            }
-
-                            if (status === 'completed') {
-                                sudahSelesai = true;
-                                clearInterval(window.pollInterval);
-                                const emailTerkirim = String(checkData.email || '').startsWith('terkirim');
-                                teks.innerText = emailTerkirim
-                                    ? "Pembayaran berhasil. Kode lisensi sudah dikirim ke email Anda (cek juga folder Spam/Promosi). Mengarahkan ke halaman unduh..."
-                                    : "Pembayaran berhasil. Catat nomor pesanan " + data.order_id + " — hubungi support@kibo.ai.id kalau kode lisensi belum masuk ke email Anda.";
-                                teks.style.color = "#0F6E56";
-                                if (emailTerkirim) {
-                                    setTimeout(() => { window.location.href = '/download'; }, 2500);
-                                }
-                            }
-                        } catch(e) {}
-                    }, 5000);
-                }
+                setTimeout(() => { window.location.href = data.payment_link; }, 1200);
             } catch (error) {
                 alert('Gagal menghubungi server.');
                 btn.innerText = originalText;

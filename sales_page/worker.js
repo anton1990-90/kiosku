@@ -2,18 +2,16 @@
  * Worker halaman penjualan TokoKu (tokoku.kibo.ai.id).
  *
  * Alur pembelian:
- *   halaman -> POST /api/checkout -> Pakasir (QRIS / VA)
- *           -> pembeli bayar -> Pakasir kirim webhook -> voucher dibuat
- *           -> email berisi kode dikirim lewat Resend
+ *   halaman -> POST /api/checkout -> DOKU Checkout (/checkout/v1/payment)
+ *           -> pembeli memilih metode & bayar di halaman DOKU
+ *           -> DOKU kirim notifikasi -> voucher dibuat -> email dikirim (Resend)
  *
- * Dua jalur di bawah ini menuju fungsi yang SAMA (lunasiPesanan), supaya
- * tidak mungkin ada versi kode yang berbeda antara "lewat webhook" dan
- * "lewat pengecekan status":
- *   1. Webhook Pakasir (jalur utama, seketika).
- *   2. /api/check-payment yang dipanggil halaman tiap 5 detik. Kalau webhook
- *      hilang (URL salah, gangguan jaringan, atau Cloudflare menolak), halaman
- *      yang sedang terbuka tetap menyelamatkan pesanan: worker menanyakan
- *      status langsung ke Pakasir lalu menerbitkan voucher.
+ * Gateway: **DOKU** (Jokul Checkout). Pakasir sudah tidak dipakai.
+ *
+ * Dua jalur menuju fungsi yang SAMA (lunasiPesanan), supaya tidak mungkin ada
+ * versi kode berbeda antara "lewat notifikasi" dan "lewat pengecekan status":
+ *   1. POST /api/doku-notification  (jalur utama, seketika)
+ *   2. GET  /api/check-payment     (jaring pengaman kalau notifikasi hilang)
  */
 
 /** Harga lisensi. Dikunci di server, tidak pernah diambil dari peramban. */
@@ -22,8 +20,14 @@ const HARGA = 99000;
 /** Alamat halaman unduh yang dipakai di dalam email. */
 const HALAMAN_UNDUH = "https://tokoku.kibo.ai.id/unduh";
 
-/** Alamat portal aktivasi yang dipakai di dalam email. */
+/** Halaman yang dibuka lagi setelah pembeli selesai di DOKU. */
+const HALAMAN_KEMBALI = "https://tokoku.kibo.ai.id/download";
+
+/** Portal aktivasi yang dipakai di dalam email. */
 const PORTAL_AKTIVASI = "https://lisensi.kibo.ai.id";
+
+/** Path endpoint notifikasi — dipakai juga sebagai Request-Target tanda tangan. */
+const PATH_NOTIFIKASI = "/api/doku-notification";
 
 function aman(teks, cadangan) {
   const nilai = String(teks ?? '').trim();
@@ -62,6 +66,21 @@ function rupiah(nilai) {
 }
 
 /**
+ * Nama metode yang enak dibaca dari id channel DOKU.
+ * Contoh: "VIRTUAL_ACCOUNT_BRI" -> "Virtual Account BRI", "QRIS" -> "QRIS".
+ */
+function namaMetode(metode) {
+  const teks = String(metode || '').trim();
+  if (!teks) return 'DOKU';
+  if (/^qris$/i.test(teks)) return 'QRIS';
+  if (/^virtual_account_/i.test(teks)) {
+    return 'Virtual Account ' + teks.replace(/^virtual_account_/i, '').replace(/_/g, ' ');
+  }
+  if (/^emoney_/i.test(teks)) return teks.replace(/^emoney_/i, '').toUpperCase();
+  return teks.replace(/_/g, ' ');
+}
+
+/**
  * Isi email yang dikirim ke pelanggan setelah pembayaran terkonfirmasi.
  *
  * Ditulis dengan gaya surat biasa (bukan halaman web): memakai tabel dan
@@ -85,7 +104,7 @@ function emailVoucher(o) {
   const nomorPesanan = String((o && o.nomorPesanan) || '').trim();
   const jumlah = rupiah(o && o.jumlah);
   const waktu = String((o && o.waktu) || '').trim();
-  const metode = String((o && o.metode) || 'QRIS').trim().toUpperCase();
+  const metode = String((o && o.metode) || 'DOKU').trim();
 
   const subject = `Kode Aktivasi ${namaAplikasi} Anda — ${kode}`;
 
@@ -141,7 +160,7 @@ function emailVoucher(o) {
         '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">' +
         (nomorPesanan ? rincianBaris('Nomor pesanan', aman(nomorPesanan, '')) : '') +
         (waktu ? rincianBaris('Waktu bayar', aman(waktu, '')) : '') +
-        rincianBaris('Metode', aman(metode, 'QRIS')) +
+        rincianBaris('Metode', aman(metode, 'DOKU')) +
         (jumlah ? rincianBaris('Jumlah', aman(jumlah, '')) : '') +
         '</table>' +
         '</div>'
@@ -191,25 +210,114 @@ function emailVoucher(o) {
     '<tr><td style="padding:18px 24px 24px 24px;font-family:Helvetica,Arial,sans-serif">' +
     '<p style="margin:0;font-size:12px;line-height:19px;color:#9CA3AF">Email ini dikirim otomatis setelah pembayaran Anda terkonfirmasi. Kalau kode di atas tidak bisa dipakai, balas email ini.</p>' +
     '</td></tr>' +
-
     '</table></td></tr></table></body></html>';
 
   return { subject, html, text: teks };
 }
 
 // ---------------------------------------------------------------------------
-// Pembantu
+// Tanda tangan DOKU (Non-SNAP)
+// ---------------------------------------------------------------------------
+//
+// stringToSign = baris berikut digabung "\n" TANPA newline di akhir:
+//   Client-Id:{clientId}
+//   Request-Id:{requestId}
+//   Request-Timestamp:{timestamp}   ISO8601 UTC, TANPA milidetik
+//   Request-Target:{path}
+//   Digest:{base64(sha256(body))}   HANYA untuk request ber-body
+// Signature = "HMACSHA256=" + base64(HMAC-SHA256(stringToSign, secretKey))
+//
+// Tiga jebakan: Digest base64 POLOS (tanpa prefiks "SHA-256="), GET tidak
+// memuat baris Digest, dan timestamp bermilidetik ditolak DOKU.
+
+const B64 = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+
+function keBase64(bytes) {
+  let keluaran = "";
+  for (let i = 0; i < bytes.length; i += 3) {
+    const b0 = bytes[i];
+    const b1 = i + 1 < bytes.length ? bytes[i + 1] : 0;
+    const b2 = i + 2 < bytes.length ? bytes[i + 2] : 0;
+    keluaran += B64[b0 >> 2];
+    keluaran += B64[((b0 & 0x03) << 4) | (b1 >> 4)];
+    keluaran += i + 1 < bytes.length ? B64[((b1 & 0x0f) << 2) | (b2 >> 6)] : "=";
+    keluaran += i + 2 < bytes.length ? B64[b2 & 0x3f] : "=";
+  }
+  return keluaran;
+}
+
+async function sha256Base64(teks) {
+  const hash = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(teks));
+  return keBase64(new Uint8Array(hash));
+}
+
+async function hmacSha256Base64(pesan, kunci) {
+  const enc = new TextEncoder();
+  const cryptoKey = await crypto.subtle.importKey(
+    "raw",
+    enc.encode(kunci),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"]
+  );
+  const tanda = await crypto.subtle.sign("HMAC", cryptoKey, enc.encode(pesan));
+  return keBase64(new Uint8Array(tanda));
+}
+
+/** ISO8601 UTC tanpa milidetik — DOKU menolak yang bermilidetik. */
+function capWaktuDoku() {
+  return new Date().toISOString().replace(/\.\d+Z$/, "Z");
+}
+
+async function tandaTanganDoku(env, o) {
+  const baris = [
+    `Client-Id:${String(env.DOKU_CLIENT_ID || "").trim()}`,
+    `Request-Id:${o.requestId}`,
+    `Request-Timestamp:${o.timestamp}`,
+    `Request-Target:${o.target}`,
+  ];
+  if (o.rawBody !== undefined) {
+    baris.push(`Digest:${await sha256Base64(o.rawBody)}`);
+  }
+  const hmac = await hmacSha256Base64(baris.join("\n"), String(env.DOKU_SECRET_KEY || "").trim());
+  return `HMACSHA256=${hmac}`;
+}
+
+/** Header bertanda tangan untuk request keluar ke DOKU. */
+async function headerDoku(env, o) {
+  const requestId = crypto.randomUUID();
+  const timestamp = capWaktuDoku();
+  const signature = await tandaTanganDoku(env, {
+    requestId,
+    timestamp,
+    target: o.target,
+    rawBody: o.rawBody,
+  });
+  return {
+    "Content-Type": "application/json",
+    "Client-Id": String(env.DOKU_CLIENT_ID || "").trim(),
+    "Request-Id": requestId,
+    "Request-Timestamp": timestamp,
+    Signature: signature,
+  };
+}
+
+function dasarDoku(env) {
+  return String(env.DOKU_API_BASE_URL || "https://api.doku.com").replace(/\/$/, "");
+}
+
+// ---------------------------------------------------------------------------
+// Pembantu umum
 // ---------------------------------------------------------------------------
 
 /** Perbandingan yang tidak membocorkan panjang/isi lewat waktu balasan. */
 function rahasiaSama(a, b) {
-  const kiri = String(a || '');
-  const kanan = String(b || '');
-  if (kanan === '') return false;
-  let beda = kiri.length ^ kanan.length;
-  const panjang = Math.max(kiri.length, kanan.length);
-  for (let i = 0; i < panjang; i += 1) {
-    beda |= (kiri.charCodeAt(i) || 0) ^ (kanan.charCodeAt(i) || 0);
+  const kiri = String(a || "");
+  const kanan = String(b || "");
+  if (kanan === "" || kiri.length !== kanan.length) return false;
+  let beda = 0;
+  for (let i = 0; i < kanan.length; i += 1) {
+    beda |= kiri.charCodeAt(i) ^ kanan.charCodeAt(i);
   }
   return beda === 0;
 }
@@ -239,33 +347,30 @@ function balasJson(isi, status = 200) {
 /**
  * Catat kejadian webhook TANPA merusak catatan email yang sudah ada.
  *
- * delivery_id adalah kunci utama, dan Pakasir bisa mengirim webhook yang sama
- * lebih dari sekali. Dulu baris kedua ditolak UNIQUE sehingga yang tercatat
- * justru galatnya. Sesudah diperbaiki dengan INSERT OR REPLACE, muncul masalah
- * baru yang lebih halus: pencatatan "webhook masuk" MENIMPA kolom email_status
- * pada baris yang sama, sehingga pemeriksaan "sudah pernah dikirim?" membaca
- * string kosong dan pelanggan menerima email kedua.
- *
- * Karena itu kejadian biasa hanya memperbarui status/alasan, sedangkan kolom
- * email dan voucher hanya ditulis oleh catatHasilEmail.
+ * delivery_id adalah kunci utama, dan DOKU bisa mengirim notifikasi yang sama
+ * lebih dari sekali. INSERT OR REPLACE polos MENIMPA kolom email_status pada
+ * baris yang sama, sehingga pemeriksaan "sudah pernah dikirim?" membaca string
+ * kosong dan pelanggan menerima email kedua. Karena itu kejadian biasa hanya
+ * memperbarui status/alasan; kolom email hanya ditulis catatHasilEmail.
  */
 async function catatKejadian(env, o) {
   try {
     await env.DB.prepare(
       "INSERT INTO webhook_events " +
         "(delivery_id, sumber, event, status, voucher_code, email, email_status, alasan, received_at) " +
-        "VALUES (?, 'pakasir', ?, ?, NULL, '', '', ?, ?) " +
+        "VALUES (?, ?, ?, ?, NULL, '', '', ?, ?) " +
         "ON CONFLICT(delivery_id) DO UPDATE SET " +
-        "event = excluded.event, " +
-        // Jangan turunkan status akhir ("processed"/"error" dari pengiriman
-        // email) menjadi status webhook mentah saat Pakasir mengirim ulang.
+        "sumber = excluded.sumber, event = excluded.event, " +
+        // Jangan turunkan status akhir ("processed"/"error") menjadi status
+        // notifikasi mentah saat DOKU mengirim ulang.
         "status = CASE WHEN webhook_events.status IN ('processed', 'error') " +
         "THEN webhook_events.status ELSE excluded.status END, " +
         "alasan = excluded.alasan, received_at = excluded.received_at"
     )
       .bind(
         String(o.delivery || "tanpa-id").slice(0, 120),
-        String(o.event || "webhook").slice(0, 40),
+        String(o.sumber || "doku").slice(0, 20),
+        String(o.event || "notifikasi").slice(0, 40),
         String(o.status || "").slice(0, 40),
         String(o.alasan || "").slice(0, 300),
         new Date().toISOString()
@@ -282,15 +387,16 @@ async function catatHasilEmail(env, o) {
     await env.DB.prepare(
       "INSERT INTO webhook_events " +
         "(delivery_id, sumber, event, status, voucher_code, email, email_status, alasan, received_at) " +
-        "VALUES (?, 'pakasir', ?, ?, ?, ?, ?, ?, ?) " +
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) " +
         "ON CONFLICT(delivery_id) DO UPDATE SET " +
-        "event = excluded.event, status = excluded.status, " +
+        "sumber = excluded.sumber, event = excluded.event, status = excluded.status, " +
         "voucher_code = excluded.voucher_code, email = excluded.email, " +
         "email_status = excluded.email_status, alasan = excluded.alasan, " +
         "received_at = excluded.received_at"
     )
       .bind(
         String(o.delivery || "tanpa-id").slice(0, 120),
+        String(o.sumber || "doku").slice(0, 20),
         String(o.event || "pembayaran").slice(0, 40),
         String(o.status || "").slice(0, 40),
         o.voucher ? String(o.voucher).slice(0, 40) : null,
@@ -389,7 +495,7 @@ async function statusEmailVoucher(env, kode) {
 /**
  * Terbitkan voucher untuk pesanan yang sudah dibayar, lalu kirim emailnya.
  *
- * Aman dipanggil berkali-kali (webhook, pengecekan status, atau keduanya
+ * Aman dipanggil berkali-kali (notifikasi, pengecekan status, atau keduanya
  * bersamaan): peralihan status dikunci oleh
  * "UPDATE ... WHERE status = 'pending'", jadi hanya satu pemanggil yang
  * benar-benar membuat kode baru. Pemanggil berikutnya hanya mengirim ulang
@@ -447,11 +553,12 @@ async function lunasiPesanan(env, orderRef, txnId, info) {
     nomorPesanan: orderRef,
     jumlah: (info && info.jumlah) || HARGA,
     waktu: waktuIndonesia((info && info.waktu) || pesanan.created_at),
-    metode: (info && info.metode) || "QRIS",
+    metode: (info && info.metode) || "DOKU",
   });
 
   await catatHasilEmail(env, {
     delivery: txnId || orderRef,
+    sumber: "doku",
     event: "pembayaran",
     status: hasil.startsWith("terkirim") ? "processed" : "error",
     voucher: kode,
@@ -463,90 +570,169 @@ async function lunasiPesanan(env, orderRef, txnId, info) {
   return { ok: hasil.startsWith("terkirim"), kode, email: hasil };
 }
 
-/** POST /api/v2/create-transaction — "find or create", jadi aman diulang. */
-async function buatTransaksiPakasir(env, orderId, metode) {
-  const apiKey = String((env.PAKASIR_API_KEY || "")).trim();
-  const slug = String((env.PAKASIR_SLUG || "")).trim();
-  if (!apiKey || !slug) return { error: "gateway_belum_diatur" };
+// ---------------------------------------------------------------------------
+// DOKU — buat pembayaran & cek status
+// ---------------------------------------------------------------------------
 
+/** true kalau kredensial DOKU tersedia di worker. */
+function dokuSiap(env) {
+  return Boolean(String(env.DOKU_CLIENT_ID || "").trim() && String(env.DOKU_SECRET_KEY || "").trim());
+}
+
+/**
+ * Buat pembayaran lewat DOKU Checkout.
+ *
+ * Channel sengaja TIDAK dibatasi (`payment_method_types` tidak dikirim):
+ * daftar channel aktif berbeda tiap akun dan bisa berubah dari Back Office,
+ * sedangkan channel yang tidak aktif ditolak DOKU dengan
+ * "PAYMENT CHANNEL IS INACTIVE". Dengan cara ini DOKU menampilkan semua
+ * metode yang benar-benar aktif (QRIS, VA, e-wallet) dan pembeli memilih.
+ */
+async function buatPembayaranDoku(env, o) {
+  if (!dokuSiap(env)) return { error: "doku_belum_diatur" };
+
+  const body = {
+    order: {
+      amount: HARGA,
+      invoice_number: o.invoice,
+      currency: "IDR",
+      callback_url: HALAMAN_KEMBALI,
+      callback_url_result: HALAMAN_KEMBALI,
+      auto_redirect: true,
+      language: "ID",
+    },
+    payment: { payment_due_date: 1440, type: "SALE" },
+    customer: { name: o.nama, email: o.email },
+    additional_info: { override_notification_url: o.notifikasiUrl },
+  };
+
+  const rawBody = JSON.stringify(body);
   try {
-    const res = await fetch(
-      `https://app.pakasir.com/api/v2/create-transaction/${slug}/${encodeURIComponent(orderId)}`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "X-Api-Key": apiKey },
-        body: JSON.stringify({ method: metode, amount: HARGA }),
-        signal: AbortSignal.timeout(12000),
-      }
-    );
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) return { error: data.error || `http_${res.status}` };
-    return data;
+    const res = await fetch(`${dasarDoku(env)}/checkout/v1/payment`, {
+      method: "POST",
+      headers: await headerDoku(env, { target: "/checkout/v1/payment", rawBody }),
+      body: rawBody,
+      signal: AbortSignal.timeout(25000),
+    });
+
+    const data = await res.json().catch(() => null);
+    const pesan = Array.isArray(data && data.message)
+      ? data.message.join(", ")
+      : (data && data.message) || "";
+
+    if (!res.ok || !data) {
+      return { error: pesan || `doku_http_${res.status}` };
+    }
+
+    const pembayaran = (data.response && data.response.payment) || {};
+    const url = String(pembayaran.url || "");
+    if (!url) return { error: pesan || "doku_tanpa_url" };
+
+    return {
+      url,
+      tokenId: String(pembayaran.token_id || ""),
+      invoice: String((data.response && data.response.order && data.response.order.invoice_number) || o.invoice),
+    };
   } catch (e) {
-    return { error: String((e && e.message) || e).slice(0, 120) };
+    return { error: String((e && e.message) || e).slice(0, 140) };
   }
 }
 
-/** GET /api/v2/transaction-status — sumber kebenaran status pembayaran. */
-async function statusPakasir(env, txnId) {
-  const apiKey = String((env.PAKASIR_API_KEY || "")).trim();
-  const slug = String((env.PAKASIR_SLUG || "")).trim();
-  if (!apiKey || !slug || !txnId) return "";
-
+/**
+ * Status transaksi menurut DOKU: "SUCCESS" | "PENDING" | "FAILED".
+ * Kosong kalau tidak bisa dibaca (jangan dianggap lunas).
+ */
+async function statusDoku(env, invoice) {
+  if (!dokuSiap(env) || !invoice) return "";
+  const target = `/orders/v1/status/${encodeURIComponent(invoice)}`;
   try {
-    const res = await fetch(
-      `https://app.pakasir.com/api/v2/transaction-status/${slug}/${encodeURIComponent(txnId)}`,
-      {
-        headers: { "X-Api-Key": apiKey },
-        signal: AbortSignal.timeout(8000),
-      }
-    );
+    const res = await fetch(`${dasarDoku(env)}${target}`, {
+      method: "GET",
+      headers: await headerDoku(env, { target }),
+      signal: AbortSignal.timeout(10000),
+    });
     if (!res.ok) return "";
-    const data = await res.json().catch(() => ({}));
-    return String(data.status || "");
+    const data = await res.json().catch(() => null);
+    const isi = (data && data.response) || data || {};
+    return String((isi.transaction && isi.transaction.status) || "").toUpperCase();
   } catch (_) {
     return "";
   }
 }
 
-/** Simpan txn_id supaya pesanan bisa diperiksa ulang walau webhook hilang. */
-async function simpanTxnId(env, orderRef, txnId) {
-  if (!txnId) return;
+/**
+ * Verifikasi tanda tangan notifikasi DOKU.
+ *
+ * `Request-Target` yang ditandatangani DOKU adalah PATH dari URL notifikasi
+ * yang terdaftar. Kalau header itu tidak ada (atau isinya berbeda karena URL
+ * didaftarkan dengan cara lain), path tetap dicoba — tanpa mengorbankan
+ * keamanan, karena tanda tangan tetap harus cocok untuk salah satu path itu.
+ */
+async function notifikasiDokuSah(env, request, rawBody) {
+  if (!dokuSiap(env)) return false;
+
+  const clientId = request.headers.get("Client-Id") || "";
+  const requestId = request.headers.get("Request-Id") || "";
+  const timestamp = request.headers.get("Request-Timestamp") || "";
+  const signature = request.headers.get("Signature") || "";
+
+  if (!requestId || !timestamp || !signature) return false;
+  // Client-Id bukan rahasia, tapi kalau tidak cocok pesannya bukan untuk kita.
+  if (clientId && !rahasiaSama(clientId, String(env.DOKU_CLIENT_ID || "").trim())) return false;
+
+  const kandidat = [];
+  const dariHeader = request.headers.get("Request-Target") || "";
+  if (dariHeader) kandidat.push(dariHeader);
+  kandidat.push(PATH_NOTIFIKASI);
   try {
-    await env.DB.prepare(
-      "UPDATE vouchers SET txn_id = ? WHERE order_ref = ? AND (txn_id IS NULL OR txn_id = '')"
-    )
-      .bind(String(txnId).slice(0, 60), orderRef)
-      .run();
-  } catch (_) {
-    // Kolom txn_id mungkin belum ada di database lama — jangan gagal total.
+    const jalur = new URL(request.url).pathname;
+    if (jalur) kandidat.push(jalur);
+  } catch (_) {}
+
+  for (const target of [...new Set(kandidat)]) {
+    const diharapkan = await tandaTanganDoku(env, {
+      requestId,
+      timestamp,
+      target,
+      rawBody,
+    });
+    if (rahasiaSama(diharapkan, signature)) return true;
   }
+  return false;
 }
+
+// ---------------------------------------------------------------------------
+// Handler
+// ---------------------------------------------------------------------------
 
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
 
-    // 1. BUAT TRANSAKSI DARI HALAMAN SALES
+    // 1. BUAT PEMBAYARAN DARI HALAMAN SALES
     if (request.method === "POST" && url.pathname === "/api/checkout") {
       try {
-        const body = await request.json();
+        const body = await request.json().catch(() => ({}));
         const customerName = String(body.name || "").trim();
         const customerEmail = String(body.email || "").trim();
-        const metode = String(body.method || "qris").trim();
 
         if (!customerName || !customerEmail) {
           return balasJson({ error: "Nama dan Email wajib diisi" }, 400);
         }
+        if (!dokuSiap(env)) {
+          return balasJson({ error: "Pembayaran belum siap: kredensial DOKU belum diatur." }, 503);
+        }
 
         const orderId = "INV-" + Date.now();
-        const data = await buatTransaksiPakasir(env, orderId, metode);
+        const hasil = await buatPembayaranDoku(env, {
+          invoice: orderId,
+          nama: customerName,
+          email: customerEmail,
+          notifikasiUrl: url.origin + PATH_NOTIFIKASI,
+        });
 
-        if (data.error) {
-          return balasJson({ error: "Gagal memproses pembayaran: " + data.error }, 502);
-        }
-        if (!data.payment_link && !data.qr_string && !data.va_number) {
-          return balasJson({ error: "Gagal memproses pembayaran" }, 502);
+        if (hasil.error) {
+          return balasJson({ error: "Gagal memproses pembayaran: " + hasil.error }, 502);
         }
 
         // Pesanan disimpan sebagai "pending" sampai pembayaran terbukti masuk.
@@ -555,23 +741,22 @@ export default {
         try {
           await env.DB.prepare(
             "INSERT OR IGNORE INTO vouchers " +
-              "(code, batch, customer_name, customer_email, order_ref, status, created_at) " +
-              "VALUES (?, ?, ?, ?, ?, 'pending', ?)"
+              "(code, batch, customer_name, customer_email, order_ref, txn_id, status, created_at) " +
+              "VALUES (?, ?, ?, ?, ?, ?, 'pending', ?)"
           )
             .bind(
               orderId,
-              "pakasir-web",
+              "doku-web",
               customerName,
               customerEmail,
               orderId,
+              hasil.tokenId || "",
               new Date().toISOString()
             )
             .run();
         } catch (e) {
           return balasJson({ error: "Gagal menyimpan pesanan: " + e.message }, 500);
         }
-
-        await simpanTxnId(env, orderId, data.txn_id);
 
         // KABARI CRM (tidak boleh menggagalkan checkout).
         try {
@@ -591,28 +776,28 @@ export default {
         } catch (_) {}
 
         return balasJson({
-          ...data,
+          payment_link: hasil.url,
           order_id: orderId,
-          total_payment: data.total_payment ?? HARGA,
-          metode,
+          payment_method: "doku",
+          total_payment: HARGA,
         });
       } catch (err) {
         return balasJson({ error: err.message }, 500);
       }
     }
 
-    // 2. PENGECEKAN STATUS PEMBAYARAN (dipanggil halaman tiap 5 detik)
+    // 2. PENGECEKAN STATUS PEMBAYARAN
     //
-    // Ini bukan sekadar membaca database. Kalau pesanan masih "pending",
-    // worker menanyakan status langsung ke Pakasir — jadi pembeli yang sudah
-    // membayar tetap mendapat kode walau webhook tidak pernah sampai.
+    // Bukan sekadar membaca database: kalau pesanan masih "pending", worker
+    // menanyakan status langsung ke DOKU — jadi pembeli yang sudah membayar
+    // tetap mendapat kode walau notifikasi tidak pernah sampai.
     if (request.method === "GET" && url.pathname === "/api/check-payment") {
       try {
         const orderId = String(url.searchParams.get("order_id") || "").trim();
         if (!orderId) return balasJson({ error: "order_id wajib diisi" }, 400);
 
         const pesanan = await env.DB.prepare(
-          "SELECT code, status, txn_id, customer_email FROM vouchers WHERE order_ref = ?"
+          "SELECT code, status FROM vouchers WHERE order_ref = ?"
         )
           .bind(orderId)
           .first();
@@ -621,7 +806,6 @@ export default {
 
         const statusDb = String(pesanan.status || "");
 
-        // Sudah lunas sebelumnya — cukup laporkan.
         if (statusDb !== "pending") {
           const kode = String(pesanan.code || "");
           return balasJson({
@@ -631,25 +815,10 @@ export default {
           });
         }
 
-        // Masih pending: pastikan dulu ke Pakasir.
-        let txnId = String(pesanan.txn_id || "").trim();
-        if (!txnId) {
-          // Pesanan lama (sebelum txn_id disimpan). create-transaction
-          // bersifat "find or create", jadi memanggilnya lagi mengembalikan
-          // transaksi yang sama beserta txn_id-nya.
-          const ulang = await buatTransaksiPakasir(env, orderId, "qris");
-          if (ulang && ulang.txn_id) {
-            txnId = String(ulang.txn_id);
-            await simpanTxnId(env, orderId, txnId);
-          }
-        }
+        const status = await statusDoku(env, orderId);
 
-        if (!txnId) return balasJson({ status: "pending" });
-
-        const status = await statusPakasir(env, txnId);
-
-        if (status === "completed") {
-          const hasil = await lunasiPesanan(env, orderId, txnId, { metode: "QRIS" });
+        if (status === "SUCCESS") {
+          const hasil = await lunasiPesanan(env, orderId, "", { metode: "DOKU" });
           return balasJson({
             status: hasil.ok ? "completed" : "paid_email_gagal",
             kode_terkirim: hasil.ok,
@@ -657,7 +826,7 @@ export default {
           });
         }
 
-        if (status === "canceled") {
+        if (status === "FAILED" || status === "EXPIRED" || status === "CANCELLED") {
           try {
             await env.DB.prepare(
               "UPDATE vouchers SET status = 'batal' WHERE order_ref = ? AND status = 'pending'"
@@ -674,103 +843,99 @@ export default {
       }
     }
 
-    // 3. TERIMA WEBHOOK DARI PAKASIR
+    // 3. NOTIFIKASI DARI DOKU
     //
-    // Pengecualian /api/ dan /internal/ perlu disebut supaya permintaan ke
-    // halaman internal tidak tercatat sebagai acara webhook palsu.
-    if (
-      request.method === "POST" &&
-      !url.pathname.startsWith("/api/") &&
-      !url.pathname.startsWith("/internal/")
-    ) {
+    // Alamat ini yang didaftarkan di DOKU (dan dikirim ulang lewat
+    // additional_info.override_notification_url saat membuat pembayaran).
+    // Wajib menjawab 200; kalau 4xx/5xx DOKU akan mengirim ulang terus.
+    if (request.method === "POST" && url.pathname === PATH_NOTIFIKASI) {
       const rawPayload = await request.text();
-      let payload = {};
-      try {
-        payload = JSON.parse(rawPayload);
-      } catch (_) {}
 
-      const txnId = String(payload.txn_id || "").trim();
-      const orderId = String(payload.order_id || "").trim();
-      const statusMasuk = String(payload.status || "").trim().toLowerCase();
-
-      const secretHeader = request.headers.get("X-Secret");
-      const webhookSecret = String(env.PAKASIR_WEBHOOK_SECRET || "").trim();
-
-      // JANGAN pernah mengembalikan nilai secret di dalam balasan galat.
-      // Versi lama mencantumkannya, sehingga siapa pun yang mengirim POST
-      // sekali bisa membaca secret itu dan memalsukan pembayaran.
-      //
-      // Pemeriksaan ini juga dilakukan SEBELUM mencatat apa pun: kalau tidak,
-      // siapa pun bisa membanjiri tabel webhook_events dengan POST sampah.
-      if (!rahasiaSama(secretHeader, webhookSecret)) {
+      const sah = await notifikasiDokuSah(env, request, rawPayload);
+      if (!sah) {
+        // Jangan catat apa pun untuk permintaan tak sah: kalau dicatat,
+        // siapa pun bisa membanjiri tabel dengan POST sampah.
         return balasJson({ error: "unauthorized" }, 401);
       }
 
-      // Catat lebih dulu, apa pun hasilnya — supaya penjual bisa melihat
-      // "webhook masuk tapi email gagal" di dasbor admin.
+      let payload = {};
+      try {
+        payload = JSON.parse(rawPayload);
+      } catch (_) {
+        await catatKejadian(env, {
+          delivery: "rusak-" + Date.now(),
+          event: "notifikasi",
+          status: "json_rusak",
+          alasan: rawPayload.slice(0, 300),
+        });
+        return balasJson({ error: "bad_json" }, 400);
+      }
+
+      const invoice = String((payload.order && payload.order.invoice_number) || "").trim();
+      const jumlah = Number((payload.order && payload.order.amount) ?? 0);
+      const statusMasuk = String((payload.transaction && payload.transaction.status) || "").toUpperCase();
+      const waktuBayar = (payload.transaction && payload.transaction.date) || "";
+      const kanal = (payload.channel && payload.channel.id) || (payload.service && payload.service.id) || "";
+
       await catatKejadian(env, {
-        delivery: txnId || "tanpa-txn-" + Date.now(),
-        event: "webhook",
+        delivery: invoice || "tanpa-invoice-" + Date.now(),
+        event: "notifikasi",
         status: statusMasuk || "tanpa_status",
         alasan: rawPayload.slice(0, 300),
       });
 
-      if (statusMasuk !== "completed") {
+      if (statusMasuk !== "SUCCESS") {
         await catatKejadian(env, {
-          delivery: txnId || "tanpa-txn",
-          event: "webhook",
+          delivery: invoice || "tanpa-invoice",
+          event: "notifikasi",
           status: "diabaikan",
           alasan: "status " + (statusMasuk || "(kosong)"),
         });
-        return new Response("OK", { status: 200 });
+        return balasJson({ ok: true, diabaikan: true });
       }
 
       // Nominal harus cocok. Tanpa pemeriksaan ini, transaksi Rp 1.000 bisa
       // dipakai untuk mengklaim lisensi Rp 99.000.
-      if (payload.amount != null && Number(payload.amount) !== HARGA) {
+      if (jumlah !== HARGA) {
         await catatKejadian(env, {
-          delivery: txnId || "tanpa-txn",
-          event: "webhook",
+          delivery: invoice || "tanpa-invoice",
+          event: "notifikasi",
           status: "nominal_tidak_cocok",
-          alasan: "amount=" + String(payload.amount),
+          alasan: "amount=" + String(jumlah),
         });
-        return new Response("OK", { status: 200 });
+        return balasJson({ ok: true, nominal: false });
       }
 
-      if (!orderId) {
+      if (!invoice) {
         await catatKejadian(env, {
-          delivery: txnId || "tanpa-txn",
-          event: "webhook",
-          status: "tanpa_order",
+          delivery: "tanpa-invoice",
+          event: "notifikasi",
+          status: "tanpa_invoice",
           alasan: rawPayload.slice(0, 300),
         });
-        return new Response("OK", { status: 200 });
+        return balasJson({ ok: true });
       }
 
-      const hasil = await lunasiPesanan(env, orderId, txnId, {
-        jumlah: payload.amount,
-        waktu: payload.completed_at,
-        metode: payload.payment_method,
+      const hasil = await lunasiPesanan(env, invoice, "", {
+        jumlah,
+        waktu: waktuBayar,
+        metode: namaMetode(kanal),
       });
 
-      // 500 hanya kalau voucher belum jadi — Pakasir akan mencoba lagi.
-      // Email yang gagal TIDAK diulang lewat webhook (voucher sudah ada);
+      // 500 hanya kalau voucher belum jadi — DOKU akan mencoba lagi.
+      // Email yang gagal TIDAK diulang lewat notifikasi (voucher sudah ada);
       // jalur /api/check-payment dan dasbor admin yang menanganinya.
       if (!hasil.kode) {
-        return new Response("Gagal menerbitkan voucher", { status: 500 });
+        return balasJson({ ok: false, reason: hasil.alasan || "gagal" }, 500);
       }
-      return new Response("OK", { status: 200 });
+      return balasJson({ ok: true });
     }
 
     // 4. UNDUHAN — dilayani dari domain ini, bukan dari server lisensi
-    //
-    // Berkas APK tetap diambil dari server lisensi karena hanya di sana
-    // kredensial GitHub disimpan — Worker ini sengaja tidak tahu-menahu soal
-    // repo rilis. Yang berubah hanya alamat yang dilihat pelanggan.
     if (request.method === "GET" && url.pathname === "/api/versi") {
       try {
         return await fetch("https://lisensi.kibo.ai.id/api/versi", {
-          headers: { "Accept": "application/json" },
+          headers: { Accept: "application/json" },
         });
       } catch (err) {
         return balasJson({ ok: false, error: err.message }, 502);
@@ -798,12 +963,6 @@ export default {
     }
 
     // 5. HALAMAN INTERNAL — alat penjual, bukan untuk pelanggan
-    //
-    // Halaman ini tidak ditautkan dari mana pun. Isinya baru terbuka setelah
-    // kunci admin dimasukkan, dan kunci itu tidak pernah dikirim ke Worker
-    // ini: halaman memanggil API admin di server lisensi langsung dari
-    // peramban. Jadi yang perlu dijaga di sini hanya dua hal — alamatnya
-    // tidak diindeks mesin pencari, dan isinya tidak ikut tersimpan di cache.
     if (url.pathname === "/internal" || url.pathname === "/internal/") {
       return Response.redirect(url.origin + "/internal/voucher", 301);
     }
@@ -812,9 +971,6 @@ export default {
       if (request.method !== "GET" && request.method !== "HEAD") {
         return new Response("Metode tidak diizinkan", { status: 405 });
       }
-      // Binding ASSETS bisa tidak ada kalau konfigurasi deploy berubah.
-      // Tanpa pemeriksaan ini, permintaan melempar galat dan Cloudflare
-      // menjawab 500.
       if (!env.ASSETS) {
         return new Response("Halaman internal belum tersedia", {
           status: 404,
@@ -822,8 +978,6 @@ export default {
         });
       }
       const aset = await env.ASSETS.fetch(request);
-      // Hanya balasan yang benar-benar berisi yang perlu ditambahi header;
-      // balasan pengalihan dibiarkan apa adanya supaya tidak berputar.
       if (aset.status !== 200) return aset;
       const kepalaAset = new Headers(aset.headers);
       kepalaAset.set("X-Robots-Tag", "noindex, nofollow, noarchive");
@@ -832,13 +986,11 @@ export default {
       return new Response(aset.body, { status: 200, headers: kepalaAset });
     }
 
-    // Jika bukan rute di atas, serahkan ke aset statis (HTML/CSS/gambar).
+    // Selain rute di atas, serahkan ke aset statis (HTML/CSS/gambar).
     //
     // Binding `ASSETS` hanya ada kalau didaftarkan di konfigurasi deploy.
-    // Tanpa pemeriksaan ini, permintaan ke berkas yang sudah dihapus atau URL
-    // yang salah ketik melempar galat dan Cloudflare menjawab 500 ("Worker
-    // threw an exception") — terlihat seperti server rusak, padahal yang
-    // benar cukup 404.
+    // Tanpa pemeriksaan ini, permintaan ke berkas yang sudah dihapus melempar
+    // galat dan Cloudflare menjawab 500 — terlihat seperti server rusak.
     if (env.ASSETS) {
       return env.ASSETS.fetch(request);
     }

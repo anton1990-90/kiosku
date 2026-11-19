@@ -585,11 +585,11 @@ function dokuSiap(env) {
  * channel yang aktif di akun merchant.
  *
  * Kenapa diatur lewat env, bukan dipaku di kode: aktivasi channel dilakukan
- * di Back Office DOKU dan waktunya tidak selalu bersamaan. QRIS akun ini
- * belum aktif, jadi sementara hanya Virtual Account yang ditawarkan —
- * pembeli yang memilih QRIS akan ditolak DOKU dengan
- * "PAYMENT CHANNEL IS INACTIVE". Begitu QRIS aktif, cukup tambahkan "QRIS"
- * di daftar itu lalu deploy ulang; tidak perlu menyentuh kode.
+ * di Back Office DOKU dan waktunya tidak selalu bersamaan. QRIS sekarang
+ * sudah aktif di akun merchant ini, jadi "QRIS" ada di daftar paling depan
+ * dan Virtual Account tetap tersedia sebagai cadangan. Kalau nanti ada
+ * channel baru, cukup tambahkan kodenya di daftar itu lalu deploy ulang;
+ * tidak perlu menyentuh kode.
  */
 function daftarChannelDoku(env) {
   const mentah = String(env.DOKU_PAYMENT_METHODS || "").trim();

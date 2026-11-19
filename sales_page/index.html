@@ -255,13 +255,19 @@
             <div class="checkout-form" style="margin-top: 18px; margin-bottom: 0;">
                 <input type="text" id="cust-name-modal" placeholder="Nama Lengkap Anda" required class="input-field">
                 <input type="email" id="cust-email-modal" placeholder="Alamat Email Aktif (untuk lisensi)" required class="input-field">
-                <button class="cta-btn primary-btn" id="btn-process-checkout" style="width: 100%;" onclick="processCheckout()">
-                    Lanjutkan ke Pembayaran
+                <button class="cta-btn primary-btn" id="btn-qris" style="width: 100%; display: none;" onclick="processQris()">
+                    Scan QRIS (Bayar di Sini)
+                </button>
+                <div id="pemisah-metode" style="display: none; text-align: center; color: #94A3B8; font-size: 0.78rem; margin: 4px 0 2px 0;">atau</div>
+                <button class="cta-btn" id="btn-process-checkout" style="width: 100%; background: #F1F5F9; color: #0F172A; border: 1px solid #E2E8F0;" onclick="processCheckout()">
+                    Virtual Account / Metode Lain
                 </button>
             </div>
 
             <p style="font-size: 0.78rem; color: #94A3B8; margin: 14px 0 0 0; text-align: center; line-height: 1.5;">
-                Pembayaran lewat QRIS (scan dari bank/e-wallet) atau Virtual Account di halaman DOKU yang aman.
+                QRIS langsung tampil di halaman ini — cukup scan dari bank atau e-wallet.
+                Untuk Virtual Account (BRI, BNI, Mandiri, Permata, CIMB, Danamon, BSI, Maybank, BJB, Sinarmas, BTN, BNC, DOKU)
+                Anda diarahkan ke halaman DOKU yang aman.
             </p>
         </div>
     </div>
@@ -275,31 +281,208 @@
     </footer>
 
     <script>
-        function openModal() {
+        // Simpan bentuk awal modal: setelah QRIS ditampilkan, isinya diganti,
+        // jadi saat ditutup kita kembalikan supaya bisa dipakai lagi.
+        let modalAsli = '';
+        let metodeCache = null;
+        document.addEventListener('DOMContentLoaded', function () {
+            modalAsli = document.querySelector('.modal-content').innerHTML;
+        });
+
+        async function cekMetode() {
+            if (metodeCache) return metodeCache;
+            try {
+                const r = await fetch('/api/metode', { headers: { Accept: 'application/json' } });
+                metodeCache = await r.json();
+            } catch (_) {
+                metodeCache = { qris: false, metode_lain: true };
+            }
+            return metodeCache;
+        }
+
+        async function openModal() {
+            if (!modalAsli) {
+                modalAsli = document.querySelector('.modal-content').innerHTML;
+            }
             document.getElementById('checkoutModal').style.display = 'block';
+            // Tombol QRIS hanya muncul kalau server memang siap membuat QRIS.
+            const m = await cekMetode();
+            const btn = document.getElementById('btn-qris');
+            const pisah = document.getElementById('pemisah-metode');
+            if (btn && m && m.qris) {
+                btn.style.display = 'block';
+                if (pisah) pisah.style.display = 'block';
+            }
         }
 
         function closeModal() {
             document.getElementById('checkoutModal').style.display = 'none';
             if (window.pollInterval) clearInterval(window.pollInterval);
+            if (modalAsli) {
+                const wadah = document.querySelector('.modal-content');
+                wadah.innerHTML = modalAsli;
+                // Elemen hasil render ulang: pasang lagi penanganannya.
+                const btnQris = document.getElementById('btn-qris');
+                if (btnQris) btnQris.onclick = processQris;
+                const btnLain = document.getElementById('btn-process-checkout');
+                if (btnLain) btnLain.onclick = processCheckout;
+                if (metodeCache && metodeCache.qris && btnQris) {
+                    btnQris.style.display = 'block';
+                    const pisah = document.getElementById('pemisah-metode');
+                    if (pisah) pisah.style.display = 'block';
+                }
+            }
         }
 
-        async function processCheckout() {
-            const nameInput = document.getElementById('cust-name-modal');
-            const emailInput = document.getElementById('cust-email-modal');
-            const btn = document.getElementById('btn-process-checkout');
-
-            const name = nameInput.value.trim();
-            const email = emailInput.value.trim();
-
+        function ambilDataPembeli() {
+            const name = document.getElementById('cust-name-modal').value.trim();
+            const email = document.getElementById('cust-email-modal').value.trim();
             if (!name || !email) {
                 alert("Mohon isi Nama dan Email Anda agar kami bisa mengirimkan Kode Lisensi.");
-                return;
+                return null;
+            }
+            return { name: name, email: email };
+        }
+
+        // --- QRIS: QR digambar di halaman ini, tanpa pindah ke DOKU ---------
+        async function processQris() {
+            const pembeli = ambilDataPembeli();
+            if (!pembeli) return;
+
+            const btn = document.getElementById('btn-qris');
+            const teksAsli = btn ? btn.innerText : '';
+            if (btn) { btn.innerText = "Menyiapkan QRIS..."; btn.disabled = true; }
+
+            if (typeof fbq === 'function') {
+                fbq('track', 'InitiateCheckout');
+                fbq('track', 'Lead');
             }
 
-            const originalText = btn.innerText;
-            btn.innerText = "Memproses Pesanan...";
-            btn.disabled = true;
+            try {
+                const res = await fetch('/api/qris', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(pembeli)
+                });
+                const data = await res.json();
+
+                if (!data.qr_string) {
+                    if (btn) { btn.innerText = teksAsli; btn.disabled = false; }
+                    // QRIS belum siap di server: jangan buntu, pakai jalur DOKU.
+                    alert('QRIS belum bisa ditampilkan (' + (data.error || 'terjadi kesalahan') +
+                          ').\nAnda akan diarahkan ke halaman pembayaran DOKU.');
+                    return processCheckout();
+                }
+                await tampilkanQris(data);
+            } catch (error) {
+                if (btn) { btn.innerText = teksAsli; btn.disabled = false; }
+                alert('Gagal menghubungi server.');
+            }
+        }
+
+        async function gambarQr(teks) {
+            if (typeof qrcode !== 'function') {
+                await new Promise(function (selesai) {
+                    const s = document.createElement('script');
+                    s.src = '/qr-lib.js';
+                    s.onload = selesai;
+                    s.onerror = selesai;
+                    document.head.appendChild(s);
+                });
+            }
+            const canvas = document.getElementById('qr-canvas');
+            if (!canvas) return;
+            if (typeof qrcode !== 'function') {
+                canvas.parentElement.innerHTML =
+                    '<div style="padding:18px; font-size:0.82rem; color:#B91C1C;">QR tidak bisa digambar di peramban ini. Hubungi support@kibo.ai.id</div>';
+                return;
+            }
+            const qr = qrcode(0, 'M');
+            qr.addData(teks);
+            qr.make();
+            const jumlah = qr.getModuleCount();
+            const sel = Math.max(2, Math.floor(220 / (jumlah + 2)));
+            const px = sel * (jumlah + 2);
+            const ctx = canvas.getContext('2d');
+            canvas.width = px;
+            canvas.height = px;
+            ctx.fillStyle = '#fff';
+            ctx.fillRect(0, 0, px, px);
+            ctx.fillStyle = '#000';
+            for (let r = 0; r < jumlah; r += 1) {
+                for (let c = 0; c < jumlah; c += 1) {
+                    if (qr.isDark(r, c)) ctx.fillRect((c + 1) * sel, (r + 1) * sel, sel, sel);
+                }
+            }
+        }
+
+        async function tampilkanQris(data) {
+            const wadah = document.querySelector('.modal-content');
+            const harga = Number(data.total_payment || 0).toLocaleString('id-ID');
+            wadah.innerHTML = `
+                <span class="close-btn" onclick="closeModal()">&times;</span>
+                <h2 style="text-align: center; font-size: 1.35rem; margin-bottom: 4px;">Scan QRIS</h2>
+                <p style="text-align: center; color: #64748B; font-size: 0.85rem; margin-bottom: 14px;">
+                    Buka aplikasi bank atau e-wallet, pilih <b>QRIS</b>, lalu scan kode di bawah ini.
+                </p>
+                <div style="text-align: center;">
+                    <div style="display: inline-block; background: #fff; padding: 12px; border-radius: 16px; border: 1px solid #E2E8F0; line-height: 0;">
+                        <canvas id="qr-canvas" width="220" height="220"></canvas>
+                    </div>
+                </div>
+                <p style="text-align: center; font-size: 1.25rem; font-weight: 800; color: #0F6E56; margin: 14px 0 2px 0;">Rp ${harga}</p>
+                <p id="status-bayar" style="text-align: center; font-size: 0.85rem; color: #64748B; margin: 0 0 10px 0;">Menunggu pembayaran…</p>
+                <p style="text-align: center; font-size: 0.78rem; color: #94A3B8; margin: 0 0 12px 0;">Nomor pesanan: <b>${data.order_id}</b></p>
+                <button class="cta-btn" style="width: 100%; background: #F1F5F9; color: #0F172A; border: 1px solid #E2E8F0;"
+                        onclick="cekBayarSekarang('${data.order_id}')">Saya Sudah Bayar</button>
+                <p style="text-align: center; font-size: 0.75rem; color: #94A3B8; margin-top: 10px;">
+                    Kode lisensi dikirim ke email Anda setelah pembayaran terkonfirmasi.
+                </p>
+            `;
+            await gambarQr(data.qr_string);
+            mulaiPolling(data.order_id);
+        }
+
+        function mulaiPolling(orderId) {
+            if (window.pollInterval) clearInterval(window.pollInterval);
+            window.pollInterval = setInterval(function () { cekStatusBayar(orderId, false); }, 4000);
+        }
+
+        function cekBayarSekarang(orderId) {
+            const label = document.getElementById('status-bayar');
+            if (label) label.innerText = 'Memeriksa pembayaran…';
+            cekStatusBayar(orderId, true);
+        }
+
+        async function cekStatusBayar(orderId, manual) {
+            try {
+                const r = await fetch('/api/check-payment?order_id=' + encodeURIComponent(orderId));
+                const d = await r.json();
+                const label = document.getElementById('status-bayar');
+
+                if (d.status === 'completed' || d.status === 'paid_email_gagal') {
+                    if (window.pollInterval) clearInterval(window.pollInterval);
+                    if (label) { label.innerText = 'Pembayaran diterima. Mengalihkan…'; label.style.color = '#0F6E56'; }
+                    setTimeout(function () { window.location.href = '/download'; }, 1200);
+                    return;
+                }
+                if (d.status === 'canceled') {
+                    if (window.pollInterval) clearInterval(window.pollInterval);
+                    if (label) { label.innerText = 'QRIS kedaluwarsa. Silakan buat pesanan baru.'; label.style.color = '#B91C1C'; }
+                    return;
+                }
+                if (manual && label) label.innerText = 'Belum terdeteksi. Coba lagi beberapa saat.';
+            } catch (_) {}
+        }
+
+        // --- Virtual Account / metode lain: halaman DOKU --------------------
+        async function processCheckout() {
+            const pembeli = ambilDataPembeli();
+            if (!pembeli) return;
+
+            const btn = document.getElementById('btn-process-checkout');
+            const teksAsli = btn ? btn.innerText : '';
+            if (btn) { btn.innerText = "Memproses Pesanan..."; btn.disabled = true; }
 
             if (typeof fbq === 'function') {
                 fbq('track', 'InitiateCheckout');
@@ -310,27 +493,26 @@
                 const response = await fetch('/api/checkout', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ name: name, email: email })
+                    body: JSON.stringify(pembeli)
                 });
                 const data = await response.json();
 
                 if (!data.payment_link) {
                     alert('Gagal membuat transaksi: ' + (data.error || 'Terjadi kesalahan sistem.'));
-                    btn.innerText = originalText;
-                    btn.disabled = false;
+                    if (btn) { btn.innerText = teksAsli; btn.disabled = false; }
                     return;
                 }
 
-                // DOKU Checkout: pembeli memilih sendiri metodenya (QRIS atau
-                // Virtual Account), lalu dikembalikan ke /download setelah
-                // selesai. Tombol tetap ditampilkan supaya pembeli tidak buntu
-                // kalau pengalihan otomatis diblokir peramban.
+                // DOKU Checkout: pembeli memilih sendiri metodenya (Virtual
+                // Account atau QRIS di sana), lalu dikembalikan ke /download
+                // setelah selesai. Tombol tetap ditampilkan supaya pembeli
+                // tidak buntu kalau pengalihan otomatis diblokir peramban.
                 document.querySelector('.modal-content').innerHTML = `
                     <span class="close-btn" onclick="closeModal()">&times;</span>
                     <h2 style="text-align: center; margin-bottom: 6px; font-size: 1.4rem;">Mengalihkan ke Pembayaran</h2>
                     <p style="text-align: center; color: #64748B; margin-bottom: 18px; font-size: 0.9rem;">
                         Anda akan diarahkan ke halaman pembayaran DOKU yang aman.
-                        Pilih QRIS lalu scan kodenya, atau pilih bank Virtual Account dan transfer sesuai nomor yang muncul.
+                        Pilih bank Virtual Account lalu transfer sesuai nomor yang muncul.
                     </p>
                     <div style="text-align: center;">
                         <a href="${data.payment_link}" style="display: inline-block; background: #0F6E56; color: #fff; text-decoration: none; padding: 12px 22px; border-radius: 10px; font-weight: 800;">
@@ -348,8 +530,7 @@
                 setTimeout(() => { window.location.href = data.payment_link; }, 1200);
             } catch (error) {
                 alert('Gagal menghubungi server.');
-                btn.innerText = originalText;
-                btn.disabled = false;
+                if (btn) { btn.innerText = teksAsli; btn.disabled = false; }
             }
         }
     </script>

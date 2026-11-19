@@ -723,6 +723,272 @@ async function notifikasiDokuSah(env, request, rawBody) {
 }
 
 // ---------------------------------------------------------------------------
+// DOKU SNAP — QRIS MPM (QR digambar di halaman kita, tanpa pindah ke DOKU)
+// ---------------------------------------------------------------------------
+//
+// SNAP memakai skema tanda tangan yang BERBEDA dari Checkout biasa:
+//
+//   1. Access token B2B — POST /authorization/v1/access-token/b2b
+//      X-SIGNATURE = base64( RSA-SHA256( clientId + "|" + X-TIMESTAMP ) )
+//      Ditandatangani DOKU_PRIVATE_KEY (PKCS#8, isi base64 tanpa header).
+//
+//   2. Panggilan API — X-SIGNATURE = base64( HMAC-SHA512(
+//        "POST:<path>:<token>:<hex(sha256(body))>:<timestamp>", SecretKey ))
+//      Header: Authorization, X-PARTNER-ID, X-EXTERNAL-ID, X-TIMESTAMP,
+//      CHANNEL-ID: H2H.
+//
+// Kanal QRIS in-app hanya ditawarkan kalau DOKU_QRIS_MERCHANT_ID dan
+// DOKU_PRIVATE_KEY terpasang; tanpa itu halaman tetap memakai DOKU Checkout
+// (pembeli memilih QRIS di sana). Jadi tidak ada pelanggan yang buntu.
+
+const JALUR_SNAP_TOKEN = "/authorization/v1/access-token/b2b";
+const JALUR_QRIS_GENERATE = "/snap-adapter/b2b/v1.0/qr/qr-mpm-generate";
+const JALUR_QRIS_QUERY = "/snap-adapter/b2b/v1.0/qr/qr-mpm-query";
+
+/** Cache token per-isolate. DOKU memberi masa berlaku 900 detik. */
+let tokenSnapCache = { nilai: "", kedaluwarsa: 0 };
+
+/** true kalau QRIS in-app bisa dibuat (merchant ID + RSA key tersedia). */
+function qrisSiap(env) {
+  return Boolean(
+    String(env.DOKU_QRIS_MERCHANT_ID || "").trim() &&
+      String(env.DOKU_PRIVATE_KEY || "").includes("PRIVATE KEY")
+  );
+}
+
+function dariBase64(b64) {
+  const biner = atob(String(b64 || "").replace(/[^A-Za-z0-9+/=]/g, ""));
+  const bytes = new Uint8Array(biner.length);
+  for (let i = 0; i < biner.length; i += 1) bytes[i] = biner.charCodeAt(i);
+  return bytes;
+}
+
+/** "2026-11-20T14:30:00+07:00" — SNAP menuntut zona waktu eksplisit. */
+function capWaktuSnap() {
+  return new Date(Date.now() + 7 * 3600 * 1000)
+    .toISOString()
+    .replace(/\.\d+Z$/, "+07:00");
+}
+
+/** Ambil (atau pakai ulang) access token B2B. Kosong kalau gagal. */
+async function ambilTokenSnap(env) {
+  if (tokenSnapCache.nilai && Date.now() < tokenSnapCache.kedaluwarsa) {
+    return tokenSnapCache.nilai;
+  }
+
+  const clientId = String(env.DOKU_CLIENT_ID || "").trim();
+  // Secret bisa tersimpan dengan "\n" literal (mis. dari berkas .env).
+  const pem = String(env.DOKU_PRIVATE_KEY || "").replace(/\\n/g, "\n");
+  const isi = pem.replace(/-----[^-]+-----/g, "").replace(/\s+/g, "");
+  if (!clientId || !isi) return "";
+
+  try {
+    const kunci = await crypto.subtle.importKey(
+      "pkcs8",
+      dariBase64(isi),
+      { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" },
+      false,
+      ["sign"]
+    );
+    const ts = capWaktuDoku();
+    const tanda = await crypto.subtle.sign(
+      "RSASSA-PKCS1-v1_5",
+      kunci,
+      new TextEncoder().encode(`${clientId}|${ts}`)
+    );
+    const res = await fetch(dasarDoku(env) + JALUR_SNAP_TOKEN, {
+      method: "POST",
+      headers: {
+        "X-CLIENT-KEY": clientId,
+        "X-TIMESTAMP": ts,
+        "X-SIGNATURE": keBase64(new Uint8Array(tanda)),
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ grantType: "client_credentials" }),
+      signal: AbortSignal.timeout(15000),
+    });
+    const data = await res.json().catch(() => null);
+    const token = String((data && data.accessToken) || "");
+    if (!token) return "";
+    tokenSnapCache = { nilai: token, kedaluwarsa: Date.now() + 10 * 60 * 1000 };
+    return token;
+  } catch (_) {
+    return "";
+  }
+}
+
+/** Panggil endpoint SNAP bertanda tangan HMAC-SHA512. */
+async function panggilSnap(env, o) {
+  const clientId = String(env.DOKU_CLIENT_ID || "").trim();
+  const secret = String(env.DOKU_SECRET_KEY || "").trim();
+  const bodyText = JSON.stringify(o.body);
+  const ts = capWaktuSnap();
+
+  const hash = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(bodyText));
+  const hex = Array.from(new Uint8Array(hash))
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+  const kunci = await crypto.subtle.importKey(
+    "raw",
+    new TextEncoder().encode(secret),
+    { name: "HMAC", hash: "SHA-512" },
+    false,
+    ["sign"]
+  );
+  const tanda = await crypto.subtle.sign(
+    "HMAC",
+    kunci,
+    new TextEncoder().encode(["POST", o.path, o.token, hex, ts].join(":"))
+  );
+
+  try {
+    const res = await fetch(dasarDoku(env) + o.path, {
+      method: "POST",
+      headers: {
+        Authorization: "Bearer " + o.token,
+        "X-PARTNER-ID": clientId,
+        "X-EXTERNAL-ID": String(Date.now()),
+        "X-TIMESTAMP": ts,
+        "X-SIGNATURE": keBase64(new Uint8Array(tanda)),
+        "CHANNEL-ID": "H2H",
+        "Content-Type": "application/json",
+      },
+      body: bodyText,
+      signal: AbortSignal.timeout(25000),
+    });
+    const data = await res.json().catch(() => null);
+    if (!res.ok) {
+      const pesan = (data && (data.responseMessage || data.message)) || `snap_http_${res.status}`;
+      return { error: String(pesan).slice(0, 160) };
+    }
+    return { data };
+  } catch (e) {
+    return { error: String((e && e.message) || e).slice(0, 160) };
+  }
+}
+
+/** Buat QRIS lewat SNAP -> { qrString, referenceNo, expiresAt } atau { error }. */
+async function buatQrisSnap(env, o) {
+  if (!qrisSiap(env)) return { error: "qris_belum_diatur" };
+  const token = await ambilTokenSnap(env);
+  if (!token) return { error: "snap_token_gagal" };
+
+  const kedaluwarsa = new Date(Date.now() + 30 * 60 * 1000)
+    .toISOString()
+    .replace(/\.\d+Z$/, "+07:00");
+
+  const badan = {
+    partnerReferenceNo: String(o.invoice).slice(0, 64),
+    amount: { value: Number(HARGA).toFixed(2), currency: "IDR" },
+    merchantId: String(env.DOKU_QRIS_MERCHANT_ID || "").trim(),
+    terminalId: String(env.DOKU_QRIS_TERMINAL_ID || "A01").trim().slice(0, 16) || "A01",
+    validityPeriod: kedaluwarsa,
+    additionalInfo: {
+      postalCode: String(env.DOKU_QRIS_POSTAL_CODE || "12190").trim(),
+      feeType: String(env.DOKU_QRIS_FEE_TYPE || "1").trim(),
+    },
+  };
+
+  const hasil = await panggilSnap(env, { path: JALUR_QRIS_GENERATE, body: badan, token });
+  if (hasil.error) return hasil;
+
+  const isi = hasil.data || {};
+  const qr = String(isi.qrContent || "").trim();
+  if (!qr) {
+    return { error: String(isi.responseMessage || "qr_kosong").slice(0, 160) };
+  }
+  return {
+    qrString: qr,
+    referenceNo: String(isi.referenceNo || ""),
+    expiresAt: String((isi.additionalInfo && isi.additionalInfo.validityPeriod) || kedaluwarsa),
+  };
+}
+
+/**
+ * Status QRIS menurut SNAP: "SUCCESS" | "PENDING" | "FAILED" | "".
+ * latestTransactionStatus berupa kode: 00 sukses, 01/02/03 masih jalan,
+ * 05/06/07 batal/gagal/tidak ditemukan.
+ */
+async function statusQrisSnap(env, invoice) {
+  if (!qrisSiap(env)) return "";
+  const token = await ambilTokenSnap(env);
+  if (!token) return "";
+
+  const hasil = await panggilSnap(env, {
+    path: JALUR_QRIS_QUERY,
+    body: {
+      originalPartnerReferenceNo: String(invoice).slice(0, 64),
+      merchantId: String(env.DOKU_QRIS_MERCHANT_ID || "").trim(),
+      serviceCode: "47",
+    },
+    token,
+  });
+  if (hasil.error) return "";
+
+  const isi = hasil.data || {};
+  const kode = String(isi.latestTransactionStatus || isi.transactionStatus || "").toUpperCase();
+  if (!kode) return "";
+  if (kode === "00" || kode === "SUCCESS") return "SUCCESS";
+  if (kode === "05" || kode === "06" || kode === "07" || kode === "FAILED" || kode === "CANCELLED") {
+    return "FAILED";
+  }
+  return "PENDING";
+}
+
+/**
+ * Kode status SNAP ("00", "05", …) -> teks status internal yang dipakai
+ * handler notifikasi (SUCCESS / PENDING / FAILED).
+ */
+function statusSnapTeks(kode) {
+  const k = String(kode || "").toUpperCase();
+  if (k === "00" || k === "SUCCESS") return "SUCCESS";
+  if (k === "05" || k === "06" || k === "07" || k === "FAILED" || k === "CANCELLED") {
+    return "FAILED";
+  }
+  return k ? "PENDING" : "";
+}
+
+/**
+ * Verifikasi notifikasi SNAP (QRIS). Skemanya sama seperti panggilan keluar,
+ * tetapi tanpa access token (notifikasi tidak membawa Bearer).
+ */
+async function notifikasiSnapSah(env, request, rawBody) {
+  const signature = request.headers.get("X-SIGNATURE") || "";
+  const timestamp = request.headers.get("X-TIMESTAMP") || "";
+  const partner = request.headers.get("X-PARTNER-ID") || "";
+  if (!signature || !timestamp) return false;
+  if (partner && !rahasiaSama(partner, String(env.DOKU_CLIENT_ID || "").trim())) return false;
+
+  const secret = String(env.DOKU_SECRET_KEY || "").trim();
+  if (!secret) return false;
+
+  const hash = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(rawBody));
+  const hex = Array.from(new Uint8Array(hash))
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+  const kunci = await crypto.subtle.importKey(
+    "raw",
+    new TextEncoder().encode(secret),
+    { name: "HMAC", hash: "SHA-512" },
+    false,
+    ["sign"]
+  );
+
+  const kandidat = [];
+  try {
+    kandidat.push(new URL(request.url).pathname);
+  } catch (_) {}
+  kandidat.push(PATH_NOTIFIKASI);
+
+  for (const target of [...new Set(kandidat)]) {
+    const baris = ["POST", target, "", hex, timestamp].join(":");
+    const tanda = await crypto.subtle.sign("HMAC", kunci, new TextEncoder().encode(baris));
+    if (rahasiaSama(keBase64(new Uint8Array(tanda)), signature)) return true;
+  }
+  return false;
+}
+
+// ---------------------------------------------------------------------------
 // Handler
 // ---------------------------------------------------------------------------
 
@@ -807,6 +1073,85 @@ export default {
       }
     }
 
+    // 1b. METODE APA YANG TERSEDIA DI HALAMAN (dibaca halaman saat dibuka)
+    if (request.method === "GET" && url.pathname === "/api/metode") {
+      return balasJson({
+        qris: qrisSiap(env),
+        harga: HARGA,
+        metode_lain: dokuSiap(env),
+      });
+    }
+
+    // 1c. BAYAR QRIS DI HALAMAN INI (QR tampil langsung, tanpa pindah situs)
+    if (request.method === "POST" && url.pathname === "/api/qris") {
+      try {
+        const body = await request.json().catch(() => ({}));
+        const customerName = String(body.name || "").trim();
+        const customerEmail = String(body.email || "").trim();
+
+        if (!customerName || !customerEmail) {
+          return balasJson({ error: "Nama dan Email wajib diisi" }, 400);
+        }
+        if (!qrisSiap(env)) {
+          return balasJson({ error: "QRIS belum siap di server." }, 503);
+        }
+
+        const orderId = "INV-" + Date.now();
+        const hasil = await buatQrisSnap(env, { invoice: orderId });
+        if (hasil.error) {
+          return balasJson({ error: "Gagal membuat QRIS: " + hasil.error }, 502);
+        }
+
+        try {
+          await env.DB.prepare(
+            "INSERT OR IGNORE INTO vouchers " +
+              "(code, batch, customer_name, customer_email, order_ref, txn_id, status, created_at) " +
+              "VALUES (?, ?, ?, ?, ?, ?, 'pending', ?)"
+          )
+            .bind(
+              orderId,
+              "qris-snap",
+              customerName,
+              customerEmail,
+              orderId,
+              hasil.referenceNo || "",
+              new Date().toISOString()
+            )
+            .run();
+        } catch (e) {
+          return balasJson({ error: "Gagal menyimpan pesanan: " + e.message }, 500);
+        }
+
+        // KABARI CRM (tidak boleh menggagalkan checkout).
+        try {
+          await fetch("https://lisensi.kibo.ai.id/webhook/internal-crm", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              event: "checkout",
+              email: customerEmail,
+              name: customerName,
+              amount: HARGA,
+              order_id: orderId,
+              source: "tokoku.kibo.ai.id",
+              metode: "QRIS",
+            }),
+            signal: AbortSignal.timeout(6000),
+          });
+        } catch (_) {}
+
+        return balasJson({
+          order_id: orderId,
+          qr_string: hasil.qrString,
+          expires_at: hasil.expiresAt,
+          payment_method: "QRIS",
+          total_payment: HARGA,
+        });
+      } catch (err) {
+        return balasJson({ error: err.message }, 500);
+      }
+    }
+
     // 2. PENGECEKAN STATUS PEMBAYARAN
     //
     // Bukan sekadar membaca database: kalau pesanan masih "pending", worker
@@ -818,7 +1163,7 @@ export default {
         if (!orderId) return balasJson({ error: "order_id wajib diisi" }, 400);
 
         const pesanan = await env.DB.prepare(
-          "SELECT code, status FROM vouchers WHERE order_ref = ?"
+          "SELECT code, status, batch FROM vouchers WHERE order_ref = ?"
         )
           .bind(orderId)
           .first();
@@ -836,10 +1181,16 @@ export default {
           });
         }
 
-        const status = await statusDoku(env, orderId);
+        // Pesanan QRIS in-app ditanyakan lewat SNAP; sisanya lewat Checkout.
+        const status =
+          String(pesanan.batch || "") === "qris-snap"
+            ? await statusQrisSnap(env, orderId)
+            : await statusDoku(env, orderId);
 
         if (status === "SUCCESS") {
-          const hasil = await lunasiPesanan(env, orderId, "", { metode: "DOKU" });
+          const hasil = await lunasiPesanan(env, orderId, "", {
+            metode: String(pesanan.batch || "") === "qris-snap" ? "QRIS" : "DOKU",
+          });
           return balasJson({
             status: hasil.ok ? "completed" : "paid_email_gagal",
             kode_terkirim: hasil.ok,
@@ -872,8 +1223,10 @@ export default {
     if (request.method === "POST" && url.pathname === PATH_NOTIFIKASI) {
       const rawPayload = await request.text();
 
-      const sah = await notifikasiDokuSah(env, request, rawPayload);
-      if (!sah) {
+      const sahBiasa = await notifikasiDokuSah(env, request, rawPayload);
+      // QRIS in-app memakai notifikasi SNAP (X-SIGNATURE / HMAC-SHA512).
+      const sahSnap = sahBiasa ? false : await notifikasiSnapSah(env, request, rawPayload);
+      if (!sahBiasa && !sahSnap) {
         // Jangan catat apa pun untuk permintaan tak sah: kalau dicatat,
         // siapa pun bisa membanjiri tabel dengan POST sampah.
         return balasJson({ error: "unauthorized" }, 401);
@@ -892,11 +1245,25 @@ export default {
         return balasJson({ error: "bad_json" }, 400);
       }
 
-      const invoice = String((payload.order && payload.order.invoice_number) || "").trim();
-      const jumlah = Number((payload.order && payload.order.amount) ?? 0);
-      const statusMasuk = String((payload.transaction && payload.transaction.status) || "").toUpperCase();
+      // Dua bentuk payload: Checkout (order/transaction) dan SNAP (datar).
+      const snap = !sahBiasa;
+      const invoice = String(
+        (payload.order && payload.order.invoice_number) ||
+          (snap ? payload.originalPartnerReferenceNo : "") ||
+          ""
+      ).trim();
+      const jumlah = Number(
+        (payload.order && payload.order.amount) ??
+          (payload.amount && payload.amount.value) ??
+          0
+      );
+      const statusMasuk = snap
+        ? statusSnapTeks(payload.latestTransactionStatus)
+        : String((payload.transaction && payload.transaction.status) || "").toUpperCase();
       const waktuBayar = (payload.transaction && payload.transaction.date) || "";
-      const kanal = (payload.channel && payload.channel.id) || (payload.service && payload.service.id) || "";
+      const kanal = snap
+        ? "QRIS"
+        : (payload.channel && payload.channel.id) || (payload.service && payload.service.id) || "";
 
       await catatKejadian(env, {
         delivery: invoice || "tanpa-invoice-" + Date.now(),

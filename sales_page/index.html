@@ -259,15 +259,18 @@
                     Scan QRIS (Bayar di Sini)
                 </button>
                 <div id="pemisah-metode" style="display: none; text-align: center; color: #94A3B8; font-size: 0.78rem; margin: 4px 0 2px 0;">atau</div>
-                <button class="cta-btn" id="btn-process-checkout" style="width: 100%; background: #F1F5F9; color: #0F172A; border: 1px solid #E2E8F0;" onclick="processCheckout()">
-                    Virtual Account / Metode Lain
+                <button class="cta-btn" id="btn-va" style="width: 100%; background: #0F6E56; color: #fff;" onclick="pilihBank()">
+                    Virtual Account (Transfer Bank)
+                </button>
+                <button class="cta-btn" id="btn-process-checkout" style="width: 100%; background: transparent; color: #64748B; font-size: 0.85rem; font-weight: 600; padding: 8px; box-shadow: none;" onclick="processCheckout()">
+                    Metode lain (e-wallet, gerai retail) di halaman DOKU
                 </button>
             </div>
 
-            <p style="font-size: 0.78rem; color: #94A3B8; margin: 14px 0 0 0; text-align: center; line-height: 1.5;">
-                QRIS langsung tampil di halaman ini — cukup scan dari bank atau e-wallet.
-                Untuk Virtual Account (BRI, BNI, Mandiri, Permata, CIMB, Danamon, BSI, Maybank, BJB, Sinarmas, BTN, BNC, DOKU)
-                Anda diarahkan ke halaman DOKU yang aman.
+            <p style="font-size: 0.78rem; color: #94A3B8; margin: 10px 0 0 0; text-align: center; line-height: 1.5;">
+                QRIS dan Virtual Account (BNI, BRI, Mandiri, CIMB, Danamon, BSI, Maybank, DOKU)
+                langsung tampil di halaman ini. Permata, BJB, Sinarmas, BTN, BNC, serta e-wallet
+                dan gerai retail tersedia lewat halaman DOKU.
             </p>
         </div>
     </div>
@@ -305,25 +308,30 @@
                 modalAsli = document.querySelector('.modal-content').innerHTML;
             }
             document.getElementById('checkoutModal').style.display = 'block';
-            // Tombol QRIS hanya muncul kalau server memang siap membuat QRIS.
+            // Tombol hanya muncul kalau server memang sanggup membuatnya.
             const m = await cekMetode();
             const btn = document.getElementById('btn-qris');
             const pisah = document.getElementById('pemisah-metode');
+            const btnVa = document.getElementById('btn-va');
             if (btn && m && m.qris) {
                 btn.style.display = 'block';
                 if (pisah) pisah.style.display = 'block';
             }
+            if (btnVa && m && !m.va) btnVa.style.display = 'none';
         }
 
         function closeModal() {
             document.getElementById('checkoutModal').style.display = 'none';
             if (window.pollInterval) clearInterval(window.pollInterval);
+            window.pembeliAktif = null;
             if (modalAsli) {
                 const wadah = document.querySelector('.modal-content');
                 wadah.innerHTML = modalAsli;
                 // Elemen hasil render ulang: pasang lagi penanganannya.
                 const btnQris = document.getElementById('btn-qris');
                 if (btnQris) btnQris.onclick = processQris;
+                const btnVa = document.getElementById('btn-va');
+                if (btnVa) btnVa.onclick = pilihBank;
                 const btnLain = document.getElementById('btn-process-checkout');
                 if (btnLain) btnLain.onclick = processCheckout;
                 if (metodeCache && metodeCache.qris && btnQris) {
@@ -331,6 +339,7 @@
                     const pisah = document.getElementById('pemisah-metode');
                     if (pisah) pisah.style.display = 'block';
                 }
+                if (metodeCache && metodeCache.va === false && btnVa) btnVa.style.display = 'none';
             }
         }
 
@@ -475,7 +484,115 @@
             } catch (_) {}
         }
 
-        // --- Virtual Account / metode lain: halaman DOKU --------------------
+        // --- Virtual Account: pilih bank, nomor VA tampil di sini -----------
+        async function pilihBank() {
+            const pembeli = ambilDataPembeli();
+            if (!pembeli) return;
+            // disimpan supaya tidak perlu mengetik ulang setelah memilih bank
+            window.pembeliAktif = pembeli;
+
+            let bank = [];
+            try {
+                const r = await fetch('/api/va/banks');
+                const d = await r.json();
+                bank = d.banks || [];
+            } catch (_) {}
+
+            if (!bank.length) {
+                alert('Virtual Account belum tersedia. Anda akan diarahkan ke halaman DOKU.');
+                return processCheckout();
+            }
+
+            const wadah = document.querySelector('.modal-content');
+            wadah.innerHTML = `
+                <span class="close-btn" onclick="closeModal()">&times;</span>
+                <h2 style="text-align: center; font-size: 1.3rem; margin-bottom: 4px;">Pilih Bank</h2>
+                <p style="text-align: center; color: #64748B; font-size: 0.85rem; margin-bottom: 14px;">
+                    Nomor Virtual Account langsung tampil di halaman ini.
+                </p>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+                    ${bank.map(function (b) {
+                        return `<button class="cta-btn" style="background: #F8FAFC; color: #0F172A; border: 1px solid #E2E8F0; font-size: 0.85rem; padding: 10px; box-shadow: none;" onclick="prosesVa('${b.id}')">${b.label}</button>`;
+                    }).join('')}
+                </div>
+                <p style="text-align: center; font-size: 0.75rem; color: #94A3B8; margin-top: 12px;">Nomor berlaku 24 jam.</p>
+            `;
+        }
+
+        async function prosesVa(bank) {
+            const pembeli = window.pembeliAktif;
+            if (!pembeli) return closeModal();
+
+            const wadah = document.querySelector('.modal-content');
+            const isiLama = wadah.innerHTML;
+            wadah.innerHTML = `<span class="close-btn" onclick="closeModal()">&times;</span>
+                <p style="text-align: center; padding: 30px 0; color: #64748B;">Menerbitkan nomor Virtual Account…</p>`;
+
+            if (typeof fbq === 'function') fbq('track', 'InitiateCheckout');
+
+            try {
+                const res = await fetch('/api/va', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name: pembeli.name, email: pembeli.email, bank: bank })
+                });
+                const data = await res.json();
+                if (!data.va_number) {
+                    wadah.innerHTML = isiLama;
+                    alert('Gagal membuat Virtual Account: ' + (data.error || 'terjadi kesalahan') +
+                          '\nSilakan pilih bank lain atau metode lain.');
+                    return;
+                }
+                tampilkanVa(data);
+            } catch (error) {
+                wadah.innerHTML = isiLama;
+                alert('Gagal menghubungi server.');
+            }
+        }
+
+        function tampilkanVa(data) {
+            const wadah = document.querySelector('.modal-content');
+            const harga = Number(data.total_payment || 0).toLocaleString('id-ID');
+            wadah.innerHTML = `
+                <span class="close-btn" onclick="closeModal()">&times;</span>
+                <h2 style="text-align: center; font-size: 1.3rem; margin-bottom: 4px;">Virtual Account ${data.bank}</h2>
+                <p style="text-align: center; color: #64748B; font-size: 0.85rem; margin-bottom: 14px;">
+                    Buka m-banking ${data.bank}, pilih <b>Transfer ke Virtual Account</b>, lalu masukkan nomor di bawah ini.
+                </p>
+                <div style="background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 14px; padding: 16px; text-align: center;">
+                    <p style="margin: 0 0 6px 0; font-size: 0.72rem; color: #64748B; letter-spacing: 0.06em;">NOMOR VIRTUAL ACCOUNT</p>
+                    <p style="margin: 0; font-size: 1.5rem; font-weight: 800; letter-spacing: 0.06em; color: #0F172A;">${data.va_number}</p>
+                    <button class="cta-btn" style="margin-top: 10px; background: #0F6E56; color: #fff; font-size: 0.82rem; padding: 8px 16px; box-shadow: none;"
+                            onclick="salinVa('${data.va_number}')">Salin Nomor</button>
+                </div>
+                <p style="text-align: center; font-size: 1.2rem; font-weight: 800; color: #0F6E56; margin: 14px 0 2px 0;">Rp ${harga}</p>
+                <p id="status-bayar" style="text-align: center; font-size: 0.85rem; color: #64748B; margin: 0 0 10px 0;">Menunggu pembayaran…</p>
+                <p style="text-align: center; font-size: 0.78rem; color: #94A3B8; margin: 0 0 12px 0;">Nomor pesanan: <b>${data.order_id}</b></p>
+                <button class="cta-btn" style="width: 100%; background: #F1F5F9; color: #0F172A; border: 1px solid #E2E8F0;"
+                        onclick="cekBayarSekarang('${data.order_id}')">Saya Sudah Bayar</button>
+                <p style="text-align: center; font-size: 0.75rem; color: #94A3B8; margin-top: 10px;">
+                    Kode lisensi dikirim ke email Anda setelah pembayaran terkonfirmasi.
+                </p>
+            `;
+            mulaiPolling(data.order_id);
+        }
+
+        function salinVa(nomor) {
+            const selesai = function () { alert('Nomor Virtual Account disalin.'); };
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(nomor).then(selesai).catch(selesai);
+                return;
+            }
+            const ta = document.createElement('textarea');
+            ta.value = nomor;
+            document.body.appendChild(ta);
+            ta.select();
+            try { document.execCommand('copy'); } catch (_) {}
+            document.body.removeChild(ta);
+            selesai();
+        }
+
+        // --- Metode lain (e-wallet, gerai retail): halaman DOKU -------------
         async function processCheckout() {
             const pembeli = ambilDataPembeli();
             if (!pembeli) return;

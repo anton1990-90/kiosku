@@ -28,7 +28,9 @@ create table if not exists vouchers (
   status         text not null default 'unused', -- unused | used | revoked
   license_code   text,                           -- Kode Aktivasi hasil penukaran (AK-...)
   created_at     text not null,
-  used_at        text
+  used_at        text,
+  va_number      text not null default '',       -- nomor VA (pembayaran in-app)
+  va_bank        text not null default ''        -- bank VA, mis. "BNI"
 );
 
 create index if not exists vouchers_status_idx on vouchers (status);

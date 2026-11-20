@@ -723,6 +723,99 @@ async function notifikasiDokuSah(env, request, rawBody) {
 }
 
 // ---------------------------------------------------------------------------
+// Virtual Account lewat Direct API (non-SNAP)
+// ---------------------------------------------------------------------------
+//
+// Endpoint per bank di bawah mengembalikan NOMOR VA langsung di respons, jadi
+// nomornya bisa ditampilkan di halaman kita sendiri — pembeli tidak perlu
+// pindah ke halaman DOKU. Jalur ini yang dipakai HotspotKu sejak lama dengan
+// kredensial produksi akun merchant yang sama.
+//
+// BNI menuntut tambahan `merchant_unique_reference` berisi ANGKA < 13 digit.
+
+// Hanya bank yang endpoint non-SNAP-nya BENAR-BENAR hidup di akun merchant ini
+// (diuji langsung ke api.doku.com, 20 Nov 2026 — masing-masing menerbitkan
+// nomor VA asli). Permata, BJB, Sinarmas, BNC, dan BTN tidak punya endpoint
+// non-SNAP: semuanya lewat SNAP yang menuntut partnerServiceId khusus per
+// bank, jadi kelimanya tetap dilayani halaman DOKU (DOKU_PAYMENT_METHODS).
+const VA_LANGSUNG = {
+  bni: { path: "/bni-virtual-account/v2/payment-code", bank: "BNI", butuhReferensi: true },
+  bri: { path: "/bri-virtual-account/v2/payment-code", bank: "BRI" },
+  mandiri: { path: "/mandiri-virtual-account/v2/payment-code", bank: "Mandiri" },
+  cimb: { path: "/cimb-virtual-account/v2/payment-code", bank: "CIMB Niaga" },
+  danamon: { path: "/danamon-virtual-account/v2/payment-code", bank: "Danamon" },
+  bsi: { path: "/bsm-virtual-account/v2/payment-code", bank: "BSI" },
+  maybank: { path: "/maybank-virtual-account/v2/payment-code", bank: "Maybank" },
+  doku: { path: "/doku-virtual-account/v2/payment-code", bank: "DOKU" },
+};
+
+/** Angka acak < 13 digit untuk merchant_unique_reference (wajib di BNI). */
+function referensiUnik() {
+  return String(Date.now()).slice(-10) + String(Math.floor(Math.random() * 100)).padStart(2, "0");
+}
+
+/** Buat VA di DOKU -> { vaNumber, bank, expiredAt } atau { error }. */
+async function buatVaDoku(env, o) {
+  if (!dokuSiap(env)) return { error: "doku_belum_diatur" };
+
+  const kunci = String(o.bank || "").toLowerCase();
+  const kanal = VA_LANGSUNG[kunci];
+  if (!kanal) return { error: "bank_tidak_dikenal" };
+
+  const vaInfo = {
+    expired_time: 1440,
+    reusable_status: false,
+    info1: "TokoKu POS",
+    info2: "Lisensi",
+    info3: "Terima kasih",
+  };
+  if (kanal.butuhReferensi) vaInfo.merchant_unique_reference = referensiUnik();
+
+  const body = {
+    order: { invoice_number: o.invoice, amount: HARGA },
+    virtual_account_info: vaInfo,
+    customer: { name: o.nama, email: o.email },
+    additional_info: { integration: { name: "tokoku", version: "1.0.0" } },
+  };
+
+  const rawBody = JSON.stringify(body);
+  try {
+    const res = await fetch(`${dasarDoku(env)}${kanal.path}`, {
+      method: "POST",
+      headers: await headerDoku(env, { target: kanal.path, rawBody }),
+      body: rawBody,
+      signal: AbortSignal.timeout(25000),
+    });
+    const data = await res.json().catch(() => null);
+
+    if (!res.ok || !data) {
+      const mentah =
+        (data && data.error && data.error.message) ||
+        (data && data.message) ||
+        `doku_http_${res.status}`;
+      const pesan = Array.isArray(mentah) ? mentah.join(", ") : String(mentah);
+      return { error: pesan.slice(0, 160) };
+    }
+
+    const info = data.virtual_account_info || {};
+    const nomor = String(info.virtual_account_number || "").trim();
+    if (!nomor) {
+      const mentah = (data.error && data.error.message) || data.message || "";
+      const pesan = Array.isArray(mentah) ? mentah.join(", ") : String(mentah);
+      return { error: (pesan || "va_kosong").slice(0, 160) };
+    }
+
+    return {
+      vaNumber: nomor,
+      bank: kanal.bank,
+      expiredAt: String(info.expired_date || ""),
+    };
+  } catch (e) {
+    return { error: String((e && e.message) || e).slice(0, 160) };
+  }
+}
+
+// ---------------------------------------------------------------------------
 // DOKU SNAP — QRIS MPM (QR digambar di halaman kita, tanpa pindah ke DOKU)
 // ---------------------------------------------------------------------------
 //
@@ -1077,9 +1170,93 @@ export default {
     if (request.method === "GET" && url.pathname === "/api/metode") {
       return balasJson({
         qris: qrisSiap(env),
+        va: dokuSiap(env),
         harga: HARGA,
         metode_lain: dokuSiap(env),
       });
+    }
+
+    // 1c2. DAFTAR BANK UNTUK VIRTUAL ACCOUNT
+    if (request.method === "GET" && url.pathname === "/api/va/banks") {
+      const bank = Object.keys(VA_LANGSUNG).map((id) => ({
+        id,
+        label: VA_LANGSUNG[id].bank,
+      }));
+      return balasJson({ banks: dokuSiap(env) ? bank : [] });
+    }
+
+    // 1c3. BAYAR VIRTUAL ACCOUNT DI HALAMAN INI (nomor VA tampil langsung)
+    if (request.method === "POST" && url.pathname === "/api/va") {
+      try {
+        const body = await request.json().catch(() => ({}));
+        const customerName = String(body.name || "").trim();
+        const customerEmail = String(body.email || "").trim();
+        const bank = String(body.bank || "").trim().toLowerCase();
+
+        if (!customerName || !customerEmail) {
+          return balasJson({ error: "Nama dan Email wajib diisi" }, 400);
+        }
+        if (!bank) return balasJson({ error: "Bank wajib dipilih" }, 400);
+
+        const orderId = "INV-" + Date.now();
+        const hasil = await buatVaDoku(env, {
+          invoice: orderId,
+          nama: customerName,
+          email: customerEmail,
+          bank,
+        });
+        if (hasil.error) {
+          return balasJson({ error: "Gagal membuat Virtual Account: " + hasil.error }, 502);
+        }
+
+        try {
+          await env.DB.prepare(
+            "INSERT OR IGNORE INTO vouchers " +
+              "(code, batch, customer_name, customer_email, order_ref, txn_id, status, created_at, va_number, va_bank) " +
+              "VALUES (?, 'va-direct', ?, ?, ?, '', 'pending', ?, ?, ?)"
+          )
+            .bind(
+              orderId,
+              customerName,
+              customerEmail,
+              orderId,
+              new Date().toISOString(),
+              hasil.vaNumber,
+              hasil.bank
+            )
+            .run();
+        } catch (e) {
+          return balasJson({ error: "Gagal menyimpan pesanan: " + e.message }, 500);
+        }
+
+        try {
+          await fetch("https://lisensi.kibo.ai.id/webhook/internal-crm", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              event: "checkout",
+              email: customerEmail,
+              name: customerName,
+              amount: HARGA,
+              order_id: orderId,
+              source: "tokoku.kibo.ai.id",
+              metode: "VA " + hasil.bank,
+            }),
+            signal: AbortSignal.timeout(6000),
+          });
+        } catch (_) {}
+
+        return balasJson({
+          order_id: orderId,
+          va_number: hasil.vaNumber,
+          bank: hasil.bank,
+          expires_at: hasil.expiredAt,
+          payment_method: "VA " + hasil.bank,
+          total_payment: HARGA,
+        });
+      } catch (err) {
+        return balasJson({ error: err.message }, 500);
+      }
     }
 
     // 1c. BAYAR QRIS DI HALAMAN INI (QR tampil langsung, tanpa pindah situs)
@@ -1163,7 +1340,7 @@ export default {
         if (!orderId) return balasJson({ error: "order_id wajib diisi" }, 400);
 
         const pesanan = await env.DB.prepare(
-          "SELECT code, status, batch FROM vouchers WHERE order_ref = ?"
+          "SELECT code, status, batch, va_bank FROM vouchers WHERE order_ref = ?"
         )
           .bind(orderId)
           .first();
@@ -1188,9 +1365,14 @@ export default {
             : await statusDoku(env, orderId);
 
         if (status === "SUCCESS") {
-          const hasil = await lunasiPesanan(env, orderId, "", {
-            metode: String(pesanan.batch || "") === "qris-snap" ? "QRIS" : "DOKU",
-          });
+          const batch = String(pesanan.batch || "");
+          const metodeLunas =
+            batch === "qris-snap"
+              ? "QRIS"
+              : batch === "va-direct"
+                ? "VA " + String(pesanan.va_bank || "").trim()
+                : "DOKU";
+          const hasil = await lunasiPesanan(env, orderId, "", { metode: metodeLunas });
           return balasJson({
             status: hasil.ok ? "completed" : "paid_email_gagal",
             kode_terkirim: hasil.ok,
